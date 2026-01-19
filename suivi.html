@@ -1,356 +1,228 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Suivi des demandes (HAL / Communication)</title>
+  <meta charset="utf-8">
+  <title>Déclarations – Laboratoire</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
   <style>
-    :root{
-      --bg:#f5f5f8; --card:#fff; --text:#222; --muted:#666; --border:#ddd;
-      --accent:#2c7be5; --ok:#1b7c3a; --warn:#b26a00; --bad:#b32020;
+    :root {
+      --bg:#f5f5f8; --card:#fff; --accent:#2c7be5;
+      --accent-soft:#e1ecff; --text:#222; --muted:#666; --border:#ddd;
     }
     *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--text)}
-    .wrap{max-width:1100px;margin:28px auto;padding:0 16px}
-    header{display:flex;gap:14px;align-items:flex-end;justify-content:space-between;flex-wrap:wrap}
-    h1{margin:0;font-size:1.45rem}
-    .sub{margin:6px 0 0;color:var(--muted);font-size:.92rem}
-    .pill{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#fff;font-size:.85rem;color:var(--muted)}
-    .bar{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px}
-    .controls{display:grid;grid-template-columns: 1.2fr 1fr 1fr 1fr;gap:10px}
-    @media (max-width: 900px){ .controls{grid-template-columns:1fr 1fr} }
-    @media (max-width: 520px){ .controls{grid-template-columns:1fr} }
-    input,select,button{
-      font:inherit;padding:9px 10px;border-radius:10px;border:1px solid var(--border);background:#fff
-    }
-    button{cursor:pointer}
-    button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:650}
-    button.ghost{background:#fff}
-    .stats{display:flex;gap:10px;flex-wrap:wrap}
-    .stat{min-width:160px}
-    .stat b{display:block;font-size:1.05rem}
-    .stat span{color:var(--muted);font-size:.85rem}
+    body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text)}
+    .page{max-width:900px;margin:32px auto;padding:0 16px}
+    header{margin-bottom:18px}
+    h1{margin:0 0 6px;font-size:1.7rem;font-weight:650}
+    .subtitle{margin:0;color:var(--muted);font-size:.95rem}
 
-    table{width:100%;border-collapse:separate;border-spacing:0;margin-top:12px}
-    th,td{padding:10px 10px;border-bottom:1px solid var(--border);vertical-align:top}
-    th{font-size:.82rem;color:var(--muted);text-align:left;white-space:nowrap}
-    td{font-size:.92rem}
-    .title a{color:inherit;text-decoration:none}
-    .title a:hover{text-decoration:underline}
-    .muted{color:var(--muted)}
-    .tag{
-      display:inline-flex;align-items:center;gap:6px;
-      padding:4px 8px;border-radius:999px;border:1px solid var(--border);
-      font-size:.82rem;background:#fff;white-space:nowrap
+    .switcher{display:flex;gap:8px;margin:18px 0 14px}
+    .switcher button{
+      flex:1;border-radius:999px;border:1px solid var(--border);
+      background:#fff;padding:10px 16px;font-size:.95rem;cursor:pointer;
+      display:inline-flex;justify-content:center;align-items:center;gap:8px;
     }
-    .tag.ok{border-color:rgba(27,124,58,.35);background:rgba(27,124,58,.08);color:var(--ok)}
-    .tag.warn{border-color:rgba(178,106,0,.35);background:rgba(178,106,0,.08);color:var(--warn)}
-    .tag.bad{border-color:rgba(179,32,32,.35);background:rgba(179,32,32,.08);color:var(--bad)}
-    .mini{font-size:.82rem}
-    .right{white-space:nowrap}
+    .switcher button.active{background:var(--accent-soft);border-color:var(--accent)}
+    .hint{color:var(--muted);font-size:.9rem;margin:0 0 14px}
 
-    .statusline{margin-top:10px;color:var(--muted);font-size:.9rem;white-space:pre-wrap}
-    .loading{display:inline-flex;gap:8px;align-items:center}
-    .dot{width:8px;height:8px;border-radius:99px;background:var(--accent);display:inline-block;animation:pulse 1s infinite ease-in-out}
-    .dot:nth-child(2){animation-delay:.15s}
-    .dot:nth-child(3){animation-delay:.3s}
-    @keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
+    form{background:var(--card);padding:18px;border-radius:10px;border:1px solid var(--border)}
+    label{display:block;margin:0 0 10px;font-weight:600;font-size:.9rem}
+    label span{display:block;margin:0 0 3px}
+    input,select,textarea{
+      width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);
+      font:inherit;background:#fff
+    }
+    textarea{resize:vertical}
+
+    .two-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px 16px}
+
+    button[type="submit"]{
+      margin-top:8px;padding:8px 16px;border-radius:999px;border:none;
+      background:var(--accent);color:#fff;font-weight:700;cursor:pointer
+    }
+    button[disabled]{opacity:.7;cursor:default}
+
+    .status{margin-top:8px;font-size:.9rem;white-space:pre-wrap}
+    .status.ok{color:#1b7c3a}
+    .status.err{color:#b32020}
+
+    .authors-title{font-weight:700;margin:10px 0 6px}
+    .author-row{border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px}
+    .btn-secondary{border-radius:999px;border:1px solid var(--border);background:#fff;padding:6px 12px;cursor:pointer}
+    .small-muted{color:var(--muted);font-size:.85rem;margin-left:8px}
+
+    .opts {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin: 12px 0;
+      background: #fff;
+    }
+    .opts h3 {
+      margin: 0 0 8px;
+      font-size: .95rem;
+    }
+    .opts p {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: .85rem;
+    }
+
+    footer{margin-top:18px;color:var(--muted);font-size:.8rem}
   </style>
 </head>
+
 <body>
-  <div class="wrap">
+  <div class="page">
     <header>
-      <div>
-        <h1>Suivi public — HAL & Communication</h1>
-        <p class="sub">
-          Ce tableau montre les demandes issues des déclarations (Zotero) et l’état de traitement par le laboratoire.
-        </p>
-      </div>
-      <div class="pill" id="lastUpdate">Chargement…</div>
-    </header>
+  <h1>Déclarations du laboratoire</h1>
+  <p class="subtitle">Les données sont envoyées automatiquement dans Zotero.</p>
 
-    <div class="bar">
-      <div class="card" style="flex:1;min-width:260px">
-        <div class="controls">
-          <input id="q" type="search" placeholder="Rechercher (titre, auteur, éditeur, ISBN…)" />
-          <select id="filterType">
-            <option value="all">Tous types</option>
-            <option value="book">Livres</option>
-            <option value="bookSection">Chapitres</option>
-          </select>
-          <select id="filterNeeds">
-            <option value="all">Toutes demandes</option>
-            <option value="needsAction">À traiter</option>
-            <option value="halYes">HAL demandé</option>
-            <option value="commsYes">Com demandé</option>
-          </select>
-          <select id="filterYear">
-            <option value="all">Toutes années</option>
-          </select>
+  <p style="margin-top:8px;font-size:.9rem">
+    📊
+    <a href="/suivi.html" target="_blank" rel="noopener noreferrer"
+       style="color:var(--accent);text-decoration:none;font-weight:600">
+      Voir le suivi public des demandes (HAL & communication)
+    </a>
+  </p>
+</header>
 
-          <button class="ghost" id="reset">Réinitialiser</button>
-          <button class="primary" id="refresh">Rafraîchir</button>
-        </div>
 
-        <div class="statusline" id="msg"></div>
-
-        <div class="stats" style="margin-top:12px">
-          <div class="stat">
-            <b id="sTotal">—</b><span>items (livres + chapitres)</span>
-          </div>
-          <div class="stat">
-            <b id="sNeed">—</b><span>à traiter (HAL ou com demandés)</span>
-          </div>
-          <div class="stat">
-            <b id="sHal">—</b><span>HAL demandés</span>
-          </div>
-          <div class="stat">
-            <b id="sComms">—</b><span>Communications demandées</span>
-          </div>
-        </div>
-      </div>
+    <div class="switcher">
+      <button type="button" class="active">Nouvelle publication</button>
     </div>
 
-    <div class="card">
-      <table>
-        <thead>
-          <tr>
-            <th style="width:90px">Date</th>
-            <th style="width:90px">Type</th>
-            <th>Titre</th>
-            <th style="width:220px">Auteur(s)</th>
-            <th style="width:140px">HAL</th>
-            <th style="width:170px">Communication</th>
-            <th style="width:140px">Statut</th>
-          </tr>
-        </thead>
-        <tbody id="rows">
-          <tr><td colspan="7">
-            <span class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span> Chargement des données…</span>
-          </td></tr>
-        </tbody>
-      </table>
-    </div>
+    <p class="hint">Choisissez le type (Livre / Chapitre), puis remplissez les champs requis.</p>
 
-    <p class="sub" style="margin-top:12px">
-      Astuce : si vous voyez “HAL demandé” ou “Communication demandée”, le labo traite les demandes dans l’ordre (priorité aux échéances).
-    </p>
+    <form id="pub-form">
+      <label>
+        <span>Type de publication *</span>
+        <select name="pubType" id="pubType">
+          <option value="book">Livre</option>
+          <option value="bookSection">Chapitre d’ouvrage</option>
+        </select>
+      </label>
+
+      <label>
+        <span>Title *</span>
+        <input name="title" required>
+      </label>
+
+      <div class="authors-title">Author(s) *</div>
+      <div id="authors-list"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin:8px 0 12px">
+        <button type="button" id="add-author-btn" class="btn-secondary">+ Ajouter un auteur</button>
+        <span class="small-muted">Prénom/Nom (minimum : un auteur)</span>
+      </div>
+
+      <!-- ====== CHAMPS LIVRE ====== -->
+      <div id="book-fields">
+        <div class="two-cols">
+          <label><span>Date *</span><input name="date" placeholder="2024 ou 2024-06-15"></label>
+          <label><span>Language</span><input name="language" placeholder="fr / en"></label>
+        </div>
+
+        <div class="two-cols">
+          <label><span>Publisher *</span><input name="publisher"></label>
+          <label><span>Place *</span><input name="place"></label>
+        </div>
+
+        <label><span>ISBN</span><input name="isbn" placeholder="978-..."></label>
+        <label><span>Abstract</span><textarea name="abstract" rows="4"></textarea></label>
+      </div>
+
+      <!-- ====== CHAMPS CHAPITRE ====== -->
+      <div id="section-fields" style="display:none">
+        <label><span>Book Title *</span><input name="bookTitle"></label>
+
+        <div class="two-cols">
+          <label><span>Pages</span><input name="pages" placeholder="123-145"></label>
+          <label><span>Edition</span><input name="edition"></label>
+        </div>
+
+        <div class="two-cols">
+          <label><span>Series</span><input name="series"></label>
+          <label><span>Series Number</span><input name="seriesNumber"></label>
+        </div>
+
+        <div class="two-cols">
+          <label><span>Volume</span><input name="volume"></label>
+          <label><span>Date *</span><input name="sectionDate" placeholder="2024 ou 2024-06-15"></label>
+        </div>
+
+        <div class="two-cols">
+          <label><span>Publisher *</span><input name="sectionPublisher"></label>
+          <label><span>Place *</span><input name="sectionPlace"></label>
+        </div>
+
+        <label><span>ISBN</span><input name="sectionIsbn" placeholder="978-..."></label>
+      </div>
+
+      <!-- ====== OPTIONS (HAL / COMMS) ====== -->
+      <div class="opts">
+        <h3>Options</h3>
+        <p>Ces choix seront enregistrés dans Zotero (champ “Extra”).</p>
+
+        <div class="two-cols">
+          <label>
+            <span>Souhaitez-vous la création d’une notice sur HAL ? *</span>
+            <select name="optHal" required>
+              <option value="">— Choisir —</option>
+              <option value="yes">Oui</option>
+              <option value="no">Non</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Souhaitez-vous une communication (newsletter + réseaux sociaux) ? *</span>
+            <select name="optComms" required>
+              <option value="">— Choisir —</option>
+              <option value="yes">Oui</option>
+              <option value="no">Non</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <label>
+        <span>Extra</span>
+        <textarea name="extra" rows="4" placeholder="Infos internes, HAL, projet, axe, etc."></textarea>
+      </label>
+
+      <button type="submit">Envoyer vers Zotero</button>
+      <p id="pub-status" class="status"></p>
+
+      <footer>Les champs marqués d’un * sont obligatoires.</footer>
+    </form>
   </div>
 
-  <script>
-    // --- State ---
-    let ALL = [];
-    let VIEW = [];
-
-    // --- Helpers ---
-    const $ = (id) => document.getElementById(id);
-
-    function norm(s){
-      return (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-    }
-
-    function typeLabel(t){
-      if (t === 'book') return 'Livre';
-      if (t === 'bookSection') return 'Chapitre';
-      return t || '';
-    }
-
-    function yearFromDate(dateStr){
-      const m = (dateStr || '').match(/\b(19|20)\d{2}\b/);
-      return m ? m[0] : '';
-    }
-
-    function joinCreators(creators){
-      if (!Array.isArray(creators)) return '';
-      const names = creators
-        .filter(c => c && (c.creatorType === 'author' || c.creatorType === 'editor' || c.creatorType === 'presenter'))
-        .map(c => {
-          const fn = (c.firstName || '').trim();
-          const ln = (c.lastName || '').trim();
-          return (ln && fn) ? (ln + ' ' + fn) : (ln || fn);
-        })
-        .filter(Boolean);
-      return names.join(', ');
-    }
-
-    function tagYesNo(val){
-      if (val === 'yes') return { txt:'Oui', cls:'ok' };
-      if (val === 'no') return { txt:'Non', cls:'' };
-      return { txt:'—', cls:'' };
-    }
-
-    function statusFor(item){
-      // item.flags: { hal_create, comms_publish, hal_done, comms_done }
-      const f = item.flags || {};
-      const halWanted = f.hal_create === 'yes';
-      const commWanted = f.comms_publish === 'yes';
-      const halDone = f.hal_done === 'yes';
-      const commDone = f.comms_done === 'yes';
-
-      if (!halWanted && !commWanted) return { txt:'Non demandé', cls:'' };
-
-      const needHal = halWanted && !halDone;
-      const needCom = commWanted && !commDone;
-
-      if (needHal || needCom) return { txt:'À traiter', cls:'warn' };
-      return { txt:'Traité', cls:'ok' };
-    }
-
-    function render(){
-      // Filters
-      const q = norm($('q').value);
-      const fType = $('filterType').value;
-      const fNeeds = $('filterNeeds').value;
-      const fYear = $('filterYear').value;
-
-      VIEW = ALL.filter(it => {
-        if (fType !== 'all' && it.itemType !== fType) return false;
-
-        const y = it.year || '';
-        if (fYear !== 'all' && y !== fYear) return false;
-
-        const flags = it.flags || {};
-        const st = statusFor(it);
-
-        if (fNeeds === 'needsAction' && st.txt !== 'À traiter') return false;
-        if (fNeeds === 'halYes' && flags.hal_create !== 'yes') return false;
-        if (fNeeds === 'commsYes' && flags.comms_publish !== 'yes') return false;
-
-        if (!q) return true;
-        const hay = norm([
-          it.title, it.bookTitle, it.publisher, it.place, it.isbn,
-          it.creatorsText
-        ].filter(Boolean).join(' | '));
-        return hay.includes(q);
-      });
-
-      // Stats
-      $('sTotal').textContent = VIEW.length;
-      const need = VIEW.filter(it => statusFor(it).txt === 'À traiter').length;
-      $('sNeed').textContent = need;
-      $('sHal').textContent = VIEW.filter(it => (it.flags?.hal_create === 'yes')).length;
-      $('sComms').textContent = VIEW.filter(it => (it.flags?.comms_publish === 'yes')).length;
-
-      // Rows
-      const tbody = $('rows');
-      tbody.innerHTML = '';
-
-      if (!VIEW.length){
-        tbody.innerHTML = `<tr><td colspan="7" class="muted">Aucun résultat avec ces filtres.</td></tr>`;
-        return;
-      }
-
-      // Sort: newest year/date first
-      VIEW.sort((a,b) => {
-        const ay = parseInt(a.year || '0', 10);
-        const by = parseInt(b.year || '0', 10);
-        if (by !== ay) return by - ay;
-        return (b.date || '').localeCompare(a.date || '');
-      });
-
-      for (const it of VIEW){
-        const st = statusFor(it);
-        const hal = tagYesNo(it.flags?.hal_create);
-        const comms = tagYesNo(it.flags?.comms_publish);
-
-        const halDone = it.flags?.hal_done === 'yes';
-        const commDone = it.flags?.comms_done === 'yes';
-
-        const halTxt = halDone ? 'Demandé (traité)' : (hal.txt === 'Oui' ? 'Demandé' : hal.txt);
-        const commTxt = commDone ? 'Demandé (traité)' : (comms.txt === 'Oui' ? 'Demandé' : comms.txt);
-
-        const title = it.title || '(sans titre)';
-        const titleHtml = it.zoteroUrl
-          ? `<a href="${it.zoteroUrl}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a>`
-          : escapeHtml(title);
-
-        const extraMini = it.bookTitle ? `<div class="mini muted">Dans : ${escapeHtml(it.bookTitle)}</div>` : '';
-
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="right">${escapeHtml(it.year || '')}</td>
-          <td><span class="tag">${escapeHtml(typeLabel(it.itemType))}</span></td>
-          <td class="title">${titleHtml}${extraMini}</td>
-          <td>${escapeHtml(it.creatorsText || '')}</td>
-          <td>
-            <span class="tag ${hal.cls}">${escapeHtml(halTxt)}</span>
-          </td>
-          <td>
-            <span class="tag ${comms.cls}">${escapeHtml(commTxt)}</span>
-          </td>
-          <td><span class="tag ${st.cls}">${escapeHtml(st.txt)}</span></td>
-        `;
-        tbody.appendChild(tr);
-      }
-    }
-
-    function escapeHtml(str){
-      return String(str || '')
-        .replaceAll('&','&amp;')
-        .replaceAll('<','&lt;')
-        .replaceAll('>','&gt;')
-        .replaceAll('"','&quot;')
-        .replaceAll("'","&#039;");
-    }
-
-    function fillYears(items){
-      const years = [...new Set(items.map(i => i.year).filter(Boolean))].sort((a,b)=>b.localeCompare(a));
-      const sel = $('filterYear');
-      const cur = sel.value;
-      sel.innerHTML = `<option value="all">Toutes années</option>` + years.map(y => `<option value="${y}">${y}</option>`).join('');
-      sel.value = years.includes(cur) ? cur : 'all';
-    }
-
-    async function load(){
-      $('msg').textContent = '';
-      $('rows').innerHTML = `<tr><td colspan="7"><span class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span> Chargement des données…</span></td></tr>`;
-
-      try{
-        const r = await fetch('/.netlify/functions/public-suivi', { cache: 'no-store' });
-        const data = await r.json();
-
-        if (!r.ok) {
-          $('msg').textContent = 'Erreur de chargement.';
-          $('rows').innerHTML = `<tr><td colspan="7" class="muted">Erreur côté serveur.</td></tr>`;
-          return;
+  <script src="assets/app.js"></script>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+<script>
+  // Initialise le widget
+  if (window.netlifyIdentity) {
+    window.netlifyIdentity.on("init", (user) => {
+      // Si on arrive via un lien d'invitation / confirmation, Netlify met souvent un hash dans l’URL
+      // On ouvre le widget automatiquement pour permettre la création/validation.
+      if (!user) {
+        const h = window.location.hash || "";
+        if (h.includes("invite_token") || h.includes("confirmation_token") || h.includes("recovery_token")) {
+          window.netlifyIdentity.open();
         }
-
-        ALL = (data.items || []).map(it => {
-          const y = it.year || yearFromDate(it.date);
-          return {
-            ...it,
-            year: y || '',
-            creatorsText: it.creatorsText || joinCreators(it.creators || []),
-          };
-        });
-
-        fillYears(ALL);
-
-        const ts = data.fetchedAt ? new Date(data.fetchedAt) : new Date();
-        $('lastUpdate').textContent = `Dernière mise à jour : ${ts.toLocaleString('fr-FR')}`;
-
-        render();
-      } catch(err){
-        console.error(err);
-        $('msg').textContent = 'Erreur réseau.';
-        $('rows').innerHTML = `<tr><td colspan="7" class="muted">Impossible de charger les données.</td></tr>`;
       }
-    }
-
-    // Events
-    ['q','filterType','filterNeeds','filterYear'].forEach(id => $(id).addEventListener('input', render));
-    $('reset').addEventListener('click', () => {
-      $('q').value = '';
-      $('filterType').value = 'all';
-      $('filterNeeds').value = 'all';
-      $('filterYear').value = 'all';
-      render();
     });
-    $('refresh').addEventListener('click', load);
+    window.netlifyIdentity.init();
+  }
+</script>
+<script>
+  (function(){
+    var h = window.location.hash || "";
+    if (h.includes("invite_token=") || h.includes("confirmation_token=") || h.includes("recovery_token=") || h.includes("email_change_token=")) {
+      window.location.replace("/auth.html" + h);
+    }
+  })();
+</script>
 
-    // Start
-    load();
-  </script>
 </body>
 </html>
