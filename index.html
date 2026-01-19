@@ -15,9 +15,7 @@
       --border: #dddddd;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -32,9 +30,7 @@
       padding: 0 16px;
     }
 
-    header {
-      margin-bottom: 24px;
-    }
+    header { margin-bottom: 24px; }
 
     h1 {
       margin: 0 0 8px;
@@ -72,9 +68,7 @@
       transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
     }
 
-    .switcher button span.emoji {
-      font-size: 1.2rem;
-    }
+    .switcher button span.emoji { font-size: 1.2rem; }
 
     .switcher button.active {
       border-color: var(--accent);
@@ -82,9 +76,7 @@
       box-shadow: 0 0 0 1px rgba(44, 123, 229, 0.2);
     }
 
-    .switcher button:hover:not(.active) {
-      background: #f0f2f7;
-    }
+    .switcher button:hover:not(.active) { background: #f0f2f7; }
 
     .hint {
       font-size: 0.9rem;
@@ -93,13 +85,8 @@
     }
 
     /* Sections / formulaires */
-    .section {
-      display: none;
-    }
-
-    .section.visible {
-      display: block;
-    }
+    .section { display: none; }
+    .section.visible { display: block; }
 
     form {
       background: var(--card);
@@ -140,16 +127,47 @@
       border: 1px solid var(--border);
       font: inherit;
       margin: 0;
+      background: #fff;
     }
 
-    textarea {
-      resize: vertical;
-    }
+    textarea { resize: vertical; }
 
     .two-cols {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 10px 16px;
+    }
+
+    .subtle-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: flex-start;
+      margin-top: 6px;
+      margin-bottom: 12px;
+    }
+
+    .btn-secondary {
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      padding: 8px 12px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      color: var(--text-main);
+    }
+
+    .btn-secondary:hover { background: #f0f2f7; }
+
+    .btn-link {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 0;
+      font: inherit;
+      text-decoration: underline;
+      text-underline-offset: 2px;
     }
 
     button[type="submit"] {
@@ -167,26 +185,41 @@
       gap: 6px;
     }
 
-    button[type="submit"]:disabled {
-      opacity: 0.75;
-      cursor: default;
-    }
+    button[type="submit"]:disabled { opacity: 0.75; cursor: default; }
 
     .status {
       margin-top: 6px;
       font-size: 0.85rem;
+      white-space: pre-wrap;
     }
-    .status.ok {
-      color: #1b7c3a;
-    }
-    .status.err {
-      color: #b32020;
-    }
+    .status.ok { color: #1b7c3a; }
+    .status.err { color: #b32020; }
 
     footer {
       margin-top: 24px;
       font-size: 0.8rem;
       color: var(--text-muted);
+    }
+
+    /* Bloc auteurs */
+    .authors-title {
+      margin: 8px 0 6px;
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    .author-row {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 10px;
+      background: #fff;
+    }
+
+    .author-row .row-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 6px;
     }
   </style>
 </head>
@@ -218,144 +251,91 @@
       Cliquez sur un bouton ci-dessus pour afficher le formulaire correspondant. Seuls quelques champs sont obligatoires.
     </p>
 
-    <!-- SECTION PUBLICATION -->
+    <!-- SECTION PUBLICATION : LIVRE -->
     <section id="pub-section" class="section visible">
-  <form id="pub-form">
-    <h2>Nouvelle publication (Livre)</h2>
-    <p class="description">
-      Déclarez un livre. Les informations sont envoyées vers Zotero.
-    </p>
+      <form id="pub-form">
+        <h2>Nouvelle publication (Livre)</h2>
+        <p class="description">
+          Déclarez un livre. Les informations sont envoyées vers Zotero.
+        </p>
 
-    <label>
-      <span>Title *</span>
-      <input name="title" required>
-    </label>
+        <label>
+          <span>Title *</span>
+          <input name="title" required>
+        </label>
 
-   <div class="authors-block">
-  <label>
-    <span>Author(s) *</span>
-  </label>
+        <div class="authors-title">Author(s) *</div>
+        <div id="authors-list"></div>
 
-  <div id="authors-list"></div>
+        <div class="subtle-actions">
+          <button type="button" id="add-author-btn" class="btn-secondary">+ Ajouter un auteur</button>
+          <span style="color:var(--text-muted); font-size:0.85rem;">Prénom/Nom (minimum : un auteur)</span>
+        </div>
 
-  <div style="display:flex; gap:8px; align-items:center;">
-    <button type="button" id="add-author-btn" style="background:#fff;border:1px solid var(--border);color:var(--text-main);border-radius:999px;padding:8px 12px;cursor:pointer;">
-      + Ajouter un auteur
-    </button>
-    <span style="color:var(--text-muted); font-size:0.85rem;">Vous pouvez ajouter plusieurs auteurs.</span>
-  </div>
-</div>
+        <div class="two-cols">
+          <label>
+            <span>Date *</span>
+            <input name="date" placeholder="2025 ou 2025-03-15" required>
+          </label>
 
+          <label>
+            <span>Language</span>
+            <select name="language">
+              <option value="">(non renseigné)</option>
+              <option value="fr">fr</option>
+              <option value="en">en</option>
+              <option value="es">es</option>
+              <option value="de">de</option>
+              <option value="it">it</option>
+            </select>
+          </label>
+        </div>
 
-    <div class="two-cols">
-      <label>
-        <span>Date *</span>
-        <input name="date" placeholder="2025 ou 2025-03-15" required>
-      </label>
+        <div class="two-cols">
+          <label>
+            <span>Publisher *</span>
+            <input name="publisher" required>
+          </label>
 
-      <label>
-        <span>Language</span>
-        <select name="language">
-          <option value="">(non renseigné)</option>
-          <option value="fr">fr</option>
-          <option value="en">en</option>
-          <option value="es">es</option>
-          <option value="de">de</option>
-          <option value="it">it</option>
-        </select>
-      </label>
-    </div>
+          <label>
+            <span>Place *</span>
+            <input name="place" required>
+          </label>
+        </div>
 
-    <div class="two-cols">
-      <label>
-        <span>Publisher *</span>
-        <input name="publisher" required>
-      </label>
+        <label>
+          <span>ISBN</span>
+          <input name="isbn" placeholder="978-...">
+        </label>
 
-      <label>
-        <span>Place *</span>
-        <input name="place" required>
-      </label>
-    </div>
+        <label>
+          <span>Abstract</span>
+          <textarea name="abstract" rows="4"></textarea>
+        </label>
 
-    <label>
-      <span>ISBN</span>
-      <input name="isbn" placeholder="978-...">
-    </label>
+        <label>
+          <span>Extra</span>
+          <textarea name="extra" rows="4" placeholder="Infos internes, HAL, projet, axe, etc."></textarea>
+        </label>
 
-    <label>
-      <span>Abstract</span>
-      <textarea name="abstract" rows="4"></textarea>
-    </label>
+        <button type="submit">
+          <span>Envoyer vers Zotero</span>
+        </button>
+        <p id="pub-status" class="status"></p>
+      </form>
+    </section>
 
-    <label>
-      <span>Extra</span>
-      <textarea name="extra" rows="4" placeholder="Infos internes, HAL, projet, axe, etc."></textarea>
-    </label>
-
-    <button type="submit">
-      <span>Envoyer vers Zotero</span>
-    </button>
-    <p id="pub-status" class="status"></p>
-  </form>
-</section>
-
-
-
-    <!-- SECTION EVENEMENT -->
+    <!-- SECTION EVENEMENT (placeholder : on retravaillera plus tard) -->
     <section id="event-section" class="section">
       <form id="event-form">
         <h2>Nouvel événement scientifique</h2>
         <p class="description">
-          Journée d’étude, colloque, séminaire organisé par le laboratoire ou en partenariat.
+          (Formulaire à retravailler ensuite.)
         </p>
 
         <label>
-          <span>Titre de l’événement *</span>
+          <span>Titre *</span>
           <input name="title" required>
-        </label>
-
-        <div class="two-cols">
-          <label>
-            <span>Type d’événement *</span>
-            <select name="eventType" required>
-              <option value="journee">Journée d’étude</option>
-              <option value="colloque">Colloque</option>
-              <option value="seminaire">Séminaire</option>
-              <option value="autre">Autre</option>
-            </select>
-          </label>
-
-          <label>
-            <span>Lieu (ville, établissement) *</span>
-            <input name="location" required>
-          </label>
-        </div>
-
-        <div class="two-cols">
-          <label>
-            <span>Date de début *</span>
-            <input name="startDate" type="date" required>
-          </label>
-          <label>
-            <span>Date de fin (facultatif)</span>
-            <input name="endDate" type="date">
-          </label>
-        </div>
-
-        <label>
-          <span>Organisateurs / équipe organisatrice (facultatif)</span>
-          <input name="organizers" placeholder="Noms des personnes / équipes">
-        </label>
-
-        <label>
-          <span>URL de la page de l’événement (facultatif)</span>
-          <input name="url" placeholder="https://…">
-        </label>
-
-        <label>
-          <span>Remarques internes (facultatif)</span>
-          <textarea name="internalNotes" rows="3" placeholder="Projet, financement, remarques internes…"></textarea>
         </label>
 
         <button type="submit">
@@ -365,59 +345,17 @@
       </form>
     </section>
 
-    <!-- SECTION COMMUNICATION -->
+    <!-- SECTION COMMUNICATION (placeholder : on retravaillera plus tard) -->
     <section id="comm-section" class="section">
       <form id="comm-form">
         <h2>Nouvelle communication</h2>
         <p class="description">
-          Communication orale, poster, intervention dans une journée d’étude, colloque, séminaire.
+          (Formulaire à retravailler ensuite.)
         </p>
 
         <label>
-          <span>Titre de la communication *</span>
+          <span>Titre *</span>
           <input name="title" required>
-        </label>
-
-        <label>
-          <span>Auteurs / intervenant·es (séparés par des virgules) *</span>
-          <input name="authors" placeholder="Prénom Nom, Prénom Nom" required>
-        </label>
-
-        <div class="two-cols">
-          <label>
-            <span>Type de communication *</span>
-            <select name="commType" required>
-              <option value="orale">Communication orale</option>
-              <option value="poster">Poster</option>
-              <option value="invited">Conférence invitée</option>
-              <option value="autre">Autre</option>
-            </select>
-          </label>
-          <label>
-            <span>Année *</span>
-            <input name="year" type="number" min="1900" max="2100" required>
-          </label>
-        </div>
-
-        <label>
-          <span>Nom de l’événement (colloque, séminaire…) *</span>
-          <input name="eventName" required>
-        </label>
-
-        <div class="two-cols">
-          <label>
-            <span>Lieu (ville, établissement) *</span>
-            <input name="location" required>
-          </label>
-          <label>
-            <span>Date (ou date de début) *</span>
-            <input name="date" type="date" required>
-          </label>
-        </div>
-
-        <label>
-          <span>Remarques internes (facultatif)</span>
-          <textarea name="internalNotes" rows="3" placeholder="Lien avec un projet, financements, etc."></textarea>
         </label>
 
         <button type="submit">
@@ -428,7 +366,7 @@
     </section>
 
     <footer>
-      Les champs marqués d’un * sont obligatoires. Pour toute question, contactez le/la référent·e du laboratoire.
+      Les champs marqués d’un * sont obligatoires.
     </footer>
   </div>
 
