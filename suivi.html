@@ -1,228 +1,253 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8">
-  <title>Déclarations – Laboratoire</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Suivi public — HAL & communication</title>
 
   <style>
-    :root {
-      --bg:#f5f5f8; --card:#fff; --accent:#2c7be5;
-      --accent-soft:#e1ecff; --text:#222; --muted:#666; --border:#ddd;
+    :root{
+      --bg:#0b0d10;
+      --panel:#12161b;
+      --muted:#9aa4b2;
+      --text:#e7edf5;
+      --border:#222a33;
+      --accent:#2c7be5;
+      --ok:#1b7c3a;
+      --warn:#b26a00;
+      --bad:#b32020;
     }
-    *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text)}
-    .page{max-width:900px;margin:32px auto;padding:0 16px}
-    header{margin-bottom:18px}
-    h1{margin:0 0 6px;font-size:1.7rem;font-weight:650}
-    .subtitle{margin:0;color:var(--muted);font-size:.95rem}
-
-    .switcher{display:flex;gap:8px;margin:18px 0 14px}
-    .switcher button{
-      flex:1;border-radius:999px;border:1px solid var(--border);
-      background:#fff;padding:10px 16px;font-size:.95rem;cursor:pointer;
-      display:inline-flex;justify-content:center;align-items:center;gap:8px;
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      background:var(--bg);
+      color:var(--text);
     }
-    .switcher button.active{background:var(--accent-soft);border-color:var(--accent)}
-    .hint{color:var(--muted);font-size:.9rem;margin:0 0 14px}
+    a{ color:var(--accent); text-decoration:none; }
 
-    form{background:var(--card);padding:18px;border-radius:10px;border:1px solid var(--border)}
-    label{display:block;margin:0 0 10px;font-weight:600;font-size:.9rem}
-    label span{display:block;margin:0 0 3px}
-    input,select,textarea{
-      width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);
-      font:inherit;background:#fff
-    }
-    textarea{resize:vertical}
-
-    .two-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px 16px}
-
-    button[type="submit"]{
-      margin-top:8px;padding:8px 16px;border-radius:999px;border:none;
-      background:var(--accent);color:#fff;font-weight:700;cursor:pointer
-    }
-    button[disabled]{opacity:.7;cursor:default}
-
-    .status{margin-top:8px;font-size:.9rem;white-space:pre-wrap}
-    .status.ok{color:#1b7c3a}
-    .status.err{color:#b32020}
-
-    .authors-title{font-weight:700;margin:10px 0 6px}
-    .author-row{border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px}
-    .btn-secondary{border-radius:999px;border:1px solid var(--border);background:#fff;padding:6px 12px;cursor:pointer}
-    .small-muted{color:var(--muted);font-size:.85rem;margin-left:8px}
-
-    .opts {
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px;
-      margin: 12px 0;
-      background: #fff;
-    }
-    .opts h3 {
-      margin: 0 0 8px;
-      font-size: .95rem;
-    }
-    .opts p {
-      margin: 0 0 10px;
-      color: var(--muted);
-      font-size: .85rem;
+    .container{
+      max-width:1200px;
+      margin:28px auto;
+      padding:0 16px;
     }
 
-    footer{margin-top:18px;color:var(--muted);font-size:.8rem}
+    header{
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:14px;
+      margin-bottom:14px;
+    }
+    h1{ margin:0 0 6px; font-size:20px; }
+    .subtitle{ margin:0; color:var(--muted); font-size:14px; }
+
+    /* === CHARTS === */
+    .charts{
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap:12px;
+      margin:14px 0 18px;
+    }
+    .chart-card{
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:12px;
+    }
+    .chart-card h2{
+      margin:0 0 10px;
+      font-size:14px;
+      color:var(--muted);
+    }
+
+    /* === TABLE === */
+    table{
+      width:100%;
+      border-collapse:collapse;
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:14px;
+      overflow:hidden;
+    }
+    th, td{
+      padding:10px 8px;
+      border-bottom:1px solid var(--border);
+      text-align:left;
+      font-size:14px;
+    }
+    th{ color:var(--muted); font-weight:600; }
+    tr:last-child td{ border-bottom:none; }
+
+    .badge{
+      padding:3px 8px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:600;
+      display:inline-block;
+    }
+    .ok{ background:#163a25; color:#7ce2a3; }
+    .warn{ background:#3a2a16; color:#f1c27d; }
+    .muted{ background:#222a33; color:#9aa4b2; }
   </style>
 </head>
 
 <body>
-  <div class="page">
+  <div class="container">
     <header>
-  <h1>Déclarations du laboratoire</h1>
-  <p class="subtitle">Les données sont envoyées automatiquement dans Zotero.</p>
+      <h1>Suivi public des demandes</h1>
+      <p class="subtitle">
+        Déclarations issues du formulaire du laboratoire — suivi des demandes HAL et communication.
+      </p>
+    </header>
 
-  <p style="margin-top:8px;font-size:.9rem">
-    📊
-    <a href="/suivi.html" target="_blank" rel="noopener noreferrer"
-       style="color:var(--accent);text-decoration:none;font-weight:600">
-      Voir le suivi public des demandes (HAL & communication)
-    </a>
-  </p>
-</header>
-
-
-    <div class="switcher">
-      <button type="button" class="active">Nouvelle publication</button>
-    </div>
-
-    <p class="hint">Choisissez le type (Livre / Chapitre), puis remplissez les champs requis.</p>
-
-    <form id="pub-form">
-      <label>
-        <span>Type de publication *</span>
-        <select name="pubType" id="pubType">
-          <option value="book">Livre</option>
-          <option value="bookSection">Chapitre d’ouvrage</option>
-        </select>
-      </label>
-
-      <label>
-        <span>Title *</span>
-        <input name="title" required>
-      </label>
-
-      <div class="authors-title">Author(s) *</div>
-      <div id="authors-list"></div>
-      <div style="display:flex;align-items:center;gap:8px;margin:8px 0 12px">
-        <button type="button" id="add-author-btn" class="btn-secondary">+ Ajouter un auteur</button>
-        <span class="small-muted">Prénom/Nom (minimum : un auteur)</span>
+    <!-- === GRAPHIQUES === -->
+    <section class="charts">
+      <div class="chart-card">
+        <h2>Déclarations par année</h2>
+        <canvas id="chartByYear"></canvas>
       </div>
-
-      <!-- ====== CHAMPS LIVRE ====== -->
-      <div id="book-fields">
-        <div class="two-cols">
-          <label><span>Date *</span><input name="date" placeholder="2024 ou 2024-06-15"></label>
-          <label><span>Language</span><input name="language" placeholder="fr / en"></label>
-        </div>
-
-        <div class="two-cols">
-          <label><span>Publisher *</span><input name="publisher"></label>
-          <label><span>Place *</span><input name="place"></label>
-        </div>
-
-        <label><span>ISBN</span><input name="isbn" placeholder="978-..."></label>
-        <label><span>Abstract</span><textarea name="abstract" rows="4"></textarea></label>
+      <div class="chart-card">
+        <h2>Répartition des demandes</h2>
+        <canvas id="chartSplit"></canvas>
       </div>
-
-      <!-- ====== CHAMPS CHAPITRE ====== -->
-      <div id="section-fields" style="display:none">
-        <label><span>Book Title *</span><input name="bookTitle"></label>
-
-        <div class="two-cols">
-          <label><span>Pages</span><input name="pages" placeholder="123-145"></label>
-          <label><span>Edition</span><input name="edition"></label>
-        </div>
-
-        <div class="two-cols">
-          <label><span>Series</span><input name="series"></label>
-          <label><span>Series Number</span><input name="seriesNumber"></label>
-        </div>
-
-        <div class="two-cols">
-          <label><span>Volume</span><input name="volume"></label>
-          <label><span>Date *</span><input name="sectionDate" placeholder="2024 ou 2024-06-15"></label>
-        </div>
-
-        <div class="two-cols">
-          <label><span>Publisher *</span><input name="sectionPublisher"></label>
-          <label><span>Place *</span><input name="sectionPlace"></label>
-        </div>
-
-        <label><span>ISBN</span><input name="sectionIsbn" placeholder="978-..."></label>
+      <div class="chart-card">
+        <h2>Statut de traitement</h2>
+        <canvas id="chartStatus"></canvas>
       </div>
+    </section>
 
-      <!-- ====== OPTIONS (HAL / COMMS) ====== -->
-      <div class="opts">
-        <h3>Options</h3>
-        <p>Ces choix seront enregistrés dans Zotero (champ “Extra”).</p>
-
-        <div class="two-cols">
-          <label>
-            <span>Souhaitez-vous la création d’une notice sur HAL ? *</span>
-            <select name="optHal" required>
-              <option value="">— Choisir —</option>
-              <option value="yes">Oui</option>
-              <option value="no">Non</option>
-            </select>
-          </label>
-
-          <label>
-            <span>Souhaitez-vous une communication (newsletter + réseaux sociaux) ? *</span>
-            <select name="optComms" required>
-              <option value="">— Choisir —</option>
-              <option value="yes">Oui</option>
-              <option value="no">Non</option>
-            </select>
-          </label>
-        </div>
-      </div>
-
-      <label>
-        <span>Extra</span>
-        <textarea name="extra" rows="4" placeholder="Infos internes, HAL, projet, axe, etc."></textarea>
-      </label>
-
-      <button type="submit">Envoyer vers Zotero</button>
-      <p id="pub-status" class="status"></p>
-
-      <footer>Les champs marqués d’un * sont obligatoires.</footer>
-    </form>
+    <!-- === TABLEAU === -->
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Titre</th>
+          <th>Année</th>
+          <th>HAL</th>
+          <th>Communication</th>
+          <th>Statut</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
   </div>
 
-  <script src="assets/app.js"></script>
-  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-<script>
-  // Initialise le widget
-  if (window.netlifyIdentity) {
-    window.netlifyIdentity.on("init", (user) => {
-      // Si on arrive via un lien d'invitation / confirmation, Netlify met souvent un hash dans l’URL
-      // On ouvre le widget automatiquement pour permettre la création/validation.
-      if (!user) {
-        const h = window.location.hash || "";
-        if (h.includes("invite_token") || h.includes("confirmation_token") || h.includes("recovery_token")) {
-          window.netlifyIdentity.open();
-        }
-      }
-    });
-    window.netlifyIdentity.init();
-  }
-</script>
-<script>
-  (function(){
-    var h = window.location.hash || "";
-    if (h.includes("invite_token=") || h.includes("confirmation_token=") || h.includes("recovery_token=") || h.includes("email_change_token=")) {
-      window.location.replace("/auth.html" + h);
-    }
-  })();
-</script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+  <script>
+    const API_URL = '/.netlify/functions/public-suivi';
+    let charts = [];
+
+    function normalizeBool(v){
+      v = String(v || '').toLowerCase();
+      if (v === 'yes' || v === 'oui' || v === 'true') return 'yes';
+      if (v === 'no' || v === 'non' || v === 'false') return 'no';
+      return '';
+    }
+
+    function computeStatus(flags){
+      const halWanted = normalizeBool(flags?.hal_create) === 'yes';
+      const commWanted = normalizeBool(flags?.comms_publish) === 'yes';
+      const halDone = normalizeBool(flags?.hal_done) === 'yes';
+      const commDone = normalizeBool(flags?.comms_done) === 'yes';
+
+      if (!halWanted && !commWanted) return 'Non demandé';
+      if ((halWanted && !halDone) || (commWanted && !commDone)) return 'À traiter';
+      return 'Traité';
+    }
+
+    function badge(label, cls){
+      return `<span class="badge ${cls}">${label}</span>`;
+    }
+
+    function destroyCharts(){
+      charts.forEach(c => c.destroy());
+      charts = [];
+    }
+
+    function renderCharts(items){
+      destroyCharts();
+
+      /* === par année === */
+      const byYear = {};
+      items.forEach(i => {
+        const y = i.year || '—';
+        byYear[y] = (byYear[y] || 0) + 1;
+      });
+      const years = Object.keys(byYear).sort();
+      const yearCounts = years.map(y => byYear[y]);
+
+      /* === répartition demandes === */
+      let halOnly=0, commOnly=0, both=0, none=0;
+      items.forEach(i => {
+        const f = i.flags || {};
+        const h = normalizeBool(f.hal_create)==='yes';
+        const c = normalizeBool(f.comms_publish)==='yes';
+        if (h && c) both++;
+        else if (h) halOnly++;
+        else if (c) commOnly++;
+        else none++;
+      });
+
+      /* === statut global === */
+      const statusCounts = { 'À traiter':0, 'Traité':0, 'Non demandé':0 };
+      items.forEach(i => statusCounts[computeStatus(i.flags||{})]++);
+
+      charts.push(new Chart(chartByYear, {
+        type:'bar',
+        data:{ labels:years, datasets:[{ data:yearCounts }] },
+        options:{ plugins:{ legend:{ display:false } } }
+      }));
+
+      charts.push(new Chart(chartSplit, {
+        type:'doughnut',
+        data:{
+          labels:['HAL seul','Com seule','HAL + Com','Aucune'],
+          datasets:[{ data:[halOnly,commOnly,both,none] }]
+        }
+      }));
+
+      charts.push(new Chart(chartStatus, {
+        type:'doughnut',
+        data:{
+          labels:['À traiter','Traité','Non demandé'],
+          datasets:[{ data:[
+            statusCounts['À traiter'],
+            statusCounts['Traité'],
+            statusCounts['Non demandé']
+          ]}]
+        }
+      }));
+    }
+
+    function renderTable(items){
+      rows.innerHTML = items.map(i => {
+        const status = computeStatus(i.flags||{});
+        return `<tr>
+          <td>${i.itemType === 'book' ? 'Livre' : 'Chapitre'}</td>
+          <td>${i.title || ''}</td>
+          <td>${i.year || ''}</td>
+          <td>${normalizeBool(i.flags?.hal_create)==='yes' ? 'Oui' : '—'}</td>
+          <td>${normalizeBool(i.flags?.comms_publish)==='yes' ? 'Oui' : '—'}</td>
+          <td>${
+            status==='Traité' ? badge('Traité','ok') :
+            status==='À traiter' ? badge('À traiter','warn') :
+            badge('Non demandé','muted')
+          }</td>
+        </tr>`;
+      }).join('');
+    }
+
+    async function load(){
+      const r = await fetch(API_URL);
+      const data = await r.json();
+      renderCharts(data.items);
+      renderTable(data.items);
+    }
+
+    load();
+  </script>
 </body>
 </html>
