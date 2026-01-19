@@ -63,21 +63,56 @@ exports.handler = async (event) => {
 function buildZoteroItemFromPayload(payload) {
   const kind = payload.kind || 'publication';
 
-  let itemType = 'journalArticle';
-  let date = '';
+  // --- Publication (Livre) ---
+  if (kind === 'publication' && (payload.pubType === 'book' || !payload.pubType)) {
+    const creators = parseCreators(payload.authors, 'author');
 
-  if (kind === 'publication') {
-    itemType = payload.itemType || 'journalArticle';
-    date = payload.year || '';
-  } else if (kind === 'event') {
-    // Événements : on utilise un "report" générique
-    itemType = 'report';
-    date = payload.startDate || '';
-  } else if (kind === 'communication') {
-    // Communications : on utilise "presentation"
-    itemType = 'presentation';
-    date = payload.date || payload.year || '';
+    const extraLines = [];
+    if (payload.extra) extraLines.push(payload.extra);
+
+    return {
+      itemType: 'book',
+      title: payload.title || '',
+      creators,
+      date: payload.date || '',
+      abstractNote: payload.abstract || '',
+      publisher: payload.publisher || '',
+      place: payload.place || '',
+      ISBN: payload.isbn || '',
+      language: payload.language || '',
+      extra: extraLines.join('\n'),
+      collections: []
+    };
   }
+
+  // --- fallback (si tu gardes event/communication ailleurs) ---
+  return {
+    itemType: 'report',
+    title: payload.title || '',
+    date: payload.date || '',
+    extra: payload.extra || '',
+    creators: [],
+    collections: []
+  };
+}
+
+// Parse "Prénom Nom, Prénom Nom" en creators Zotero
+function parseCreators(raw, creatorType) {
+  const s = (raw || '').trim();
+  if (!s) return [];
+
+  return s
+    .split(',')
+    .map((a) => a.trim())
+    .filter(Boolean)
+    .map((fullName) => {
+      const parts = fullName.split(' ').filter(Boolean);
+      const firstName = parts.shift() || '';
+      const lastName = parts.join(' ') || '';
+      return { creatorType, firstName, lastName };
+    });
+}
+
 
   // --- Créateurs ---
   const rawAuthors = payload.authors || '';
