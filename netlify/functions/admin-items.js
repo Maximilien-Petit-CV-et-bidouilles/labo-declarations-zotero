@@ -1,8 +1,8 @@
 // netlify/functions/admin-items.js
+
 exports.handler = async (event) => {
   try {
-    // Auth Netlify Identity
-    const user = event.clientContext && event.clientContext.user;
+    const user = await verifyIdentityUser(event);
     if (!user) return json(401, { error: 'Unauthorized (not logged in)' });
 
     const apiKey = process.env.ZOTERO_API_KEY;
@@ -16,7 +16,10 @@ exports.handler = async (event) => {
     const url = `https://api.zotero.org/${libraryType}/${libraryId}/items?limit=200&sort=dateModified&direction=desc`;
 
     const res = await fetch(url, {
-      headers: { 'Zotero-API-Key': apiKey, 'Zotero-API-Version': '3' }
+      headers: {
+        'Zotero-API-Key': apiKey,
+        'Zotero-API-Version': '3'
+      }
     });
 
     const raw = await res.text();
@@ -36,7 +39,7 @@ exports.handler = async (event) => {
         year: extractYear(d.date || ''),
         creatorsText: (d.creators || [])
           .filter(c => c && (c.creatorType === 'author' || c.creatorType === 'editor'))
-          .map(c => `${(c.lastName||'').trim()} ${(c.firstName||'').trim()}`.trim())
+          .map(c => `${(c.lastName || '').trim()} ${(c.firstName || '').trim()}`.trim())
           .filter(Boolean)
           .join(', '),
         bookTitle: d.bookTitle || '',
@@ -55,7 +58,10 @@ exports.handler = async (event) => {
 function json(statusCode, obj) {
   return {
     statusCode,
-    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store'
+    },
     body: JSON.stringify(obj)
   };
 }
@@ -90,4 +96,33 @@ function normalizeBool(v) {
   if (v === 'yes' || v === 'true' || v === 'oui') return 'yes';
   if (v === 'no' || v === 'false' || v === 'non') return 'no';
   return v;
+}
+
+/**
+ * Vérifie le JWT Identity via GoTrue:
+ * GET /.netlify/identity/user avec Authorization: Bearer <token>
+ */
+async function verifyIdentityUser(event) {
+  const auth = event.headers?.authorization || event.headers?.Authorization || '';
+  const m = String(auth).match(/^Bearer\s+(.+)$/i);
+  if (!m) return null;
+  const token = m[1].trim();
+  if (!token) return null;
+
+  // URL du site (Netlify fournit process.env.URL). Fallback sur l’origin de la requête.
+  const siteUrl =
+    process.env.URL ||
+    (event.headers?.origin || event.headers?.Origin || '').trim();
+
+  if (!siteUrl) return null;
+
+  const userUrl = `${siteUrl.replace(/\/$/, '')}/.netlify/identity/user`;
+
+  const res = await fetch(userUrl, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+  if (!res.ok) return null;
+
+  return await res.json();
 }
