@@ -1,16 +1,13 @@
 // netlify/functions/admin-update-status.js
-// Met à jour le champ Extra dans Zotero en modifiant le bloc [DLAB] (hal_done / comms_done)
-
-const user = event.clientContext && event.clientContext.user;
-if (!user) return json(401, { error: 'Unauthorized (not logged in)' });
-
 exports.handler = async (event) => {
   try {
     if (event.httpMethod !== 'POST') return json(405, { error: 'Method Not Allowed' });
-    if (!isAuthorized(event)) return json(401, { error: 'Unauthorized' });
+
+    const user = event.clientContext && event.clientContext.user;
+    if (!user) return json(401, { error: 'Unauthorized (not logged in)' });
 
     const apiKey = process.env.ZOTERO_API_KEY;
-    const libraryType = process.env.ZOTERO_LIBRARY_TYPE; // 'users' ou 'groups'
+    const libraryType = process.env.ZOTERO_LIBRARY_TYPE;
     const libraryId = process.env.ZOTERO_LIBRARY_ID;
 
     if (!apiKey || !libraryType || !libraryId) {
@@ -21,19 +18,15 @@ exports.handler = async (event) => {
     const key = (body.key || '').trim();
     if (!key) return json(400, { error: 'Missing item key' });
 
-    // valeurs attendues: 'yes' / 'no'
     const hal_done = normalizeBool((body.hal_done || '').trim());
     const comms_done = normalizeBool((body.comms_done || '').trim());
 
-    // 1) GET item (pour récupérer version + extra actuel)
     const getUrl = `https://api.zotero.org/${libraryType}/${libraryId}/items/${key}`;
-    const getRes = await fetch(getUrl, {
-      headers: {
-        'Zotero-API-Key': apiKey,
-        'Zotero-API-Version': '3'
-      }
-    });
 
+    // GET item
+    const getRes = await fetch(getUrl, {
+      headers: { 'Zotero-API-Key': apiKey, 'Zotero-API-Version': '3' }
+    });
     const getRaw = await getRes.text();
     if (!getRes.ok) return json(getRes.status, { error: 'Zotero GET error', details: getRaw });
 
@@ -42,16 +35,14 @@ exports.handler = async (event) => {
     if (!version) return json(500, { error: 'Missing Zotero version' });
 
     const currentExtra = item.data.extra || '';
-
-    // 2) Update DLAB block
     const updatedExtra = upsertDLAB(currentExtra, {
       ...(hal_done ? { hal_done } : {}),
       ...(comms_done ? { comms_done } : {})
     });
 
-    // 3) PUT item (avec contrôle de version)
     item.data.extra = updatedExtra;
 
+    // PUT item
     const putRes = await fetch(getUrl, {
       method: 'PUT',
       headers: {
@@ -72,12 +63,6 @@ exports.handler = async (event) => {
   }
 };
 
-function isAuthorized(event) {
-  const token = (event.headers?.['x-admin-token'] || event.headers?.['X-Admin-Token'] || '').trim();
-  const expected = (process.env.ADMIN_TOKEN || '').trim();
-  return expected && token && token === expected;
-}
-
 function json(statusCode, obj) {
   return {
     statusCode,
@@ -90,10 +75,9 @@ function normalizeBool(v) {
   const x = String(v || '').toLowerCase();
   if (x === 'yes' || x === 'true' || x === 'oui') return 'yes';
   if (x === 'no' || x === 'false' || x === 'non') return 'no';
-  return ''; // si vide ou invalide, on n’écrit pas
+  return '';
 }
 
-// Insère ou met à jour un bloc [DLAB] en conservant le reste du champ Extra
 function upsertDLAB(extra, updates) {
   const s = String(extra || '');
   const start = s.indexOf('[DLAB]');
@@ -109,12 +93,11 @@ function upsertDLAB(extra, updates) {
     after = s.slice(end + 7).trimStart();
   } else {
     before = s.trimEnd();
-    block = ''; // bloc absent
+    block = '';
     after = '';
   }
 
   const map = parseBlockToMap(block);
-
   for (const [k,v] of Object.entries(updates || {})) {
     if (v === 'yes' || v === 'no') map[k] = v;
   }
@@ -138,17 +121,14 @@ function parseBlockToMap(block) {
     const k = line.slice(0, idx).trim();
     const v = line.slice(idx + 1).trim().toLowerCase();
     if (!k) continue;
-    if (v === 'yes' || v === 'no' || v === 'true' || v === 'false' || v === 'oui' || v === 'non') {
-      map[k] = normalizeBool(v) || v;
-    } else {
-      map[k] = v;
-    }
+    map[k] = (v === 'yes' || v === 'true' || v === 'oui') ? 'yes'
+          : (v === 'no' || v === 'false' || v === 'non') ? 'no'
+          : v;
   }
   return map;
 }
 
 function mapToBlock(map) {
-  // ordre stable (lisible)
   const order = ['hal_create','comms_publish','hal_done','comms_done','hal_done_date','comms_done_date','hal_id','comms_link'];
   const keys = [...new Set([...order, ...Object.keys(map || {})])].filter(k => map[k] !== undefined);
   return keys.map(k => `${k}: ${map[k]}`).join('\n');
