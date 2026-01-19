@@ -163,6 +163,60 @@ function setupSectionSwitcher() {
 }
 
 // --- Initialisation ---
+function addAuthorRow(firstName = '', lastName = '') {
+  const list = document.getElementById('authors-list');
+  if (!list) return;
+
+  const row = document.createElement('div');
+  row.className = 'two-cols';
+  row.style.marginBottom = '10px';
+
+  row.innerHTML = `
+    <label>
+      <span>Prénom</span>
+      <input name="authorFirstName" value="${escapeHtml(firstName)}" />
+    </label>
+    <label>
+      <span>Nom *</span>
+      <input name="authorLastName" value="${escapeHtml(lastName)}" required />
+    </label>
+    <div style="grid-column: 1 / -1; display:flex; justify-content:flex-end;">
+      <button type="button" class="remove-author-btn" style="background:transparent;border:none;color:var(--text-muted);cursor:pointer;padding:0;">
+        Supprimer
+      </button>
+    </div>
+  `;
+
+  row.querySelector('.remove-author-btn').addEventListener('click', () => {
+    row.remove();
+  });
+
+  list.appendChild(row);
+}
+
+function getAuthorsFromForm(form) {
+  const firstNames = Array.from(form.querySelectorAll('input[name="authorFirstName"]'));
+  const lastNames = Array.from(form.querySelectorAll('input[name="authorLastName"]'));
+
+  const authors = [];
+  for (let i = 0; i < Math.max(firstNames.length, lastNames.length); i++) {
+    const fn = (firstNames[i]?.value || '').trim();
+    const ln = (lastNames[i]?.value || '').trim();
+    if (fn || ln) authors.push({ firstName: fn, lastName: ln });
+  }
+  return authors;
+}
+
+// mini helper pour éviter d’injecter du texte brut dans innerHTML
+function escapeHtml(str) {
+  return String(str)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   setupSectionSwitcher();
 
