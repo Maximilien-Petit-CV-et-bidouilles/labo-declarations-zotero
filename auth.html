@@ -65,12 +65,12 @@
         }
 
         // 2) Ouvrir la fenêtre Identity (signup / login)
-        window.netlifyIdentity.open('signup');
+        window.netlifyIdentity.open('login');
 
       } catch (e) {
         // Si déjà confirmé, Netlify peut renvoyer une erreur : on laisse accéder au login/signup
         setStatus("⚠️ Activation non confirmée automatiquement (peut-être déjà activée). Ouverture de la fenêtre…", "muted");
-        window.netlifyIdentity.open('signup');
+        window.netlifyIdentity.open('login');
       }
     }
 
