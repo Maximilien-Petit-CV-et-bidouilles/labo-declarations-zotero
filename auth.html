@@ -3,83 +3,98 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Connexion / Activation</title>
+  <title>Activation du compte</title>
   <style>
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:40px;max-width:780px}
     .muted{color:#666}
+    .ok{color:#1b7c3a}
+    .err{color:#b32020}
     button{font:inherit;padding:10px 14px;border-radius:10px;border:1px solid #ddd;background:#fff;cursor:pointer}
     button.primary{background:#2c7be5;color:#fff;border-color:#2c7be5;font-weight:650}
     code{background:#f2f2f6;padding:2px 6px;border-radius:6px}
-    /* FIX: certaines configs/browsers finissent avec le widget caché */
-    .netlify-identity-widget, .netlify-identity-widget iframe{
-      display:block !important;
-      visibility:visible !important;
-      opacity:1 !important;
-    }
-    .netlify-identity-widget{
-      position:fixed !important;
-      inset:0 !important;
-      z-index:999999 !important;
-    }
   </style>
 </head>
 <body>
-  <h1>Connexion / Activation du compte</h1>
+  <h1>Activation du compte</h1>
   <p class="muted">
-    Si vous venez d’un lien d’invitation, l’URL contient un <code>#invite_token=…</code>.
-    La fenêtre doit s’ouvrir automatiquement.
+    Cette page active les invitations Netlify Identity (<code>invite_token</code>) puis vous propose de définir votre accès.
   </p>
 
   <p>
-    <button id="open" class="primary">Ouvrir la fenêtre</button>
+    <button id="open" class="primary">Ouvrir / Recommencer</button>
   </p>
 
-  <p id="diag" class="muted"></p>
+  <p id="status" class="muted"></p>
 
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <script>
-    const diag = document.getElementById('diag');
+    const statusEl = document.getElementById('status');
 
-    function hasToken(){
-      const h = window.location.hash || "";
-      return h.includes("invite_token=") ||
-             h.includes("confirmation_token=") ||
-             h.includes("recovery_token=") ||
-             h.includes("email_change_token=") ||
-             h.includes("access_token=");
+    function setStatus(msg, cls){
+      statusEl.className = cls || 'muted';
+      statusEl.textContent = msg;
     }
 
-    function openSignup(){
+    function getInviteToken(){
+      // URL: /auth.html#invite_token=XXXX
+      const h = (window.location.hash || '').replace(/^#/, '');
+      const params = new URLSearchParams(h);
+      return params.get('invite_token') || '';
+    }
+
+    async function confirmInviteThenOpen(){
       if (!window.netlifyIdentity) {
-        diag.textContent = "❌ netlifyIdentity indisponible (script bloqué ? anti-tracking ?).";
+        setStatus("❌ Le widget Netlify Identity ne se charge pas (bloqueur / protection Firefox ?).", "err");
         return;
       }
-      // IMPORTANT: 'signup' est souvent plus fiable pour les invites
-      window.netlifyIdentity.open('signup');
-      // Double tap (certains navigateurs cachent le widget à l’ouverture)
-      setTimeout(() => window.netlifyIdentity.open('signup'), 400);
+
+      const inviteToken = getInviteToken();
+      setStatus(inviteToken ? "⏳ Activation de l’invitation…" : "ℹ️ Aucun invite_token dans l’URL.", "muted");
+
+      try {
+        // 1) Confirmer l'invitation via GoTrue (nécessaire en mode Invite only)
+        if (inviteToken) {
+          const gotrue = window.netlifyIdentity.gotrue;
+          if (!gotrue || !gotrue.confirm) {
+            setStatus("❌ GoTrue indisponible. (widget non initialisé)", "err");
+            return;
+          }
+
+          await gotrue.confirm(inviteToken); // <-- étape clé :contentReference[oaicite:1]{index=1}
+          setStatus("✅ Invitation activée. Vous pouvez définir votre accès.", "ok");
+        }
+
+        // 2) Ouvrir la fenêtre Identity (signup / login)
+        window.netlifyIdentity.open('signup');
+
+      } catch (e) {
+        // Si déjà confirmé, Netlify peut renvoyer une erreur : on laisse accéder au login/signup
+        setStatus("⚠️ Activation non confirmée automatiquement (peut-être déjà activée). Ouverture de la fenêtre…", "muted");
+        window.netlifyIdentity.open('signup');
+      }
     }
 
-    document.getElementById('open').addEventListener('click', openSignup);
+    document.getElementById('open').addEventListener('click', confirmInviteThenOpen);
 
-    if (!window.netlifyIdentity) {
-      diag.textContent = "❌ Le widget Identity ne se charge pas. Essaie de désactiver le bloqueur / anti-tracking pour ce site.";
-    } else {
-      window.netlifyIdentity.on("init", (user) => {
-        const h = window.location.hash || "";
-        diag.textContent = user
-          ? "✅ Déjà connecté."
-          : ("🔎 Hash détecté: " + (h ? h.slice(0, 60) + "…" : "(vide)"));
-
-        if (!user && hasToken()) openSignup();
+    // Auto-run
+    if (window.netlifyIdentity) {
+      window.netlifyIdentity.on('init', user => {
+        if (user) {
+          setStatus("✅ Déjà connecté. Redirection vers le back-office…", "ok");
+          window.location.href = "/admin.html";
+          return;
+        }
+        confirmInviteThenOpen();
       });
 
-      window.netlifyIdentity.on("login", () => {
+      window.netlifyIdentity.on('login', () => {
         window.netlifyIdentity.close();
         window.location.href = "/admin.html";
       });
 
       window.netlifyIdentity.init();
+    } else {
+      setStatus("❌ Script Identity non chargé. Désactive temporairement les protections/extension pour tester.", "err");
     }
   </script>
 </body>
