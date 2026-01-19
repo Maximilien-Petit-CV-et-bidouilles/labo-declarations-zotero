@@ -19,8 +19,8 @@ exports.handler = async (event) => {
       };
     }
 
-    // Pour l’instant : uniquement "book"
-    const item = buildBookItem(payload);
+    // Pour l’instant : chapitre d’ouvrage (bookSection)
+    const item = buildBookSectionItem(payload);
 
     const res = await fetch(`https://api.zotero.org/${libraryType}/${libraryId}/items`, {
       method: 'POST',
@@ -44,30 +44,31 @@ exports.handler = async (event) => {
   }
 };
 
-// --- Création d'un item Zotero de type "book" ---
-function buildBookItem(payload) {
-  // Accepte authors sous 2 formats :
-  // 1) tableau [{firstName,lastName}, ...]
-  // 2) string "Prénom Nom, Prénom Nom" (compatibilité)
+// --- Création d'un item Zotero de type "bookSection" ---
+function buildBookSectionItem(payload) {
   const creators = parseCreatorsFlexible(payload.authors, 'author');
 
   return {
-    itemType: 'book',
+    itemType: 'bookSection',
     title: payload.title || '',
     creators,
+    bookTitle: payload.bookTitle || '',
+    series: payload.series || '',
+    seriesNumber: payload.seriesNumber || '',
+    volume: payload.volume || '',
+    edition: payload.edition || '',
     date: payload.date || '',
-    abstractNote: payload.abstract || '',
     publisher: payload.publisher || '',
     place: payload.place || '',
+    pages: payload.pages || '',
     ISBN: payload.isbn || '',
-    language: payload.language || '',
     extra: payload.extra || '',
     collections: []
   };
 }
 
 function parseCreatorsFlexible(authors, creatorType) {
-  // Nouveau format: tableau
+  // Nouveau format: tableau [{firstName,lastName}, ...]
   if (Array.isArray(authors)) {
     return authors
       .map((a) => ({
@@ -77,7 +78,6 @@ function parseCreatorsFlexible(authors, creatorType) {
       }))
       .filter((a) => a.firstName || a.lastName)
       .map((a) => {
-        // robustesse: si lastName vide mais firstName rempli, on met tout en lastName
         if (!a.lastName && a.firstName) {
           return { creatorType, firstName: '', lastName: a.firstName };
         }
@@ -85,11 +85,10 @@ function parseCreatorsFlexible(authors, creatorType) {
       });
   }
 
-  // Ancien format: string
+  // Ancien format: string "Prénom Nom, Prénom Nom"
   return parseCreators(authors, creatorType);
 }
 
-// "Prénom Nom, Prénom Nom" -> creators
 function parseCreators(raw, creatorType) {
   const s = (raw || '').trim();
   if (!s) return [];
@@ -101,7 +100,6 @@ function parseCreators(raw, creatorType) {
     .map((fullName) => {
       const parts = fullName.split(' ').filter(Boolean);
 
-      // si 1 seul mot, on le met en nom de famille
       if (parts.length === 1) {
         return { creatorType, firstName: '', lastName: parts[0] };
       }
