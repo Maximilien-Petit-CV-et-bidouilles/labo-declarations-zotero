@@ -4,382 +4,131 @@
   <meta charset="utf-8">
   <title>Déclarations – Laboratoire</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
   <style>
     :root {
-      --bg: #f5f5f8;
-      --card: #ffffff;
-      --accent: #2c7be5;
-      --accent-soft: #e1ecff;
-      --text-main: #222222;
-      --text-muted: #666666;
-      --border: #dddddd;
+      --bg:#f5f5f8; --card:#fff; --accent:#2c7be5;
+      --accent-soft:#e1ecff; --text:#222; --muted:#666; --border:#ddd;
     }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text)}
+    .page{max-width:900px;margin:32px auto;padding:0 16px}
+    h1{margin:0 0 6px;font-size:1.7rem}
+    .subtitle{color:var(--muted);font-size:.95rem}
 
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: var(--bg);
-      color: var(--text-main);
+    .switcher{display:flex;gap:8px;margin:24px 0}
+    .switcher button{
+      flex:1;border-radius:999px;border:1px solid var(--border);
+      background:#fff;padding:10px;font-size:.95rem;cursor:pointer
     }
+    .switcher button.active{background:var(--accent-soft);border-color:var(--accent)}
 
-    .page {
-      max-width: 900px;
-      margin: 32px auto 40px;
-      padding: 0 16px;
+    form{background:var(--card);padding:18px;border-radius:10px;border:1px solid var(--border)}
+    label{display:block;margin-bottom:10px;font-weight:600;font-size:.9rem}
+    label span{display:block;margin-bottom:3px}
+    input,select,textarea{
+      width:100%;padding:8px;border-radius:6px;border:1px solid var(--border)
     }
+    textarea{resize:vertical}
+    .two-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}
+    .status{margin-top:6px;font-size:.85rem}
+    .ok{color:#1b7c3a}.err{color:#b32020}
 
-    header { margin-bottom: 24px; }
-
-    h1 {
-      margin: 0 0 8px;
-      font-size: 1.7rem;
-      font-weight: 650;
-    }
-
-    .subtitle {
-      margin: 0;
-      font-size: 0.95rem;
-      color: var(--text-muted);
-    }
-
-    .switcher {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin: 24px 0 16px;
-    }
-
-    .switcher button {
-      flex: 1 1 220px;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      background: #ffffff;
-      padding: 10px 16px;
-      font-size: 0.95rem;
-      font-weight: 500;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-    }
-
-    .switcher button span.emoji { font-size: 1.2rem; }
-
-    .switcher button.active {
-      border-color: var(--accent);
-      background: var(--accent-soft);
-      box-shadow: 0 0 0 1px rgba(44, 123, 229, 0.2);
-    }
-
-    .switcher button:hover:not(.active) { background: #f0f2f7; }
-
-    .hint {
-      font-size: 0.9rem;
-      color: var(--text-muted);
-      margin-bottom: 16px;
-    }
-
-    .section { display: none; }
-    .section.visible { display: block; }
-
-    form {
-      background: var(--card);
-      padding: 18px 16px 16px;
-      border-radius: 10px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
-      border: 1px solid var(--border);
-      margin-bottom: 20px;
-    }
-
-    form h2 {
-      margin: 0 0 10px;
-      font-size: 1.2rem;
-    }
-
-    form p.description {
-      margin: 0 0 16px;
-      font-size: 0.9rem;
-      color: var(--text-muted);
-    }
-
-    label {
-      display: block;
-      margin-bottom: 10px;
-      font-size: 0.9rem;
-      font-weight: 600;
-    }
-
-    label span {
-      display: block;
-      margin-bottom: 3px;
-    }
-
-    input, select, textarea {
-      width: 100%;
-      padding: 8px;
-      border-radius: 6px;
-      border: 1px solid var(--border);
-      font: inherit;
-      margin: 0;
-      background: #fff;
-    }
-
-    textarea { resize: vertical; }
-
-    .two-cols {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 10px 16px;
-    }
-
-    .subtle-actions {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      justify-content: flex-start;
-      margin-top: 6px;
-      margin-bottom: 12px;
-    }
-
-    .btn-secondary {
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      background: #ffffff;
-      padding: 8px 12px;
-      font-size: 0.9rem;
-      cursor: pointer;
-      color: var(--text-main);
-    }
-
-    .btn-secondary:hover { background: #f0f2f7; }
-
-    .btn-link {
-      background: transparent;
-      border: none;
-      color: var(--text-muted);
-      cursor: pointer;
-      padding: 0;
-      font: inherit;
-      text-decoration: underline;
-      text-underline-offset: 2px;
-    }
-
-    button[type="submit"] {
-      margin-top: 8px;
-      padding: 8px 16px;
-      border-radius: 999px;
-      border: none;
-      background: var(--accent);
-      color: #ffffff;
-      font-weight: 600;
-      font-size: 0.95rem;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    button[type="submit"]:disabled { opacity: 0.75; cursor: default; }
-
-    .status {
-      margin-top: 6px;
-      font-size: 0.85rem;
-      white-space: pre-wrap;
-    }
-    .status.ok { color: #1b7c3a; }
-    .status.err { color: #b32020; }
-
-    footer {
-      margin-top: 24px;
-      font-size: 0.8rem;
-      color: var(--text-muted);
-    }
-
-    .authors-title {
-      margin: 8px 0 6px;
-      font-size: 0.9rem;
-      font-weight: 700;
-    }
-
-    .author-row {
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px;
-      margin-bottom: 10px;
-      background: #fff;
-    }
-
-    .author-row .row-actions {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: 6px;
-    }
+    .authors-title{font-weight:700;margin-top:10px}
+    .author-row{border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px}
+    .btn-secondary{border-radius:999px;border:1px solid var(--border);background:#fff;padding:6px 12px;cursor:pointer}
   </style>
 </head>
-<body>
-  <div class="page">
-    <header>
-      <h1>Déclarations du laboratoire</h1>
-      <p class="subtitle">
-        Déclarez simplement les nouvelles activités pour qu’elles soient enregistrées dans Zotero.
-      </p>
-    </header>
 
-    <div class="switcher">
-      <button type="button" data-target="pub-section" class="active">
-        <span class="emoji">📚</span>
-        <span>Nouvelle publication</span>
-      </button>
-      <button type="button" data-target="event-section">
-        <span class="emoji">📅</span>
-        <span>Nouvel événement scientifique</span>
-      </button>
-      <button type="button" data-target="comm-section">
-        <span class="emoji">🗣️</span>
-        <span>Nouvelle communication</span>
-      </button>
+<body>
+<div class="page">
+
+<header>
+  <h1>Déclarations du laboratoire</h1>
+  <p class="subtitle">Les données sont envoyées automatiquement dans Zotero.</p>
+</header>
+
+<div class="switcher">
+  <button class="active">Nouvelle publication</button>
+</div>
+
+<form id="pub-form">
+
+  <label>
+    <span>Type de publication *</span>
+    <select name="pubType" id="pubType">
+      <option value="book">Livre</option>
+      <option value="bookSection">Chapitre d’ouvrage</option>
+    </select>
+  </label>
+
+  <label>
+    <span>Title *</span>
+    <input name="title" required>
+  </label>
+
+  <div class="authors-title">Author(s) *</div>
+  <div id="authors-list"></div>
+  <button type="button" id="add-author-btn" class="btn-secondary">+ Ajouter un auteur</button>
+
+  <!-- ====== CHAMPS LIVRE ====== -->
+  <div id="book-fields">
+
+    <div class="two-cols">
+      <label><span>Date *</span><input name="date"></label>
+      <label><span>Language</span><input name="language"></label>
     </div>
 
-    <p class="hint">
-      Cliquez sur un bouton ci-dessus pour afficher le formulaire correspondant. Seuls quelques champs sont obligatoires.
-    </p>
+    <div class="two-cols">
+      <label><span>Publisher *</span><input name="publisher"></label>
+      <label><span>Place *</span><input name="place"></label>
+    </div>
 
-    <!-- SECTION PUBLICATION : CHAPITRE D'OUVRAGE -->
-    <section id="pub-section" class="section visible">
-      <form id="pub-form">
-        <h2>Nouvelle publication (Chapitre d’ouvrage)</h2>
-        <p class="description">
-          Déclarez un chapitre de livre (Book Section). Les informations sont envoyées vers Zotero.
-        </p>
+    <label><span>ISBN</span><input name="isbn"></label>
+    <label><span>Abstract</span><textarea name="abstract"></textarea></label>
 
-        <label>
-          <span>Title *</span>
-          <input name="title" required>
-        </label>
-
-        <div class="authors-title">Author(s) *</div>
-        <div id="authors-list"></div>
-
-        <div class="subtle-actions">
-          <button type="button" id="add-author-btn" class="btn-secondary">+ Ajouter un auteur</button>
-          <span style="color:var(--text-muted); font-size:0.85rem;">Prénom/Nom (minimum : un auteur)</span>
-        </div>
-
-        <label>
-          <span>Book Title *</span>
-          <input name="bookTitle" required>
-        </label>
-
-        <div class="two-cols">
-          <label>
-            <span>Date *</span>
-            <input name="date" placeholder="2025 ou 2025-03-15" required>
-          </label>
-          <label>
-            <span>Pages</span>
-            <input name="pages" placeholder="123-145">
-          </label>
-        </div>
-
-        <div class="two-cols">
-          <label>
-            <span>Publisher *</span>
-            <input name="publisher" required>
-          </label>
-          <label>
-            <span>Place *</span>
-            <input name="place" required>
-          </label>
-        </div>
-
-        <div class="two-cols">
-          <label>
-            <span>Series</span>
-            <input name="series">
-          </label>
-          <label>
-            <span>Series Number</span>
-            <input name="seriesNumber">
-          </label>
-        </div>
-
-        <div class="two-cols">
-          <label>
-            <span>Volume</span>
-            <input name="volume">
-          </label>
-          <label>
-            <span>Edition</span>
-            <input name="edition">
-          </label>
-        </div>
-
-        <label>
-          <span>ISBN</span>
-          <input name="isbn" placeholder="978-...">
-        </label>
-
-        <label>
-          <span>Extra</span>
-          <textarea name="extra" rows="4" placeholder="Infos internes, HAL, projet, axe, etc."></textarea>
-        </label>
-
-        <button type="submit">
-          <span>Envoyer vers Zotero</span>
-        </button>
-        <p id="pub-status" class="status"></p>
-      </form>
-    </section>
-
-    <!-- SECTION EVENEMENT (placeholder : on retravaillera plus tard) -->
-    <section id="event-section" class="section">
-      <form id="event-form">
-        <h2>Nouvel événement scientifique</h2>
-        <p class="description">
-          (Formulaire à retravailler ensuite.)
-        </p>
-
-        <label>
-          <span>Titre *</span>
-          <input name="title" required>
-        </label>
-
-        <button type="submit">
-          <span>Envoyer vers Zotero</span>
-        </button>
-        <p id="event-status" class="status"></p>
-      </form>
-    </section>
-
-    <!-- SECTION COMMUNICATION (placeholder : on retravaillera plus tard) -->
-    <section id="comm-section" class="section">
-      <form id="comm-form">
-        <h2>Nouvelle communication</h2>
-        <p class="description">
-          (Formulaire à retravailler ensuite.)
-        </p>
-
-        <label>
-          <span>Titre *</span>
-          <input name="title" required>
-        </label>
-
-        <button type="submit">
-          <span>Envoyer vers Zotero</span>
-        </button>
-        <p id="comm-status" class="status"></p>
-      </form>
-    </section>
-
-    <footer>
-      Les champs marqués d’un * sont obligatoires.
-    </footer>
   </div>
 
-  <script src="assets/app.js" defer></script>
+  <!-- ====== CHAMPS CHAPITRE ====== -->
+  <div id="section-fields" style="display:none">
+
+    <label><span>Book Title *</span><input name="bookTitle"></label>
+
+    <div class="two-cols">
+      <label><span>Pages</span><input name="pages" placeholder="123–145"></label>
+      <label><span>Edition</span><input name="edition"></label>
+    </div>
+
+    <div class="two-cols">
+      <label><span>Series</span><input name="series"></label>
+      <label><span>Series Number</span><input name="seriesNumber"></label>
+    </div>
+
+    <div class="two-cols">
+      <label><span>Volume</span><input name="volume"></label>
+      <label><span>Date *</span><input name="date"></label>
+    </div>
+
+    <div class="two-cols">
+      <label><span>Publisher *</span><input name="publisher"></label>
+      <label><span>Place *</span><input name="place"></label>
+    </div>
+
+    <label><span>ISBN</span><input name="isbn"></label>
+
+  </div>
+
+  <label>
+    <span>Extra</span>
+    <textarea name="extra"></textarea>
+  </label>
+
+  <button type="submit">Envoyer vers Zotero</button>
+  <p id="pub-status" class="status"></p>
+
+</form>
+</div>
+
+<script src="assets/app.js"></script>
 </body>
 </html>
