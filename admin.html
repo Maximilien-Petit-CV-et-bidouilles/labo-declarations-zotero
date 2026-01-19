@@ -5,10 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Back-office — Suivi HAL / Communication</title>
   <style>
-    :root{
-      --bg:#f5f5f8; --card:#fff; --text:#222; --muted:#666; --border:#ddd;
-      --accent:#2c7be5; --ok:#1b7c3a; --warn:#b26a00; --bad:#b32020;
-    }
+    :root{--bg:#f5f5f8;--card:#fff;--text:#222;--muted:#666;--border:#ddd;--accent:#2c7be5;--ok:#1b7c3a;--warn:#b26a00;--bad:#b32020;}
     *{box-sizing:border-box}
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--text)}
     .wrap{max-width:1150px;margin:28px auto;padding:0 16px}
@@ -17,9 +14,7 @@
     .sub{margin:6px 0 0;color:var(--muted);font-size:.92rem}
     .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:14px}
     .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-    input,button,select{
-      font:inherit;padding:9px 10px;border-radius:10px;border:1px solid var(--border);background:#fff
-    }
+    input,button,select{font:inherit;padding:9px 10px;border-radius:10px;border:1px solid var(--border);background:#fff}
     button{cursor:pointer}
     button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:650}
     button.danger{background:#fff;border-color:rgba(179,32,32,.5);color:var(--bad);font-weight:650}
@@ -33,13 +28,11 @@
     .tag{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;border:1px solid var(--border);font-size:.82rem;background:#fff;white-space:nowrap}
     .tag.ok{border-color:rgba(27,124,58,.35);background:rgba(27,124,58,.08);color:var(--ok)}
     .tag.warn{border-color:rgba(178,106,0,.35);background:rgba(178,106,0,.08);color:var(--warn)}
-    .tag.bad{border-color:rgba(179,32,32,.35);background:rgba(179,32,32,.08);color:var(--bad)}
     .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
     .chk{display:flex;gap:8px;align-items:center}
     .chk input{width:18px;height:18px;padding:0}
     .right{white-space:nowrap}
-    .small{font-size:.85rem;color:var(--muted)}
-    .sticky{position:sticky;top:0;background:var(--bg);padding:10px 0;z-index:5}
+    .hidden{display:none}
   </style>
 </head>
 <body>
@@ -47,37 +40,31 @@
     <header>
       <div>
         <h1>Back-office — Suivi HAL & Communication</h1>
-        <p class="sub">Page privée (token). Met à jour le champ “Extra” dans Zotero (hal_done / comms_done).</p>
+        <p class="sub">Connexion via Netlify Identity. Mise à jour des flags dans Zotero (Extra → bloc [DLAB]).</p>
       </div>
       <div class="row">
-        <button id="refresh" class="primary">Rafraîchir</button>
-        <button id="logout" class="danger">Déconnexion</button>
+        <button id="login" class="primary">Se connecter</button>
+        <button id="logout" class="danger hidden">Se déconnecter</button>
+        <button id="refresh" class="primary hidden">Rafraîchir</button>
       </div>
     </header>
 
-    <div class="card sticky">
+    <div class="card">
       <div class="row">
-        <input id="token" type="password" placeholder="ADMIN_TOKEN" style="min-width:260px" />
-        <button id="saveToken" class="primary">Se connecter</button>
-        <span class="small">Le token est stocké dans ce navigateur (localStorage).</span>
-      </div>
-
-      <div class="row" style="margin-top:10px">
-        <input id="q" type="search" placeholder="Rechercher (titre, auteur, éditeur…)" style="flex:1;min-width:240px" />
-        <select id="filterNeed">
+        <input id="q" class="hidden" type="search" placeholder="Rechercher (titre, auteur, éditeur…)" style="flex:1;min-width:240px" />
+        <select id="filterNeed" class="hidden">
           <option value="all">Tout</option>
           <option value="needsAction">À traiter</option>
           <option value="hal">HAL demandé</option>
           <option value="comms">Com demandée</option>
         </select>
-        <select id="filterType">
+        <select id="filterType" class="hidden">
           <option value="all">Tous types</option>
           <option value="book">Livres</option>
           <option value="bookSection">Chapitres</option>
         </select>
       </div>
-
-      <div class="msg" id="msg"></div>
+      <div class="msg" id="msg">🔒 Non connecté.</div>
     </div>
 
     <div class="card">
@@ -94,12 +81,13 @@
           </tr>
         </thead>
         <tbody id="rows">
-          <tr><td colspan="7" class="small">Connecte-toi avec le token puis “Rafraîchir”.</td></tr>
+          <tr><td colspan="7" class="mini">Connecte-toi via Netlify Identity.</td></tr>
         </tbody>
       </table>
     </div>
   </div>
 
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <script>
     let ALL = [];
 
@@ -110,17 +98,10 @@
     }
     function escapeHtml(str){
       return String(str || '')
-        .replaceAll('&','&amp;')
-        .replaceAll('<','&lt;')
-        .replaceAll('>','&gt;')
-        .replaceAll('"','&quot;')
-        .replaceAll("'","&#039;");
+        .replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')
+        .replaceAll('"','&quot;').replaceAll("'","&#039;");
     }
-    function typeLabel(t){
-      if (t === 'book') return 'Livre';
-      if (t === 'bookSection') return 'Chapitre';
-      return t || '';
-    }
+    function typeLabel(t){ return t === 'book' ? 'Livre' : (t === 'bookSection' ? 'Chapitre' : (t||'')); }
     function yearFromDate(dateStr){
       const m = String(dateStr || '').match(/\b(19|20)\d{2}\b/);
       return m ? m[0] : '';
@@ -136,56 +117,44 @@
       if (needHal || needCom) return {txt:'À traiter', cls:'warn'};
       return {txt:'Traité', cls:'ok'};
     }
-
     function setMsg(t){ $('msg').textContent = t || ''; }
 
-    function getToken(){
-      const t = $('token').value.trim() || localStorage.getItem('ADMIN_TOKEN') || '';
-      return t;
+    function showAuthedUI(isAuthed){
+      ['logout','refresh','q','filterNeed','filterType'].forEach(id => $(id).classList.toggle('hidden', !isAuthed));
+      $('login').classList.toggle('hidden', isAuthed);
     }
-    async function saveToken(){
-  const t = $('token').value.trim();
-  if (!t) { setMsg('Token vide.'); return; }
-  localStorage.setItem('ADMIN_TOKEN', t);
-  setMsg('✅ Token enregistré. Chargement…');
-  await load(); // <-- charge immédiatement
-}
 
-    function logout(){
-      localStorage.removeItem('ADMIN_TOKEN');
-      $('token').value = '';
-      ALL = [];
-      $('rows').innerHTML = `<tr><td colspan="7" class="small">Déconnecté.</td></tr>`;
-      setMsg('Déconnecté.');
+    async function authedFetch(url, options = {}){
+      const user = netlifyIdentity.currentUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const token = await user.jwt(); // JWT GoTrue
+      const headers = Object.assign({}, options.headers || {}, {
+        'Authorization': 'Bearer ' + token
+      });
+
+      return fetch(url, { ...options, headers, cache: 'no-store' });
     }
 
     async function load(){
-      const token = getToken();
-      if (!token) { setMsg('Entre le token puis “Se connecter”.'); return; }
-
       setMsg('⏳ Chargement…');
-      $('rows').innerHTML = `<tr><td colspan="7" class="small">Chargement…</td></tr>`;
+      $('rows').innerHTML = `<tr><td colspan="7" class="mini">Chargement…</td></tr>`;
 
-      const r = await fetch('/.netlify/functions/admin-items', {
-        headers: { 'X-Admin-Token': token },
-        cache: 'no-store'
-      });
-
+      const r = await authedFetch('/.netlify/functions/admin-items');
       const data = await r.json().catch(()=>({}));
 
-      if (!r.ok) {
-        $('rows').innerHTML = `<tr><td colspan="7" class="small">Erreur: ${escapeHtml(data?.error || 'accès refusé')}</td></tr>`;
-        setMsg('❌ Accès refusé ou erreur serveur.');
+      if (!r.ok){
+        setMsg('❌ Erreur: ' + (data?.error || 'accès refusé'));
+        $('rows').innerHTML = `<tr><td colspan="7" class="mini">Erreur serveur.</td></tr>`;
         return;
       }
 
       ALL = (data.items || []).map(it => ({
         ...it,
         year: it.year || yearFromDate(it.date),
-        creatorsText: it.creatorsText || ''
       }));
 
-      setMsg(`✅ ${ALL.length} item(s) chargés. (Dernière sync: ${new Date(data.fetchedAt).toLocaleString('fr-FR')})`);
+      setMsg(`✅ ${ALL.length} item(s) chargés. (sync: ${new Date(data.fetchedAt).toLocaleString('fr-FR')})`);
       render();
     }
 
@@ -220,7 +189,7 @@
       tbody.innerHTML = '';
 
       if (!rows.length){
-        tbody.innerHTML = `<tr><td colspan="7" class="small">Aucun résultat.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="mini">Aucun résultat.</td></tr>`;
         return;
       }
 
@@ -230,43 +199,36 @@
 
         const halWanted = flags.hal_create === 'yes';
         const commWanted = flags.comms_publish === 'yes';
-
         const halDone = flags.hal_done === 'yes';
         const commDone = flags.comms_done === 'yes';
 
-        const halTag = halWanted ? (halDone ? 'Demandé (traité)' : 'Demandé') : 'Non';
-        const commTag = commWanted ? (commDone ? 'Demandé (traité)' : 'Demandé') : 'Non';
-
         const tr = document.createElement('tr');
-
-        const titleLine = it.title || '(sans titre)';
-        const inBook = it.bookTitle ? `<div class="mini">Dans : ${escapeHtml(it.bookTitle)}</div>` : '';
-
         tr.innerHTML = `
           <td class="right">${escapeHtml(it.year || '')}</td>
           <td><span class="tag">${escapeHtml(typeLabel(it.itemType))}</span></td>
           <td>
-            <div class="title">${escapeHtml(titleLine)}</div>
-            ${inBook}
+            <div class="title">${escapeHtml(it.title || '(sans titre)')}</div>
+            ${it.bookTitle ? `<div class="mini">Dans : ${escapeHtml(it.bookTitle)}</div>` : ''}
             <div class="mini">${escapeHtml(it.publisher || '')}${it.publisher && it.place ? ' — ' : ''}${escapeHtml(it.place || '')}${it.isbn ? ' — ISBN ' + escapeHtml(it.isbn) : ''}</div>
           </td>
           <td>${escapeHtml(it.creatorsText || '')}</td>
+
           <td>
-            <div class="tag ${halWanted ? 'warn' : ''}">${escapeHtml(halTag)}</div>
-            ${halWanted ? `
-              <div class="chk mini" style="margin-top:8px">
-                <input type="checkbox" data-k="${it.key}" data-field="hal_done" ${halDone ? 'checked' : ''}/>
-                <span>HAL traité</span>
-              </div>` : `<div class="mini muted">—</div>`}
+            <div class="tag ${halWanted ? 'warn' : ''}">${halWanted ? (halDone ? 'Demandé (traité)' : 'Demandé') : 'Non'}</div>
+            ${halWanted ? `<div class="chk mini" style="margin-top:8px">
+              <input type="checkbox" data-k="${it.key}" data-field="hal_done" ${halDone ? 'checked' : ''}/>
+              <span>HAL traité</span>
+            </div>` : `<div class="mini muted">—</div>`}
           </td>
+
           <td>
-            <div class="tag ${commWanted ? 'warn' : ''}">${escapeHtml(commTag)}</div>
-            ${commWanted ? `
-              <div class="chk mini" style="margin-top:8px">
-                <input type="checkbox" data-k="${it.key}" data-field="comms_done" ${commDone ? 'checked' : ''}/>
-                <span>Com traitée</span>
-              </div>` : `<div class="mini muted">—</div>`}
+            <div class="tag ${commWanted ? 'warn' : ''}">${commWanted ? (commDone ? 'Demandé (traité)' : 'Demandé') : 'Non'}</div>
+            ${commWanted ? `<div class="chk mini" style="margin-top:8px">
+              <input type="checkbox" data-k="${it.key}" data-field="comms_done" ${commDone ? 'checked' : ''}/>
+              <span>Com traitée</span>
+            </div>` : `<div class="mini muted">—</div>`}
           </td>
+
           <td>
             <div class="actions">
               <button class="primary" data-save="${it.key}">Enregistrer</button>
@@ -275,11 +237,9 @@
             <div class="mini muted">Key: ${escapeHtml(it.key)}</div>
           </td>
         `;
-
         tbody.appendChild(tr);
       }
 
-      // wire save buttons
       tbody.querySelectorAll('button[data-save]').forEach(btn => {
         btn.addEventListener('click', async () => {
           const key = btn.getAttribute('data-save');
@@ -289,12 +249,8 @@
     }
 
     async function saveRow(key, btn){
-      const token = getToken();
-      if (!token) { setMsg('Token manquant.'); return; }
-
       const checks = [...document.querySelectorAll(`input[type="checkbox"][data-k="${key}"]`)];
       const payload = { key };
-
       for (const c of checks){
         const field = c.getAttribute('data-field');
         payload[field] = c.checked ? 'yes' : 'no';
@@ -306,22 +262,17 @@
       setMsg('⏳ Mise à jour Zotero…');
 
       try{
-        const r = await fetch('/.netlify/functions/admin-update-status', {
+        const r = await authedFetch('/.netlify/functions/admin-update-status', {
           method:'POST',
-          headers:{
-            'Content-Type':'application/json',
-            'X-Admin-Token': token
-          },
+          headers:{ 'Content-Type':'application/json' },
           body: JSON.stringify(payload)
         });
-
         const data = await r.json().catch(()=>({}));
 
         if (!r.ok){
           setMsg('❌ Erreur: ' + (data?.error || 'mise à jour impossible'));
         } else {
-          setMsg('✅ Mis à jour. Rafraîchis pour voir le public à jour.');
-          // reload list to show updated flags
+          setMsg('✅ Mis à jour.');
           await load();
         }
       } finally {
@@ -330,5 +281,32 @@
       }
     }
 
-    // init token field
-    const saved = loca
+    // Identity wiring
+    $('login').addEventListener('click', () => netlifyIdentity.open());
+    $('logout').addEventListener('click', () => netlifyIdentity.logout());
+    $('refresh').addEventListener('click', load);
+    ['q','filterNeed','filterType'].forEach(id => $(id).addEventListener('input', render));
+
+    netlifyIdentity.on('init', user => {
+      showAuthedUI(!!user);
+      setMsg(user ? '✅ Connecté. Clique “Rafraîchir”.' : '🔒 Non connecté.');
+    });
+
+    netlifyIdentity.on('login', user => {
+      showAuthedUI(true);
+      netlifyIdentity.close();
+      setMsg('✅ Connecté. Chargement…');
+      load();
+    });
+
+    netlifyIdentity.on('logout', () => {
+      showAuthedUI(false);
+      ALL = [];
+      $('rows').innerHTML = `<tr><td colspan="7" class="mini">Déconnecté.</td></tr>`;
+      setMsg('🔒 Déconnecté.');
+    });
+
+    netlifyIdentity.init();
+  </script>
+</body>
+</html>
