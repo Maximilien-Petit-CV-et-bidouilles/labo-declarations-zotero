@@ -1,8 +1,5 @@
 // netlify/functions/zotero-create-item.js
 
-// Cette fonction reçoit les données du formulaire
-// et crée un item dans Zotero via l’API.
-
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return {
@@ -25,7 +22,6 @@ exports.handler = async (event) => {
       };
     }
 
-    // Construire l’item Zotero
     const item = buildZoteroItemFromPayload(payload);
 
     const response = await fetch(
@@ -37,7 +33,7 @@ exports.handler = async (event) => {
           'Zotero-API-Key': apiKey,
           'Zotero-API-Version': '3'
         },
-        body: JSON.stringify([item]) // l’API attend un tableau
+        body: JSON.stringify([item])
       }
     );
 
@@ -62,12 +58,29 @@ exports.handler = async (event) => {
   }
 };
 
-// -- mapping simple formulaire -> item Zotero --
+// Mapping simple des 3 types de formulaires vers Zotero
 function buildZoteroItemFromPayload(payload) {
-  const itemType = payload.itemType || 'journalArticle';
+  const kind = payload.kind || 'publication';
+  let itemType = 'journalArticle';
+  let date = '';
 
-  // transformer "Prénom Nom, Prénom Nom" en tableau creators
-  const creators = (payload.authors || '')
+  if (kind === 'publication') {
+    itemType = payload.itemType || 'journalArticle';
+    date = payload.year || '';
+  } else if (kind === 'event') {
+    // Pour les événements, on utilise un "report" générique
+    itemType = 'report';
+    // on stocke la date de début
+    date = payload.startDate || '';
+  } else if (kind === 'communication') {
+    // Pour les communications, on peut utiliser "presentation"
+    itemType = 'presentation';
+    date = payload.date || payload.year || '';
+  }
+
+  // Créateurs (auteurs / intervenants) si fournis
+  const rawAuthors = payload.authors || '';
+  const creators = rawAuthors
     .split(',')
     .map((a) => a.trim())
     .filter(Boolean)
@@ -87,16 +100,60 @@ function buildZoteroItemFromPayload(payload) {
   if (payload.internalNotes) {
     extraLines.push(`Internal notes: ${payload.internalNotes}`);
   }
-  // tu pourras ajouter ici x-audience, x-language, id HAL, etc.
 
-  return {
+  if (kind === 'event') {
+    if (payload.eventType) {
+      extraLines.push(`eventType: ${payload.eventType}`);
+    }
+    if (payload.endDate) {
+      extraLines.push(`endDate: ${payload.endDate}`);
+    }
+    if (payload.organizers) {
+      extraLines.push(`organizers: ${payload.organizers}`);
+    }
+  }
+
+  if (kind === 'communication') {
+    if (payload.commType) {
+      extraLines.push(`communicationType: ${payload.commType}`);
+    }
+    if (payload.eventName) {
+      extraLines.push(`eventName: ${payload.eventName}`);
+    }
+  }
+
+  const baseItem = {
     itemType,
     title: payload.title || '',
     creators,
-    date: payload.year || '',
-    DOI: payload.doi || '',
-    publicationTitle: payload.publicationTitle || '',
+    date,
     extra: extraLines.join('\n'),
-    collections: [] // pour l’instant, pas de collection spécifique
+    collections: []
   };
+
+  if (kind === 'publication') {
+    return {
+      ...baseItem,
+      DOI: payload.doi || '',
+      publicationTitle: payload.publicationTitle || ''
+    };
+  }
+
+  if (kind === 'event') {
+    return {
+      ...baseItem,
+      place: payload.location || '',
+      url: payload.url || ''
+    };
+  }
+
+  if (kind === 'communication') {
+    return {
+      ...baseItem,
+      place: payload.location || '',
+      conferenceName: payload.eventName || ''
+    };
+  }
+
+  return baseItem;
 }
