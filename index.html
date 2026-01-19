@@ -198,5 +198,23 @@
   </div>
 
   <script src="assets/app.js"></script>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+<script>
+  // Initialise le widget
+  if (window.netlifyIdentity) {
+    window.netlifyIdentity.on("init", (user) => {
+      // Si on arrive via un lien d'invitation / confirmation, Netlify met souvent un hash dans l’URL
+      // On ouvre le widget automatiquement pour permettre la création/validation.
+      if (!user) {
+        const h = window.location.hash || "";
+        if (h.includes("invite_token") || h.includes("confirmation_token") || h.includes("recovery_token")) {
+          window.netlifyIdentity.open();
+        }
+      }
+    });
+    window.netlifyIdentity.init();
+  }
+</script>
+
 </body>
 </html>
