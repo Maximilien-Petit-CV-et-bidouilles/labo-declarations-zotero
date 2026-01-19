@@ -143,12 +143,14 @@
       const t = $('token').value.trim() || localStorage.getItem('ADMIN_TOKEN') || '';
       return t;
     }
-    function saveToken(){
-      const t = $('token').value.trim();
-      if (!t) { setMsg('Token vide.'); return; }
-      localStorage.setItem('ADMIN_TOKEN', t);
-      setMsg('✅ Token enregistré. Clique “Rafraîchir”.');
-    }
+    async function saveToken(){
+  const t = $('token').value.trim();
+  if (!t) { setMsg('Token vide.'); return; }
+  localStorage.setItem('ADMIN_TOKEN', t);
+  setMsg('✅ Token enregistré. Chargement…');
+  await load(); // <-- charge immédiatement
+}
+
     function logout(){
       localStorage.removeItem('ADMIN_TOKEN');
       $('token').value = '';
