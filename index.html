@@ -220,60 +220,75 @@
 
     <!-- SECTION PUBLICATION -->
     <section id="pub-section" class="section visible">
-      <form id="pub-form">
-        <h2>Nouvelle publication</h2>
-        <p class="description">
-          Pour les articles, chapitres, ouvrages, rapports… Les informations seront envoyées dans la bibliothèque Zotero du laboratoire.
-        </p>
+  <form id="pub-form">
+    <h2>Nouvelle publication (Livre)</h2>
+    <p class="description">
+      Déclarez un livre. Les informations sont envoyées vers Zotero.
+    </p>
 
-        <label>
-          <span>Titre de la publication *</span>
-          <input name="title" required>
-        </label>
+    <label>
+      <span>Title *</span>
+      <input name="title" required>
+    </label>
 
-        <label>
-          <span>Auteurs (séparés par des virgules) *</span>
-          <input name="authors" placeholder="Prénom Nom, Prénom Nom" required>
-        </label>
+    <label>
+      <span>Author(s) *</span>
+      <input name="authors" placeholder="Prénom Nom, Prénom Nom" required>
+    </label>
 
-        <div class="two-cols">
-          <label>
-            <span>Année de publication *</span>
-            <input name="year" type="number" min="1900" max="2100" required>
-          </label>
+    <div class="two-cols">
+      <label>
+        <span>Date *</span>
+        <input name="date" placeholder="2025 ou 2025-03-15" required>
+      </label>
 
-          <label>
-            <span>Type de document</span>
-            <select name="itemType">
-              <option value="journalArticle">Article de revue</option>
-              <option value="book">Livre</option>
-              <option value="bookSection">Chapitre d’ouvrage</option>
-              <option value="report">Rapport</option>
-            </select>
-          </label>
-        </div>
+      <label>
+        <span>Language</span>
+        <select name="language">
+          <option value="">(non renseigné)</option>
+          <option value="fr">fr</option>
+          <option value="en">en</option>
+          <option value="es">es</option>
+          <option value="de">de</option>
+          <option value="it">it</option>
+        </select>
+      </label>
+    </div>
 
-        <label>
-          <span>DOI (facultatif)</span>
-          <input name="doi" placeholder="10.xxxx/xxxxx">
-        </label>
+    <div class="two-cols">
+      <label>
+        <span>Publisher *</span>
+        <input name="publisher" required>
+      </label>
 
-        <label>
-          <span>Revue / Ouvrage / Support (facultatif)</span>
-          <input name="publicationTitle" placeholder="Nom de la revue ou de l’ouvrage">
-        </label>
+      <label>
+        <span>Place *</span>
+        <input name="place" required>
+      </label>
+    </div>
 
-        <label>
-          <span>Remarques internes (facultatif)</span>
-          <textarea name="internalNotes" rows="3" placeholder="Infos pour le labo, dépôt HAL prévu, projet, etc."></textarea>
-        </label>
+    <label>
+      <span>ISBN</span>
+      <input name="isbn" placeholder="978-...">
+    </label>
 
-        <button type="submit">
-          <span>Envoyer vers Zotero</span>
-        </button>
-        <p id="pub-status" class="status"></p>
-      </form>
-    </section>
+    <label>
+      <span>Abstract</span>
+      <textarea name="abstract" rows="4"></textarea>
+    </label>
+
+    <label>
+      <span>Extra</span>
+      <textarea name="extra" rows="4" placeholder="Infos internes, HAL, projet, axe, etc."></textarea>
+    </label>
+
+    <button type="submit">
+      <span>Envoyer vers Zotero</span>
+    </button>
+    <p id="pub-status" class="status"></p>
+  </form>
+</section>
+
 
     <!-- SECTION EVENEMENT -->
     <section id="event-section" class="section">
