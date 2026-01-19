@@ -30,15 +30,14 @@ async function sendToZotero(payload, form, statusId) {
     if (resp.ok) {
       setStatus(statusId, '✅ Déclaration envoyée à Zotero.', true);
       form.reset();
+
+      // Après reset : réinitialiser la liste d'auteurs avec une ligne
+      if (payload.kind === 'publication') {
+        resetAuthorsUI();
+      }
     } else {
       console.error('Erreur Zotero:', text);
-      console.error('Erreur Zotero:', text);
-setStatus(
-  statusId,
-  '❌ Erreur Zotero : ' + text,
-  false
-);
-
+      setStatus(statusId, `❌ Erreur (${resp.status}) : ${text}`, false);
     }
   } catch (err) {
     console.error(err);
@@ -47,94 +46,6 @@ setStatus(
     button.disabled = false;
     button.textContent = originalLabel;
   }
-}
-
-// --- Publications ---
-function handlePublicationForm(form) {
-  const payload = {
-    kind: 'publication',
-    pubType: 'book',
-    title: form.title.value.trim(),
-    authors: form.authors.value.trim(),
-    date: form.date.value.trim(), // année ou date libre
-    abstract: form.abstract.value.trim() || null,
-    publisher: form.publisher.value.trim(),
-    place: form.place.value.trim(),
-    isbn: form.isbn.value.trim() || null,
-    language: form.language.value || null,
-    extra: form.extra.value.trim() || null
-  };
-
-  if (!payload.title || !payload.authors || !payload.date || !payload.publisher || !payload.place) {
-    setStatus(
-      'pub-status',
-      'Merci de remplir au moins Title, Author(s), Date, Publisher et Place.',
-      false
-    );
-    return;
-  }
-
-  sendToZotero(payload, form, 'pub-status');
-}
-
-// --- Événements ---
-function handleEventForm(form) {
-  const payload = {
-    kind: 'event',
-    title: form.title.value.trim(),
-    eventType: form.eventType.value,
-    location: form.location.value.trim(),
-    startDate: form.startDate.value,
-    endDate: form.endDate.value || null,
-    organizers: form.organizers.value.trim() || null,
-    url: form.url.value.trim() || null,
-    internalNotes: form.internalNotes.value.trim() || null
-  };
-
-  if (!payload.title || !payload.eventType || !payload.location || !payload.startDate) {
-    setStatus(
-      'event-status',
-      'Merci de remplir au moins le titre, le type, le lieu et la date de début.',
-      false
-    );
-    return;
-  }
-
-  sendToZotero(payload, form, 'event-status');
-}
-
-// --- Communications ---
-function handleCommForm(form) {
-  const payload = {
-    kind: 'communication',
-    title: form.title.value.trim(),
-    authors: form.authors.value.trim(),
-    commType: form.commType.value,
-    year: form.year.value.trim(),
-    eventName: form.eventName.value.trim(),
-    location: form.location.value.trim(),
-    date: form.date.value,
-    internalNotes: form.internalNotes.value.trim() || null
-  };
-
-  if (
-    !payload.title ||
-    !payload.authors ||
-    !payload.commType ||
-    !payload.year ||
-    !payload.eventName ||
-    !payload.location ||
-    !payload.date
-  ) {
-    setStatus(
-      'comm-status',
-      'Merci de remplir tous les champs obligatoires (titre, auteurs, type, année, événement, lieu, date).',
-      false
-    );
-    return;
-  }
-
-  sendToZotero(payload, form, 'comm-status');
 }
 
 // --- Gestion de l’affichage des sections ---
@@ -158,32 +69,39 @@ function setupSectionSwitcher() {
     });
   });
 
-  // Par défaut, on s’assure que la section publication est visible
   showSection('pub-section');
 }
 
-// --- Initialisation ---
+// --- Auteurs dynamiques ---
+function escapeHtml(str) {
+  return String(str)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
 function addAuthorRow(firstName = '', lastName = '') {
   const list = document.getElementById('authors-list');
   if (!list) return;
 
   const row = document.createElement('div');
-  row.className = 'two-cols';
-  row.style.marginBottom = '10px';
+  row.className = 'author-row';
 
   row.innerHTML = `
-    <label>
-      <span>Prénom</span>
-      <input name="authorFirstName" value="${escapeHtml(firstName)}" />
-    </label>
-    <label>
-      <span>Nom *</span>
-      <input name="authorLastName" value="${escapeHtml(lastName)}" required />
-    </label>
-    <div style="grid-column: 1 / -1; display:flex; justify-content:flex-end;">
-      <button type="button" class="remove-author-btn" style="background:transparent;border:none;color:var(--text-muted);cursor:pointer;padding:0;">
-        Supprimer
-      </button>
+    <div class="two-cols">
+      <label>
+        <span>Prénom</span>
+        <input name="authorFirstName" value="${escapeHtml(firstName)}" />
+      </label>
+      <label>
+        <span>Nom *</span>
+        <input name="authorLastName" value="${escapeHtml(lastName)}" required />
+      </label>
+    </div>
+    <div class="row-actions">
+      <button type="button" class="btn-link remove-author-btn">Supprimer</button>
     </div>
   `;
 
@@ -194,31 +112,102 @@ function addAuthorRow(firstName = '', lastName = '') {
   list.appendChild(row);
 }
 
+function resetAuthorsUI() {
+  const list = document.getElementById('authors-list');
+  if (!list) return;
+  list.innerHTML = '';
+  addAuthorRow();
+}
+
 function getAuthorsFromForm(form) {
   const firstNames = Array.from(form.querySelectorAll('input[name="authorFirstName"]'));
   const lastNames = Array.from(form.querySelectorAll('input[name="authorLastName"]'));
 
   const authors = [];
-  for (let i = 0; i < Math.max(firstNames.length, lastNames.length); i++) {
+  const n = Math.max(firstNames.length, lastNames.length);
+
+  for (let i = 0; i < n; i++) {
     const fn = (firstNames[i]?.value || '').trim();
     const ln = (lastNames[i]?.value || '').trim();
     if (fn || ln) authors.push({ firstName: fn, lastName: ln });
   }
-  return authors;
+
+  // Filtrer lignes vides
+  return authors.filter(a => (a.firstName || a.lastName));
 }
 
-// mini helper pour éviter d’injecter du texte brut dans innerHTML
-function escapeHtml(str) {
-  return String(str)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
+// --- Publications : Livre ---
+function handlePublicationForm(form) {
+  const authors = getAuthorsFromForm(form);
+
+  const payload = {
+    kind: 'publication',
+    pubType: 'book',
+    title: form.title.value.trim(),
+    authors, // tableau [{firstName,lastName}]
+    date: form.date.value.trim(),
+    abstract: form.abstract.value.trim() || null,
+    publisher: form.publisher.value.trim(),
+    place: form.place.value.trim(),
+    isbn: form.isbn.value.trim() || null,
+    language: form.language.value || null,
+    extra: form.extra.value.trim() || null
+  };
+
+  if (!payload.title || authors.length === 0 || !payload.date || !payload.publisher || !payload.place) {
+    setStatus('pub-status', 'Merci de remplir Title, au moins un auteur, Date, Publisher et Place.', false);
+    return;
+  }
+
+  // si l'auteur n'a pas de nom du tout, refuser (UX)
+  const hasAtLeastOneLastName = authors.some(a => (a.lastName || '').trim().length > 0);
+  if (!hasAtLeastOneLastName) {
+    setStatus('pub-status', 'Merci de renseigner au moins un Nom d’auteur.', false);
+    return;
+  }
+
+  sendToZotero(payload, form, 'pub-status');
 }
 
+// --- Événements (placeholder) ---
+function handleEventForm(form) {
+  const payload = {
+    kind: 'event',
+    title: form.title.value.trim()
+  };
+
+  if (!payload.title) {
+    setStatus('event-status', 'Merci de renseigner un titre.', false);
+    return;
+  }
+
+  sendToZotero(payload, form, 'event-status');
+}
+
+// --- Communications (placeholder) ---
+function handleCommForm(form) {
+  const payload = {
+    kind: 'communication',
+    title: form.title.value.trim()
+  };
+
+  if (!payload.title) {
+    setStatus('comm-status', 'Merci de renseigner un titre.', false);
+    return;
+  }
+
+  sendToZotero(payload, form, 'comm-status');
+}
+
+// --- Initialisation ---
 document.addEventListener('DOMContentLoaded', () => {
   setupSectionSwitcher();
+
+  // init auteurs
+  resetAuthorsUI();
+
+  const addBtn = document.getElementById('add-author-btn');
+  if (addBtn) addBtn.addEventListener('click', () => addAuthorRow());
 
   const pubForm = document.getElementById('pub-form');
   if (pubForm) {
