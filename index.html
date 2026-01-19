@@ -2,113 +2,408 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <title>Déclaration de publications du labo</title>
+  <title>Déclarations – Laboratoire</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
+    :root {
+      --bg: #f5f5f8;
+      --card: #ffffff;
+      --accent: #2c7be5;
+      --accent-soft: #e1ecff;
+      --text-main: #222222;
+      --text-muted: #666666;
+      --border: #dddddd;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
+      margin: 0;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      max-width: 800px;
-      margin: 40px auto;
+      background: var(--bg);
+      color: var(--text-main);
+    }
+
+    .page {
+      max-width: 900px;
+      margin: 32px auto 40px;
       padding: 0 16px;
-      background: #f7f7fb;
     }
-    h1, h2 {
-      color: #222;
-    }
-    form {
-      background: #fff;
-      padding: 16px;
-      border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(0,0,0,.05);
+
+    header {
       margin-bottom: 24px;
     }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.7rem;
+      font-weight: 650;
+    }
+
+    .subtitle {
+      margin: 0;
+      font-size: 0.95rem;
+      color: var(--text-muted);
+    }
+
+    /* Barre de boutons */
+    .switcher {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 24px 0 16px;
+    }
+
+    .switcher button {
+      flex: 1 1 220px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      padding: 10px 16px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .switcher button span.emoji {
+      font-size: 1.2rem;
+    }
+
+    .switcher button.active {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      box-shadow: 0 0 0 1px rgba(44, 123, 229, 0.2);
+    }
+
+    .switcher button:hover:not(.active) {
+      background: #f0f2f7;
+    }
+
+    .hint {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    /* Sections / formulaires */
+    .section {
+      display: none;
+    }
+
+    .section.visible {
+      display: block;
+    }
+
+    form {
+      background: var(--card);
+      padding: 18px 16px 16px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+      border: 1px solid var(--border);
+      margin-bottom: 20px;
+    }
+
+    form h2 {
+      margin: 0 0 10px;
+      font-size: 1.2rem;
+    }
+
+    form p.description {
+      margin: 0 0 16px;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
     label {
       display: block;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
+      font-size: 0.9rem;
       font-weight: 600;
     }
+
+    label span {
+      display: block;
+      margin-bottom: 3px;
+    }
+
     input, select, textarea {
       width: 100%;
       padding: 8px;
-      margin-top: 4px;
-      margin-bottom: 12px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
       font: inherit;
+      margin: 0;
     }
-    button {
+
+    textarea {
+      resize: vertical;
+    }
+
+    .two-cols {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px 16px;
+    }
+
+    button[type="submit"] {
+      margin-top: 8px;
       padding: 8px 16px;
+      border-radius: 999px;
       border: none;
-      border-radius: 4px;
-      background: #2c7be5;
-      color: #fff;
+      background: var(--accent);
+      color: #ffffff;
       font-weight: 600;
+      font-size: 0.95rem;
       cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
-    button:disabled {
-      opacity: .6;
+
+    button[type="submit"]:disabled {
+      opacity: 0.75;
       cursor: default;
     }
+
     .status {
-      margin-top: 8px;
-      font-size: 0.9rem;
+      margin-top: 6px;
+      font-size: 0.85rem;
     }
-    .status.ok { color: #1c7c3a; }
-    .status.err { color: #b32020; }
+    .status.ok {
+      color: #1b7c3a;
+    }
+    .status.err {
+      color: #b32020;
+    }
+
+    footer {
+      margin-top: 24px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
   </style>
 </head>
 <body>
-  <h1>Déclarer unne nouvelle publication</h1>
-  <p>Ce formulaire envoie les informations dans la bibliothèque Zotero du laboratoire.</p>
+  <div class="page">
+    <header>
+      <h1>Déclarations du laboratoire</h1>
+      <p class="subtitle">
+        Déclarez simplement les nouvelles activités pour qu’elles soient enregistrées dans Zotero.
+      </p>
+    </header>
 
-  <form id="pub-form">
-    <h2>Nouvelle publication</h2>
+    <div class="switcher">
+      <button type="button" data-target="pub-section" class="active">
+        <span class="emoji">📚</span>
+        <span>Nouvelle publication</span>
+      </button>
+      <button type="button" data-target="event-section">
+        <span class="emoji">📅</span>
+        <span>Nouvel événement scientifique</span>
+      </button>
+      <button type="button" data-target="comm-section">
+        <span class="emoji">🗣️</span>
+        <span>Nouvelle communication</span>
+      </button>
+    </div>
 
-    <label>
-      Titre de la publication
-      <input name="title" required>
-    </label>
+    <p class="hint">
+      Cliquez sur un bouton ci-dessus pour afficher le formulaire correspondant. Seuls quelques champs sont obligatoires.
+    </p>
 
-    <label>
-      Auteurs (séparés par des virgules)
-      <input name="authors" placeholder="Prénom Nom, Prénom Nom" required>
-    </label>
+    <!-- SECTION PUBLICATION -->
+    <section id="pub-section" class="section visible">
+      <form id="pub-form">
+        <h2>Nouvelle publication</h2>
+        <p class="description">
+          Pour les articles, chapitres, ouvrages, rapports… Les informations seront envoyées dans la bibliothèque Zotero du laboratoire.
+        </p>
 
-    <label>
-      Année de publication
-      <input name="year" type="number" min="1900" max="2100" required>
-    </label>
+        <label>
+          <span>Titre de la publication *</span>
+          <input name="title" required>
+        </label>
 
-    <label>
-      Type de document
-      <select name="itemType">
-        <option value="journalArticle">Article de revue</option>
-        <option value="book">Livre</option>
-        <option value="bookSection">Chapitre d’ouvrage</option>
-        <option value="report">Rapport</option>
-      </select>
-    </label>
+        <label>
+          <span>Auteurs (séparés par des virgules) *</span>
+          <input name="authors" placeholder="Prénom Nom, Prénom Nom" required>
+        </label>
 
-    <label>
-      DOI (facultatif)
-      <input name="doi" placeholder="10.xxxx/xxxxx">
-    </label>
+        <div class="two-cols">
+          <label>
+            <span>Année de publication *</span>
+            <input name="year" type="number" min="1900" max="2100" required>
+          </label>
 
-    <label>
-      Revue / Ouvrage / Support (facultatif)
-      <input name="publicationTitle" placeholder="Nom de la revue ou de l’ouvrage">
-    </label>
+          <label>
+            <span>Type de document</span>
+            <select name="itemType">
+              <option value="journalArticle">Article de revue</option>
+              <option value="book">Livre</option>
+              <option value="bookSection">Chapitre d’ouvrage</option>
+              <option value="report">Rapport</option>
+            </select>
+          </label>
+        </div>
 
-    <label>
-      Remarques internes (facultatif)
-      <textarea name="internalNotes" rows="3" placeholder="Infos pour le labo, par ex. dépôt HAL prévu, projet, etc."></textarea>
-    </label>
+        <label>
+          <span>DOI (facultatif)</span>
+          <input name="doi" placeholder="10.xxxx/xxxxx">
+        </label>
 
-    <button type="submit">Envoyer vers Zotero</button>
-    <p id="pub-status" class="status"></p>
-  </form>
+        <label>
+          <span>Revue / Ouvrage / Support (facultatif)</span>
+          <input name="publicationTitle" placeholder="Nom de la revue ou de l’ouvrage">
+        </label>
 
-  <!-- plus tard : formulaire communications, événements -->
+        <label>
+          <span>Remarques internes (facultatif)</span>
+          <textarea name="internalNotes" rows="3" placeholder="Infos pour le labo, dépôt HAL prévu, projet, etc."></textarea>
+        </label>
+
+        <button type="submit">
+          <span>Envoyer vers Zotero</span>
+        </button>
+        <p id="pub-status" class="status"></p>
+      </form>
+    </section>
+
+    <!-- SECTION EVENEMENT -->
+    <section id="event-section" class="section">
+      <form id="event-form">
+        <h2>Nouvel événement scientifique</h2>
+        <p class="description">
+          Journée d’étude, colloque, séminaire organisé par le laboratoire ou en partenariat.
+        </p>
+
+        <label>
+          <span>Titre de l’événement *</span>
+          <input name="title" required>
+        </label>
+
+        <div class="two-cols">
+          <label>
+            <span>Type d’événement *</span>
+            <select name="eventType" required>
+              <option value="journee">Journée d’étude</option>
+              <option value="colloque">Colloque</option>
+              <option value="seminaire">Séminaire</option>
+              <option value="autre">Autre</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Lieu (ville, établissement) *</span>
+            <input name="location" required>
+          </label>
+        </div>
+
+        <div class="two-cols">
+          <label>
+            <span>Date de début *</span>
+            <input name="startDate" type="date" required>
+          </label>
+          <label>
+            <span>Date de fin (facultatif)</span>
+            <input name="endDate" type="date">
+          </label>
+        </div>
+
+        <label>
+          <span>Organisateurs / équipe organisatrice (facultatif)</span>
+          <input name="organizers" placeholder="Noms des personnes / équipes">
+        </label>
+
+        <label>
+          <span>URL de la page de l’événement (facultatif)</span>
+          <input name="url" placeholder="https://…">
+        </label>
+
+        <label>
+          <span>Remarques internes (facultatif)</span>
+          <textarea name="internalNotes" rows="3" placeholder="Projet, financement, remarques internes…"></textarea>
+        </label>
+
+        <button type="submit">
+          <span>Envoyer vers Zotero</span>
+        </button>
+        <p id="event-status" class="status"></p>
+      </form>
+    </section>
+
+    <!-- SECTION COMMUNICATION -->
+    <section id="comm-section" class="section">
+      <form id="comm-form">
+        <h2>Nouvelle communication</h2>
+        <p class="description">
+          Communication orale, poster, intervention dans une journée d’étude, colloque, séminaire.
+        </p>
+
+        <label>
+          <span>Titre de la communication *</span>
+          <input name="title" required>
+        </label>
+
+        <label>
+          <span>Auteurs / intervenant·es (séparés par des virgules) *</span>
+          <input name="authors" placeholder="Prénom Nom, Prénom Nom" required>
+        </label>
+
+        <div class="two-cols">
+          <label>
+            <span>Type de communication *</span>
+            <select name="commType" required>
+              <option value="orale">Communication orale</option>
+              <option value="poster">Poster</option>
+              <option value="invited">Conférence invitée</option>
+              <option value="autre">Autre</option>
+            </select>
+          </label>
+          <label>
+            <span>Année *</span>
+            <input name="year" type="number" min="1900" max="2100" required>
+          </label>
+        </div>
+
+        <label>
+          <span>Nom de l’événement (colloque, séminaire…) *</span>
+          <input name="eventName" required>
+        </label>
+
+        <div class="two-cols">
+          <label>
+            <span>Lieu (ville, établissement) *</span>
+            <input name="location" required>
+          </label>
+          <label>
+            <span>Date (ou date de début) *</span>
+            <input name="date" type="date" required>
+          </label>
+        </div>
+
+        <label>
+          <span>Remarques internes (facultatif)</span>
+          <textarea name="internalNotes" rows="3" placeholder="Lien avec un projet, financements, etc."></textarea>
+        </label>
+
+        <button type="submit">
+          <span>Envoyer vers Zotero</span>
+        </button>
+        <p id="comm-status" class="status"></p>
+      </form>
+    </section>
+
+    <footer>
+      Les champs marqués d’un * sont obligatoires. Pour toute question, contactez le/la référent·e du laboratoire.
+    </footer>
+  </div>
 
   <script src="assets/app.js" defer></script>
 </body>
