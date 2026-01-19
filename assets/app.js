@@ -1,11 +1,55 @@
 // assets/app.js
 
-async function sendPublication(form) {
-  const statusElt = document.getElementById('pub-status');
-  statusElt.textContent = '';
-  statusElt.className = 'status';
+function setStatus(id, message, ok) {
+  const elt = document.getElementById(id);
+  if (!elt) return;
+  elt.textContent = message || '';
+  elt.className = 'status';
+  if (message) {
+    elt.classList.add(ok ? 'ok' : 'err');
+  }
+}
 
-  const data = {
+async function sendToZotero(payload, form, statusId) {
+  const button = form.querySelector('button[type="submit"]');
+  const originalLabel = button.textContent;
+
+  setStatus(statusId, '', true);
+  button.disabled = true;
+  button.textContent = 'Envoi en cours…';
+
+  try {
+    const resp = await fetch('/.netlify/functions/zotero-create-item', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const text = await resp.text();
+
+    if (resp.ok) {
+      setStatus(statusId, '✅ Déclaration envoyée à Zotero.', true);
+      form.reset();
+    } else {
+      console.error('Erreur Zotero:', text);
+      setStatus(
+        statusId,
+        '❌ Erreur côté serveur / Zotero. Si le problème persiste, contactez le support du labo.',
+        false
+      );
+    }
+  } catch (err) {
+    console.error(err);
+    setStatus(statusId, '❌ Erreur réseau ou serveur : ' + err.message, false);
+  } finally {
+    button.disabled = false;
+    button.textContent = originalLabel;
+  }
+}
+
+// --- Publications ---
+function handlePublicationForm(form) {
+  const payload = {
     kind: 'publication',
     title: form.title.value.trim(),
     authors: form.authors.value.trim(),
@@ -16,51 +60,124 @@ async function sendPublication(form) {
     internalNotes: form.internalNotes.value.trim() || null
   };
 
-  // petite validation côté client
-  if (!data.title || !data.authors || !data.year) {
-    statusElt.textContent = 'Merci de remplir au moins le titre, les auteurs et l’année.';
-    statusElt.classList.add('err');
+  if (!payload.title || !payload.authors || !payload.year) {
+    setStatus('pub-status', 'Merci de remplir au moins le titre, les auteurs et l’année.', false);
     return;
   }
 
-  const button = form.querySelector('button[type="submit"]');
-  button.disabled = true;
-  button.textContent = 'Envoi en cours…';
-
-  try {
-    const resp = await fetch('/.netlify/functions/zotero-create-item', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-
-    const text = await resp.text();
-
-    if (resp.ok) {
-      statusElt.textContent = '✅ Publication envoyée à Zotero.';
-      statusElt.classList.add('ok');
-      form.reset();
-    } else {
-      console.error('Erreur Zotero:', text);
-      statusElt.textContent = '❌ Erreur côté serveur / Zotero. Voir la console navigateur pour les détails.';
-      statusElt.classList.add('err');
-    }
-  } catch (err) {
-    console.error(err);
-    statusElt.textContent = '❌ Erreur réseau ou serveur : ' + err.message;
-    statusElt.classList.add('err');
-  } finally {
-    button.disabled = false;
-    button.textContent = 'Envoyer vers Zotero';
-  }
+  sendToZotero(payload, form, 'pub-status');
 }
 
+// --- Événements ---
+function handleEventForm(form) {
+  const payload = {
+    kind: 'event',
+    title: form.title.value.trim(),
+    eventType: form.eventType.value,
+    location: form.location.value.trim(),
+    startDate: form.startDate.value,
+    endDate: form.endDate.value || null,
+    organizers: form.organizers.value.trim() || null,
+    url: form.url.value.trim() || null,
+    internalNotes: form.internalNotes.value.trim() || null
+  };
+
+  if (!payload.title || !payload.eventType || !payload.location || !payload.startDate) {
+    setStatus(
+      'event-status',
+      'Merci de remplir au moins le titre, le type, le lieu et la date de début.',
+      false
+    );
+    return;
+  }
+
+  sendToZotero(payload, form, 'event-status');
+}
+
+// --- Communications ---
+function handleCommForm(form) {
+  const payload = {
+    kind: 'communication',
+    title: form.title.value.trim(),
+    authors: form.authors.value.trim(),
+    commType: form.commType.value,
+    year: form.year.value.trim(),
+    eventName: form.eventName.value.trim(),
+    location: form.location.value.trim(),
+    date: form.date.value,
+    internalNotes: form.internalNotes.value.trim() || null
+  };
+
+  if (
+    !payload.title ||
+    !payload.authors ||
+    !payload.commType ||
+    !payload.year ||
+    !payload.eventName ||
+    !payload.location ||
+    !payload.date
+  ) {
+    setStatus(
+      'comm-status',
+      'Merci de remplir tous les champs obligatoires (titre, auteurs, type, année, événement, lieu, date).',
+      false
+    );
+    return;
+  }
+
+  sendToZotero(payload, form, 'comm-status');
+}
+
+// --- Gestion de l’affichage des sections ---
+function setupSectionSwitcher() {
+  const buttons = document.querySelectorAll('.switcher button');
+  const sections = document.querySelectorAll('.section');
+
+  function showSection(targetId) {
+    sections.forEach((sec) => {
+      sec.classList.toggle('visible', sec.id === targetId);
+    });
+    buttons.forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.target === targetId);
+    });
+  }
+
+  buttons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.target;
+      if (target) showSection(target);
+    });
+  });
+
+  // Par défaut, on s’assure que la section publication est visible
+  showSection('pub-section');
+}
+
+// --- Initialisation ---
 document.addEventListener('DOMContentLoaded', () => {
+  setupSectionSwitcher();
+
   const pubForm = document.getElementById('pub-form');
   if (pubForm) {
     pubForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      sendPublication(pubForm);
+      handlePublicationForm(pubForm);
+    });
+  }
+
+  const eventForm = document.getElementById('event-form');
+  if (eventForm) {
+    eventForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      handleEventForm(eventForm);
+    });
+  }
+
+  const commForm = document.getElementById('comm-form');
+  if (commForm) {
+    commForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      handleCommForm(commForm);
     });
   }
 });
