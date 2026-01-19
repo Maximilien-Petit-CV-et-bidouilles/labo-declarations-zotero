@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Connexion / Activation</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:40px;max-width:720px}
+    .muted{color:#666}
+    button{font:inherit;padding:10px 14px;border-radius:10px;border:1px solid #ddd;background:#fff;cursor:pointer}
+    button.primary{background:#2c7be5;color:#fff;border-color:#2c7be5;font-weight:650}
+  </style>
+</head>
+<body>
+  <h1>Connexion / Activation du compte</h1>
+  <p class="muted">
+    Si vous venez d’un lien d’invitation ou de récupération, la fenêtre s’ouvre automatiquement.
+  </p>
+  <p>
+    <button id="open" class="primary">Ouvrir la fenêtre</button>
+  </p>
+
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <script>
+    function hasToken(){
+      const h = window.location.hash || "";
+      return h.includes("invite_token=") || h.includes("confirmation_token=") || h.includes("recovery_token=") || h.includes("email_change_token=");
+    }
+
+    document.getElementById('open').addEventListener('click', () => {
+      if (window.netlifyIdentity) window.netlifyIdentity.open();
+    });
+
+    if (window.netlifyIdentity) {
+      window.netlifyIdentity.on("init", (user) => {
+        if (!user && hasToken()) window.netlifyIdentity.open();
+      });
+
+      // Une fois connecté, tu peux renvoyer vers le back-office
+      window.netlifyIdentity.on("login", () => {
+        window.netlifyIdentity.close();
+        window.location.href = "/admin.html";
+      });
+
+      window.netlifyIdentity.init();
+    }
+  </script>
+</body>
+</html>
