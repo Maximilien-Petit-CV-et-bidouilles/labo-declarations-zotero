@@ -1,6 +1,9 @@
 // netlify/functions/admin-update-status.js
 // Met à jour le champ Extra dans Zotero en modifiant le bloc [DLAB] (hal_done / comms_done)
 
+const user = event.clientContext && event.clientContext.user;
+if (!user) return json(401, { error: 'Unauthorized (not logged in)' });
+
 exports.handler = async (event) => {
   try {
     if (event.httpMethod !== 'POST') return json(405, { error: 'Method Not Allowed' });
