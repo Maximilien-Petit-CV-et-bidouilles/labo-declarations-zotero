@@ -52,6 +52,23 @@
     .btn-secondary{border-radius:999px;border:1px solid var(--border);background:#fff;padding:6px 12px;cursor:pointer}
     .small-muted{color:var(--muted);font-size:.85rem;margin-left:8px}
 
+    .opts {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin: 12px 0;
+      background: #fff;
+    }
+    .opts h3 {
+      margin: 0 0 8px;
+      font-size: .95rem;
+    }
+    .opts p {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: .85rem;
+    }
+
     footer{margin-top:18px;color:var(--muted);font-size:.8rem}
   </style>
 </head>
@@ -106,9 +123,7 @@
         <label><span>Abstract</span><textarea name="abstract" rows="4"></textarea></label>
       </div>
 
-      <!-- ====== CHAMPS CHAPITRE ======
-           IMPORTANT : champs renommés pour éviter les doublons (sectionDate, sectionPublisher, etc.)
-      -->
+      <!-- ====== CHAMPS CHAPITRE ====== -->
       <div id="section-fields" style="display:none">
         <label><span>Book Title *</span><input name="bookTitle"></label>
 
@@ -133,6 +148,32 @@
         </div>
 
         <label><span>ISBN</span><input name="sectionIsbn" placeholder="978-..."></label>
+      </div>
+
+      <!-- ====== OPTIONS (HAL / COMMS) ====== -->
+      <div class="opts">
+        <h3>Options</h3>
+        <p>Ces choix seront enregistrés dans Zotero (champ “Extra”).</p>
+
+        <div class="two-cols">
+          <label>
+            <span>Souhaitez-vous la création d’une notice sur HAL ? *</span>
+            <select name="optHal" required>
+              <option value="">— Choisir —</option>
+              <option value="yes">Oui</option>
+              <option value="no">Non</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Souhaitez-vous une communication (newsletter + réseaux sociaux) ? *</span>
+            <select name="optComms" required>
+              <option value="">— Choisir —</option>
+              <option value="yes">Oui</option>
+              <option value="no">Non</option>
+            </select>
+          </label>
+        </div>
       </div>
 
       <label>
