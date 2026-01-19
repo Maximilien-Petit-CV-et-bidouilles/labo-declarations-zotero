@@ -1,12 +1,12 @@
 // netlify/functions/admin-items.js
 exports.handler = async (event) => {
   try {
-    // ✅ Auth Netlify Identity
+    // Auth Netlify Identity
     const user = event.clientContext && event.clientContext.user;
     if (!user) return json(401, { error: 'Unauthorized (not logged in)' });
 
     const apiKey = process.env.ZOTERO_API_KEY;
-    const libraryType = process.env.ZOTERO_LIBRARY_TYPE;
+    const libraryType = process.env.ZOTERO_LIBRARY_TYPE; // 'users' ou 'groups'
     const libraryId = process.env.ZOTERO_LIBRARY_ID;
 
     if (!apiKey || !libraryType || !libraryId) {
