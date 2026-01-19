@@ -1,9 +1,10 @@
 // netlify/functions/admin-update-status.js
+
 exports.handler = async (event) => {
   try {
     if (event.httpMethod !== 'POST') return json(405, { error: 'Method Not Allowed' });
 
-    const user = event.clientContext && event.clientContext.user;
+    const user = await verifyIdentityUser(event);
     if (!user) return json(401, { error: 'Unauthorized (not logged in)' });
 
     const apiKey = process.env.ZOTERO_API_KEY;
@@ -21,10 +22,10 @@ exports.handler = async (event) => {
     const hal_done = normalizeBool((body.hal_done || '').trim());
     const comms_done = normalizeBool((body.comms_done || '').trim());
 
-    const getUrl = `https://api.zotero.org/${libraryType}/${libraryId}/items/${key}`;
+    const itemUrl = `https://api.zotero.org/${libraryType}/${libraryId}/items/${key}`;
 
-    // GET item
-    const getRes = await fetch(getUrl, {
+    // GET item (pour version + extra)
+    const getRes = await fetch(itemUrl, {
       headers: { 'Zotero-API-Key': apiKey, 'Zotero-API-Version': '3' }
     });
     const getRaw = await getRes.text();
@@ -43,7 +44,7 @@ exports.handler = async (event) => {
     item.data.extra = updatedExtra;
 
     // PUT item
-    const putRes = await fetch(getUrl, {
+    const putRes = await fetch(itemUrl, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -98,7 +99,7 @@ function upsertDLAB(extra, updates) {
   }
 
   const map = parseBlockToMap(block);
-  for (const [k,v] of Object.entries(updates || {})) {
+  for (const [k, v] of Object.entries(updates || {})) {
     if (v === 'yes' || v === 'no') map[k] = v;
   }
 
@@ -122,8 +123,8 @@ function parseBlockToMap(block) {
     const v = line.slice(idx + 1).trim().toLowerCase();
     if (!k) continue;
     map[k] = (v === 'yes' || v === 'true' || v === 'oui') ? 'yes'
-          : (v === 'no' || v === 'false' || v === 'non') ? 'no'
-          : v;
+      : (v === 'no' || v === 'false' || v === 'non') ? 'no'
+      : v;
   }
   return map;
 }
@@ -132,4 +133,27 @@ function mapToBlock(map) {
   const order = ['hal_create','comms_publish','hal_done','comms_done','hal_done_date','comms_done_date','hal_id','comms_link'];
   const keys = [...new Set([...order, ...Object.keys(map || {})])].filter(k => map[k] !== undefined);
   return keys.map(k => `${k}: ${map[k]}`).join('\n');
+}
+
+async function verifyIdentityUser(event) {
+  const auth = event.headers?.authorization || event.headers?.Authorization || '';
+  const m = String(auth).match(/^Bearer\s+(.+)$/i);
+  if (!m) return null;
+  const token = m[1].trim();
+  if (!token) return null;
+
+  const siteUrl =
+    process.env.URL ||
+    (event.headers?.origin || event.headers?.Origin || '').trim();
+
+  if (!siteUrl) return null;
+
+  const userUrl = `${siteUrl.replace(/\/$/, '')}/.netlify/identity/user`;
+
+  const res = await fetch(userUrl, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+  if (!res.ok) return null;
+  return await res.json();
 }
