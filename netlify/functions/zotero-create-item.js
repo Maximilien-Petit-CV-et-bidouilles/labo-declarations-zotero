@@ -40,6 +40,7 @@ exports.handler = async (event) => {
     const text = await response.text();
 
     if (!response.ok) {
+      // On renvoie le message brut pour pouvoir le voir dans l’interface
       return {
         statusCode: response.status,
         body: `Erreur Zotero (${response.status}): ${text}`
@@ -58,9 +59,10 @@ exports.handler = async (event) => {
   }
 };
 
-// Mapping simple des 3 types de formulaires vers Zotero
+// Mapping des 3 types de formulaires vers un item Zotero
 function buildZoteroItemFromPayload(payload) {
   const kind = payload.kind || 'publication';
+
   let itemType = 'journalArticle';
   let date = '';
 
@@ -68,18 +70,25 @@ function buildZoteroItemFromPayload(payload) {
     itemType = payload.itemType || 'journalArticle';
     date = payload.year || '';
   } else if (kind === 'event') {
-    // Pour les événements, on utilise un "report" générique
+    // Événements : on utilise un "report" générique
     itemType = 'report';
-    // on stocke la date de début
     date = payload.startDate || '';
   } else if (kind === 'communication') {
-    // Pour les communications, on peut utiliser "presentation"
+    // Communications : on utilise "presentation"
     itemType = 'presentation';
     date = payload.date || payload.year || '';
   }
 
-  // Créateurs (auteurs / intervenants) si fournis
+  // --- Créateurs ---
   const rawAuthors = payload.authors || '';
+  let creatorType = 'author';
+
+  // Pour les communications de type "presentation",
+  // Zotero s’attend à un creatorType "presenter" et non "author"
+  if (kind === 'communication' && itemType === 'presentation') {
+    creatorType = 'presenter';
+  }
+
   const creators = rawAuthors
     .split(',')
     .map((a) => a.trim())
@@ -89,12 +98,13 @@ function buildZoteroItemFromPayload(payload) {
       const firstName = parts.shift();
       const lastName = parts.join(' ');
       return {
-        creatorType: 'author',
+        creatorType,
         firstName: firstName || '',
         lastName: lastName || ''
       };
     });
 
+  // --- Champ "extra" pour poser des méta internes / spécifiques ---
   const extraLines = [];
 
   if (payload.internalNotes) {
