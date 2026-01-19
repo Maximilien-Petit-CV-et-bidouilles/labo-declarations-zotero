@@ -58,9 +58,6 @@ function togglePubType(pubType) {
     pubType === 'book' ? 'block' : 'none';
   document.getElementById('section-fields').style.display =
     pubType === 'bookSection' ? 'block' : 'none';
-
-  // UX: ne pas laisser un vieux "✅ Envoyé" traîner
-  clearStatus();
 }
 
 // --- Init
@@ -71,7 +68,13 @@ document.getElementById('add-author-btn').addEventListener('click', () => addAut
 resetAuthors();
 
 const pubTypeSelect = document.getElementById('pubType');
-pubTypeSelect.addEventListener('change', (e) => togglePubType(e.target.value));
+
+// ✅ On efface le statut uniquement quand l’utilisateur change le type
+pubTypeSelect.addEventListener('change', (e) => {
+  togglePubType(e.target.value);
+  clearStatus();
+});
+
 togglePubType(pubTypeSelect.value);
 
 // --- Submit
@@ -94,7 +97,6 @@ form.addEventListener('submit', async (e) => {
     const pubType = form.pubType.value;
     const isSection = pubType === 'bookSection';
 
-    // Lire les bons champs (évite les doublons)
     const dateValue = isSection
       ? (form.sectionDate?.value || '').trim()
       : (form.date?.value || '').trim();
@@ -131,15 +133,11 @@ form.addEventListener('submit', async (e) => {
       extra: (form.extra.value || '').trim()
     };
 
-    // Validation minimale
     if (!payload.title) throw new Error('Titre manquant.');
     if (!payload.date) throw new Error('Date manquante.');
     if (!payload.publisher) throw new Error('Publisher manquant.');
-    if (!payload.place) throw new Error('Place manquant.');
-
-    if (pubType === 'bookSection' && !payload.bookTitle) {
-      throw new Error('Book Title manquant (chapitre).');
-    }
+    if (!payload.place) throw new Error('Place manquante.');
+    if (pubType === 'bookSection' && !payload.bookTitle) throw new Error('Book Title manquant (chapitre).');
 
     const r = await fetch('/.netlify/functions/zotero-create-item', {
       method: 'POST',
@@ -152,10 +150,10 @@ form.addEventListener('submit', async (e) => {
     if (r.ok) {
       setStatus('✅ Envoyé vers Zotero', 'ok');
 
-      // Optionnel : effacer après 3s pour éviter confusion
+      // (optionnel) effacer après 3s — tu peux commenter cette ligne si tu veux le laisser affiché
       setTimeout(() => clearStatus(), 3000);
 
-      // Reset du formulaire en conservant le type sélectionné
+      // Reset en conservant le type
       const currentType = pubTypeSelect.value;
       form.reset();
       pubTypeSelect.value = currentType;
