@@ -60,6 +60,20 @@ function togglePubType(pubType) {
     pubType === 'bookSection' ? 'block' : 'none';
 }
 
+function buildExtraWithOptions(userExtra, optHal, optComms) {
+  const base = (userExtra || '').trim();
+
+  const block =
+`[DLAB]
+hal_create: ${optHal}
+comms_publish: ${optComms}
+[/DLAB]`;
+
+  // Si l'utilisateur a déjà du texte, on ajoute une ligne vide pour lisibilité
+  if (base) return `${base}\n\n${block}`;
+  return block;
+}
+
 // --- Init
 const form = document.getElementById('pub-form');
 const submitBtn = form.querySelector('button[type="submit"]');
@@ -68,13 +82,10 @@ document.getElementById('add-author-btn').addEventListener('click', () => addAut
 resetAuthors();
 
 const pubTypeSelect = document.getElementById('pubType');
-
-// ✅ On efface le statut uniquement quand l’utilisateur change le type
 pubTypeSelect.addEventListener('change', (e) => {
   togglePubType(e.target.value);
   clearStatus();
 });
-
 togglePubType(pubTypeSelect.value);
 
 // --- Submit
@@ -97,6 +108,16 @@ form.addEventListener('submit', async (e) => {
     const pubType = form.pubType.value;
     const isSection = pubType === 'bookSection';
 
+    // Options obligatoires
+    const optHal = (form.optHal?.value || '').trim();     // yes/no
+    const optComms = (form.optComms?.value || '').trim(); // yes/no
+    if (!optHal || !optComms) {
+      setStatus('❌ Merci de répondre aux 2 questions (HAL + communication).', 'err');
+      submitBtn.disabled = false;
+      return;
+    }
+
+    // Lire les bons champs (évite les doublons)
     const dateValue = isSection
       ? (form.sectionDate?.value || '').trim()
       : (form.date?.value || '').trim();
@@ -112,6 +133,12 @@ form.addEventListener('submit', async (e) => {
     const isbnValue = isSection
       ? (form.sectionIsbn?.value || '').trim()
       : (form.isbn?.value || '').trim();
+
+    const extraValue = buildExtraWithOptions(
+      (form.extra?.value || '').trim(),
+      optHal,
+      optComms
+    );
 
     const payload = {
       kind: 'publication',
@@ -130,9 +157,10 @@ form.addEventListener('submit', async (e) => {
       seriesNumber: (form.seriesNumber?.value || '').trim(),
       volume: (form.volume?.value || '').trim(),
       edition: (form.edition?.value || '').trim(),
-      extra: (form.extra.value || '').trim()
+      extra: extraValue
     };
 
+    // Validation minimale
     if (!payload.title) throw new Error('Titre manquant.');
     if (!payload.date) throw new Error('Date manquante.');
     if (!payload.publisher) throw new Error('Publisher manquant.');
@@ -149,8 +177,6 @@ form.addEventListener('submit', async (e) => {
 
     if (r.ok) {
       setStatus('✅ Envoyé vers Zotero', 'ok');
-
-      // (optionnel) effacer après 3s — tu peux commenter cette ligne si tu veux le laisser affiché
       setTimeout(() => clearStatus(), 3000);
 
       // Reset en conservant le type
