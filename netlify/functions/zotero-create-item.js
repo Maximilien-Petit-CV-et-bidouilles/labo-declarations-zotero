@@ -2,10 +2,7 @@
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      body: 'Method Not Allowed'
-    };
+    return { statusCode: 405, body: 'Method Not Allowed' };
   }
 
   try {
@@ -13,7 +10,7 @@ exports.handler = async (event) => {
 
     const apiKey = process.env.ZOTERO_API_KEY;
     const libraryType = process.env.ZOTERO_LIBRARY_TYPE; // 'users' ou 'groups'
-    const libraryId = process.env.ZOTERO_LIBRARY_ID;     // ex : '1234567'
+    const libraryId = process.env.ZOTERO_LIBRARY_ID;
 
     if (!apiKey || !libraryType || !libraryId) {
       return {
@@ -22,81 +19,50 @@ exports.handler = async (event) => {
       };
     }
 
-    const item = buildZoteroItemFromPayload(payload);
+    const item = buildBookItem(payload);
 
-    const response = await fetch(
-      `https://api.zotero.org/${libraryType}/${libraryId}/items`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Zotero-API-Key': apiKey,
-          'Zotero-API-Version': '3'
-        },
-        body: JSON.stringify([item])
-      }
-    );
+    const res = await fetch(`https://api.zotero.org/${libraryType}/${libraryId}/items`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Zotero-API-Key': apiKey,
+        'Zotero-API-Version': '3'
+      },
+      body: JSON.stringify([item])
+    });
 
-    const text = await response.text();
+    const text = await res.text();
 
-    if (!response.ok) {
-      // On renvoie le message brut pour pouvoir le voir dans l’interface
-      return {
-        statusCode: response.status,
-        body: `Erreur Zotero (${response.status}): ${text}`
-      };
+    if (!res.ok) {
+      return { statusCode: res.status, body: `Erreur Zotero (${res.status}): ${text}` };
     }
 
-    return {
-      statusCode: 200,
-      body: text
-    };
+    return { statusCode: 200, body: text };
   } catch (err) {
-    return {
-      statusCode: 500,
-      body: 'Erreur serveur : ' + err.message
-    };
+    return { statusCode: 500, body: 'Erreur serveur : ' + err.message };
   }
 };
 
-// Mapping des 3 types de formulaires vers un item Zotero
-function buildZoteroItemFromPayload(payload) {
-  const kind = payload.kind || 'publication';
+// --- Création d'un item Zotero de type "book" ---
+function buildBookItem(payload) {
+  const creators = parseCreators(payload.authors, 'author');
 
-  // --- Publication (Livre) ---
-  if (kind === 'publication' && (payload.pubType === 'book' || !payload.pubType)) {
-    const creators = parseCreators(payload.authors, 'author');
-
-    const extraLines = [];
-    if (payload.extra) extraLines.push(payload.extra);
-
-    return {
-      itemType: 'book',
-      title: payload.title || '',
-      creators,
-      date: payload.date || '',
-      abstractNote: payload.abstract || '',
-      publisher: payload.publisher || '',
-      place: payload.place || '',
-      ISBN: payload.isbn || '',
-      language: payload.language || '',
-      extra: extraLines.join('\n'),
-      collections: []
-    };
-  }
-
-  // --- fallback (si tu gardes event/communication ailleurs) ---
   return {
-    itemType: 'report',
+    itemType: 'book',
     title: payload.title || '',
+    creators,
     date: payload.date || '',
+    abstractNote: payload.abstract || '',
+    publisher: payload.publisher || '',
+    place: payload.place || '',
+    ISBN: payload.isbn || '',
+    language: payload.language || '',
     extra: payload.extra || '',
-    creators: [],
     collections: []
   };
 }
 
-// Parse "Prénom Nom, Prénom Nom" en creators Zotero
+// "Prénom Nom, Prénom Nom" -> creators
 function parseCreators(raw, creatorType) {
   const s = (raw || '').trim();
   if (!s) return [];
@@ -107,98 +73,14 @@ function parseCreators(raw, creatorType) {
     .filter(Boolean)
     .map((fullName) => {
       const parts = fullName.split(' ').filter(Boolean);
+
+      // si 1 seul mot, on le met en nom de famille (plus robuste)
+      if (parts.length === 1) {
+        return { creatorType, firstName: '', lastName: parts[0] };
+      }
+
       const firstName = parts.shift() || '';
       const lastName = parts.join(' ') || '';
       return { creatorType, firstName, lastName };
     });
-}
-
-
-  // --- Créateurs ---
-  const rawAuthors = payload.authors || '';
-  let creatorType = 'author';
-
-  // Pour les communications de type "presentation",
-  // Zotero s’attend à un creatorType "presenter" et non "author"
-  if (kind === 'communication' && itemType === 'presentation') {
-    creatorType = 'presenter';
-  }
-
-  const creators = rawAuthors
-    .split(',')
-    .map((a) => a.trim())
-    .filter(Boolean)
-    .map((fullName) => {
-      const parts = fullName.split(' ');
-      const firstName = parts.shift();
-      const lastName = parts.join(' ');
-      return {
-        creatorType,
-        firstName: firstName || '',
-        lastName: lastName || ''
-      };
-    });
-
-  // --- Champ "extra" pour poser des méta internes / spécifiques ---
-  const extraLines = [];
-
-  if (payload.internalNotes) {
-    extraLines.push(`Internal notes: ${payload.internalNotes}`);
-  }
-
-  if (kind === 'event') {
-    if (payload.eventType) {
-      extraLines.push(`eventType: ${payload.eventType}`);
-    }
-    if (payload.endDate) {
-      extraLines.push(`endDate: ${payload.endDate}`);
-    }
-    if (payload.organizers) {
-      extraLines.push(`organizers: ${payload.organizers}`);
-    }
-  }
-
-  if (kind === 'communication') {
-    if (payload.commType) {
-      extraLines.push(`communicationType: ${payload.commType}`);
-    }
-    if (payload.eventName) {
-      extraLines.push(`eventName: ${payload.eventName}`);
-    }
-  }
-
-  const baseItem = {
-    itemType,
-    title: payload.title || '',
-    creators,
-    date,
-    extra: extraLines.join('\n'),
-    collections: []
-  };
-
-  if (kind === 'publication') {
-    return {
-      ...baseItem,
-      DOI: payload.doi || '',
-      publicationTitle: payload.publicationTitle || ''
-    };
-  }
-
-  if (kind === 'event') {
-    return {
-      ...baseItem,
-      place: payload.location || '',
-      url: payload.url || ''
-    };
-  }
-
-  if (kind === 'communication') {
-    return {
-      ...baseItem,
-      place: payload.location || '',
-      conferenceName: payload.eventName || ''
-    };
-  }
-
-  return baseItem;
 }
