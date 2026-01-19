@@ -31,7 +31,6 @@ async function sendToZotero(payload, form, statusId) {
       setStatus(statusId, '✅ Déclaration envoyée à Zotero.', true);
       form.reset();
 
-      // Après reset : réinitialiser la liste d'auteurs avec une ligne
       if (payload.kind === 'publication') {
         resetAuthorsUI();
       }
@@ -48,7 +47,6 @@ async function sendToZotero(payload, form, statusId) {
   }
 }
 
-// --- Gestion de l’affichage des sections ---
 function setupSectionSwitcher() {
   const buttons = document.querySelectorAll('.switcher button');
   const sections = document.querySelectorAll('.section');
@@ -132,34 +130,36 @@ function getAuthorsFromForm(form) {
     if (fn || ln) authors.push({ firstName: fn, lastName: ln });
   }
 
-  // Filtrer lignes vides
   return authors.filter(a => (a.firstName || a.lastName));
 }
 
-// --- Publications : Livre ---
+// --- Publications : Chapitre d'ouvrage (bookSection) ---
 function handlePublicationForm(form) {
   const authors = getAuthorsFromForm(form);
 
   const payload = {
     kind: 'publication',
-    pubType: 'book',
+    pubType: 'bookSection',
     title: form.title.value.trim(),
-    authors, // tableau [{firstName,lastName}]
+    authors,
+    bookTitle: form.bookTitle.value.trim(),
+    series: form.series.value.trim() || null,
+    seriesNumber: form.seriesNumber.value.trim() || null,
+    volume: form.volume.value.trim() || null,
+    edition: form.edition.value.trim() || null,
     date: form.date.value.trim(),
-    abstract: form.abstract.value.trim() || null,
     publisher: form.publisher.value.trim(),
     place: form.place.value.trim(),
+    pages: form.pages.value.trim() || null,
     isbn: form.isbn.value.trim() || null,
-    language: form.language.value || null,
     extra: form.extra.value.trim() || null
   };
 
-  if (!payload.title || authors.length === 0 || !payload.date || !payload.publisher || !payload.place) {
-    setStatus('pub-status', 'Merci de remplir Title, au moins un auteur, Date, Publisher et Place.', false);
+  if (!payload.title || authors.length === 0 || !payload.bookTitle || !payload.date || !payload.publisher || !payload.place) {
+    setStatus('pub-status', 'Merci de remplir Title, au moins un auteur, Book Title, Date, Publisher et Place.', false);
     return;
   }
 
-  // si l'auteur n'a pas de nom du tout, refuser (UX)
   const hasAtLeastOneLastName = authors.some(a => (a.lastName || '').trim().length > 0);
   if (!hasAtLeastOneLastName) {
     setStatus('pub-status', 'Merci de renseigner au moins un Nom d’auteur.', false);
@@ -199,11 +199,9 @@ function handleCommForm(form) {
   sendToZotero(payload, form, 'comm-status');
 }
 
-// --- Initialisation ---
 document.addEventListener('DOMContentLoaded', () => {
   setupSectionSwitcher();
 
-  // init auteurs
   resetAuthorsUI();
 
   const addBtn = document.getElementById('add-author-btn');
