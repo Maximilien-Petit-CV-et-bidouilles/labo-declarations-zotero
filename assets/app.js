@@ -32,11 +32,13 @@ async function sendToZotero(payload, form, statusId) {
       form.reset();
     } else {
       console.error('Erreur Zotero:', text);
-      setStatus(
-        statusId,
-        '❌ Erreur côté serveur / Zotero. Si le problème persiste, contactez le support du labo.',
-        false
-      );
+      console.error('Erreur Zotero:', text);
+setStatus(
+  statusId,
+  '❌ Erreur Zotero : ' + text,
+  false
+);
+
     }
   } catch (err) {
     console.error(err);
