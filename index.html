@@ -44,7 +44,6 @@
       color: var(--text-muted);
     }
 
-    /* Barre de boutons */
     .switcher {
       display: flex;
       flex-wrap: wrap;
@@ -84,7 +83,6 @@
       margin-bottom: 16px;
     }
 
-    /* Sections / formulaires */
     .section { display: none; }
     .section.visible { display: block; }
 
@@ -201,7 +199,6 @@
       color: var(--text-muted);
     }
 
-    /* Bloc auteurs */
     .authors-title {
       margin: 8px 0 6px;
       font-size: 0.9rem;
@@ -251,12 +248,12 @@
       Cliquez sur un bouton ci-dessus pour afficher le formulaire correspondant. Seuls quelques champs sont obligatoires.
     </p>
 
-    <!-- SECTION PUBLICATION : LIVRE -->
+    <!-- SECTION PUBLICATION : CHAPITRE D'OUVRAGE -->
     <section id="pub-section" class="section visible">
       <form id="pub-form">
-        <h2>Nouvelle publication (Livre)</h2>
+        <h2>Nouvelle publication (Chapitre d’ouvrage)</h2>
         <p class="description">
-          Déclarez un livre. Les informations sont envoyées vers Zotero.
+          Déclarez un chapitre de livre (Book Section). Les informations sont envoyées vers Zotero.
         </p>
 
         <label>
@@ -272,22 +269,19 @@
           <span style="color:var(--text-muted); font-size:0.85rem;">Prénom/Nom (minimum : un auteur)</span>
         </div>
 
+        <label>
+          <span>Book Title *</span>
+          <input name="bookTitle" required>
+        </label>
+
         <div class="two-cols">
           <label>
             <span>Date *</span>
             <input name="date" placeholder="2025 ou 2025-03-15" required>
           </label>
-
           <label>
-            <span>Language</span>
-            <select name="language">
-              <option value="">(non renseigné)</option>
-              <option value="fr">fr</option>
-              <option value="en">en</option>
-              <option value="es">es</option>
-              <option value="de">de</option>
-              <option value="it">it</option>
-            </select>
+            <span>Pages</span>
+            <input name="pages" placeholder="123-145">
           </label>
         </div>
 
@@ -296,21 +290,37 @@
             <span>Publisher *</span>
             <input name="publisher" required>
           </label>
-
           <label>
             <span>Place *</span>
             <input name="place" required>
           </label>
         </div>
 
+        <div class="two-cols">
+          <label>
+            <span>Series</span>
+            <input name="series">
+          </label>
+          <label>
+            <span>Series Number</span>
+            <input name="seriesNumber">
+          </label>
+        </div>
+
+        <div class="two-cols">
+          <label>
+            <span>Volume</span>
+            <input name="volume">
+          </label>
+          <label>
+            <span>Edition</span>
+            <input name="edition">
+          </label>
+        </div>
+
         <label>
           <span>ISBN</span>
           <input name="isbn" placeholder="978-...">
-        </label>
-
-        <label>
-          <span>Abstract</span>
-          <textarea name="abstract" rows="4"></textarea>
         </label>
 
         <label>
