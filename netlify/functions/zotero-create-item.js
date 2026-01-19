@@ -19,6 +19,7 @@ exports.handler = async (event) => {
       };
     }
 
+    // Pour l’instant : uniquement "book"
     const item = buildBookItem(payload);
 
     const res = await fetch(`https://api.zotero.org/${libraryType}/${libraryId}/items`, {
@@ -45,7 +46,10 @@ exports.handler = async (event) => {
 
 // --- Création d'un item Zotero de type "book" ---
 function buildBookItem(payload) {
-  const creators = parseCreators(payload.authors, 'author');
+  // Accepte authors sous 2 formats :
+  // 1) tableau [{firstName,lastName}, ...]
+  // 2) string "Prénom Nom, Prénom Nom" (compatibilité)
+  const creators = parseCreatorsFlexible(payload.authors, 'author');
 
   return {
     itemType: 'book',
@@ -62,6 +66,29 @@ function buildBookItem(payload) {
   };
 }
 
+function parseCreatorsFlexible(authors, creatorType) {
+  // Nouveau format: tableau
+  if (Array.isArray(authors)) {
+    return authors
+      .map((a) => ({
+        creatorType,
+        firstName: (a.firstName || '').trim(),
+        lastName: (a.lastName || '').trim()
+      }))
+      .filter((a) => a.firstName || a.lastName)
+      .map((a) => {
+        // robustesse: si lastName vide mais firstName rempli, on met tout en lastName
+        if (!a.lastName && a.firstName) {
+          return { creatorType, firstName: '', lastName: a.firstName };
+        }
+        return a;
+      });
+  }
+
+  // Ancien format: string
+  return parseCreators(authors, creatorType);
+}
+
 // "Prénom Nom, Prénom Nom" -> creators
 function parseCreators(raw, creatorType) {
   const s = (raw || '').trim();
@@ -74,7 +101,7 @@ function parseCreators(raw, creatorType) {
     .map((fullName) => {
       const parts = fullName.split(' ').filter(Boolean);
 
-      // si 1 seul mot, on le met en nom de famille (plus robuste)
+      // si 1 seul mot, on le met en nom de famille
       if (parts.length === 1) {
         return { creatorType, firstName: '', lastName: parts[0] };
       }
