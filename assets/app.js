@@ -51,17 +51,24 @@ async function sendToZotero(payload, form, statusId) {
 function handlePublicationForm(form) {
   const payload = {
     kind: 'publication',
+    pubType: 'book',
     title: form.title.value.trim(),
     authors: form.authors.value.trim(),
-    year: form.year.value.trim(),
-    itemType: form.itemType.value,
-    doi: form.doi.value.trim() || null,
-    publicationTitle: form.publicationTitle.value.trim() || null,
-    internalNotes: form.internalNotes.value.trim() || null
+    date: form.date.value.trim(), // année ou date libre
+    abstract: form.abstract.value.trim() || null,
+    publisher: form.publisher.value.trim(),
+    place: form.place.value.trim(),
+    isbn: form.isbn.value.trim() || null,
+    language: form.language.value || null,
+    extra: form.extra.value.trim() || null
   };
 
-  if (!payload.title || !payload.authors || !payload.year) {
-    setStatus('pub-status', 'Merci de remplir au moins le titre, les auteurs et l’année.', false);
+  if (!payload.title || !payload.authors || !payload.date || !payload.publisher || !payload.place) {
+    setStatus(
+      'pub-status',
+      'Merci de remplir au moins Title, Author(s), Date, Publisher et Place.',
+      false
+    );
     return;
   }
 
