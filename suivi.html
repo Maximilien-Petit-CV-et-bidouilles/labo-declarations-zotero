@@ -3,250 +3,483 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Suivi public — HAL & communication</title>
-
+  <title>Suivi des demandes (HAL / Communication)</title>
   <style>
     :root{
-      --bg:#0b0d10;
-      --panel:#12161b;
-      --muted:#9aa4b2;
-      --text:#e7edf5;
-      --border:#222a33;
-      --accent:#2c7be5;
-      --ok:#1b7c3a;
-      --warn:#b26a00;
-      --bad:#b32020;
+      --bg:#f5f5f8; --card:#fff; --text:#222; --muted:#666; --border:#ddd;
+      --accent:#2c7be5; --ok:#1b7c3a; --warn:#b26a00; --bad:#b32020;
     }
-    *{ box-sizing:border-box; }
-    body{
-      margin:0;
-      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
-      background:var(--bg);
-      color:var(--text);
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--text)}
+    .wrap{max-width:1100px;margin:28px auto;padding:0 16px}
+    header{display:flex;gap:14px;align-items:flex-end;justify-content:space-between;flex-wrap:wrap}
+    h1{margin:0;font-size:1.45rem}
+    .sub{margin:6px 0 0;color:var(--muted);font-size:.92rem}
+    .pill{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#fff;font-size:.85rem;color:var(--muted)}
+    .bar{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px}
+    .controls{display:grid;grid-template-columns: 1.2fr 1fr 1fr 1fr;gap:10px}
+    @media (max-width: 900px){ .controls{grid-template-columns:1fr 1fr} }
+    @media (max-width: 520px){ .controls{grid-template-columns:1fr} }
+    input,select,button{
+      font:inherit;padding:9px 10px;border-radius:10px;border:1px solid var(--border);background:#fff
     }
-    a{ color:var(--accent); text-decoration:none; }
+    button{cursor:pointer}
+    button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:650}
+    button.ghost{background:#fff}
+    .stats{display:flex;gap:10px;flex-wrap:wrap}
+    .stat{min-width:160px}
+    .stat b{display:block;font-size:1.05rem}
+    .stat span{color:var(--muted);font-size:.85rem}
 
-    .container{
-      max-width:1200px;
-      margin:28px auto;
-      padding:0 16px;
-    }
-
-    header{
-      background:var(--panel);
-      border:1px solid var(--border);
-      border-radius:14px;
-      padding:14px;
-      margin-bottom:14px;
-    }
-    h1{ margin:0 0 6px; font-size:20px; }
-    .subtitle{ margin:0; color:var(--muted); font-size:14px; }
-
-    /* === CHARTS === */
+    /* === Charts === */
     .charts{
       display:grid;
       grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap:12px;
-      margin:14px 0 18px;
+      gap:10px;
+      margin-top:12px;
     }
-    .chart-card{
-      background:var(--panel);
+    .chartCard{
+      background:#fff;
       border:1px solid var(--border);
-      border-radius:14px;
-      padding:12px;
+      border-radius:12px;
+      padding:10px;
     }
-    .chart-card h2{
-      margin:0 0 10px;
-      font-size:14px;
+    .chartTitle{
+      margin:0 0 8px;
+      font-size:.9rem;
       color:var(--muted);
+      font-weight:650;
     }
+    .chartWrap{position:relative; height:210px;}
+    @media (max-width: 520px){ .chartWrap{height:190px;} }
 
-    /* === TABLE === */
-    table{
-      width:100%;
-      border-collapse:collapse;
-      background:var(--panel);
-      border:1px solid var(--border);
-      border-radius:14px;
-      overflow:hidden;
+    table{width:100%;border-collapse:separate;border-spacing:0;margin-top:12px}
+    th,td{padding:10px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+    th{font-size:.82rem;color:var(--muted);text-align:left;white-space:nowrap}
+    td{font-size:.92rem}
+    .title a{color:inherit;text-decoration:none}
+    .title a:hover{text-decoration:underline}
+    .muted{color:var(--muted)}
+    .tag{
+      display:inline-flex;align-items:center;gap:6px;
+      padding:4px 8px;border-radius:999px;border:1px solid var(--border);
+      font-size:.82rem;background:#fff;white-space:nowrap
     }
-    th, td{
-      padding:10px 8px;
-      border-bottom:1px solid var(--border);
-      text-align:left;
-      font-size:14px;
-    }
-    th{ color:var(--muted); font-weight:600; }
-    tr:last-child td{ border-bottom:none; }
+    .tag.ok{border-color:rgba(27,124,58,.35);background:rgba(27,124,58,.08);color:var(--ok)}
+    .tag.warn{border-color:rgba(178,106,0,.35);background:rgba(178,106,0,.08);color:var(--warn)}
+    .tag.bad{border-color:rgba(179,32,32,.35);background:rgba(179,32,32,.08);color:var(--bad)}
+    .mini{font-size:.82rem}
+    .right{white-space:nowrap}
 
-    .badge{
-      padding:3px 8px;
-      border-radius:999px;
-      font-size:12px;
-      font-weight:600;
-      display:inline-block;
-    }
-    .ok{ background:#163a25; color:#7ce2a3; }
-    .warn{ background:#3a2a16; color:#f1c27d; }
-    .muted{ background:#222a33; color:#9aa4b2; }
+    .statusline{margin-top:10px;color:var(--muted);font-size:.9rem;white-space:pre-wrap}
+    .loading{display:inline-flex;gap:8px;align-items:center}
+    .dot{width:8px;height:8px;border-radius:99px;background:var(--accent);display:inline-block;animation:pulse 1s infinite ease-in-out}
+    .dot:nth-child(2){animation-delay:.15s}
+    .dot:nth-child(3){animation-delay:.3s}
+    @keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
   </style>
 </head>
-
 <body>
-  <div class="container">
+  <div class="wrap">
     <header>
-      <h1>Suivi public des demandes</h1>
-      <p class="subtitle">
-        Déclarations issues du formulaire du laboratoire — suivi des demandes HAL et communication.
-      </p>
+      <div>
+        <h1>Suivi public — HAL & Communication</h1>
+        <p class="sub">
+          Ce tableau montre les demandes issues des déclarations (Zotero) et l’état de traitement par le laboratoire.
+        </p>
+      </div>
+      <div class="pill" id="lastUpdate">Chargement…</div>
     </header>
 
-    <!-- === GRAPHIQUES === -->
-    <section class="charts">
-      <div class="chart-card">
-        <h2>Déclarations par année</h2>
-        <canvas id="chartByYear"></canvas>
-      </div>
-      <div class="chart-card">
-        <h2>Répartition des demandes</h2>
-        <canvas id="chartSplit"></canvas>
-      </div>
-      <div class="chart-card">
-        <h2>Statut de traitement</h2>
-        <canvas id="chartStatus"></canvas>
-      </div>
-    </section>
+    <div class="bar">
+      <div class="card" style="flex:1;min-width:260px">
+        <div class="controls">
+          <input id="q" type="search" placeholder="Rechercher (titre, auteur, éditeur, ISBN…)" />
+          <select id="filterType">
+            <option value="all">Tous types</option>
+            <option value="book">Livres</option>
+            <option value="bookSection">Chapitres</option>
+          </select>
+          <select id="filterNeeds">
+            <option value="all">Toutes demandes</option>
+            <option value="needsAction">À traiter</option>
+            <option value="halYes">HAL demandé</option>
+            <option value="commsYes">Com demandé</option>
+          </select>
+          <select id="filterYear">
+            <option value="all">Toutes années</option>
+          </select>
 
-    <!-- === TABLEAU === -->
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Titre</th>
-          <th>Année</th>
-          <th>HAL</th>
-          <th>Communication</th>
-          <th>Statut</th>
-        </tr>
-      </thead>
-      <tbody id="rows"></tbody>
-    </table>
+          <button class="ghost" id="reset">Réinitialiser</button>
+          <button class="primary" id="refresh">Rafraîchir</button>
+        </div>
+
+        <div class="statusline" id="msg"></div>
+
+        <div class="stats" style="margin-top:12px">
+          <div class="stat">
+            <b id="sTotal">—</b><span>items (livres + chapitres)</span>
+          </div>
+          <div class="stat">
+            <b id="sNeed">—</b><span>à traiter (HAL ou com demandés)</span>
+          </div>
+          <div class="stat">
+            <b id="sHal">—</b><span>HAL demandés</span>
+          </div>
+          <div class="stat">
+            <b id="sComms">—</b><span>Communications demandées</span>
+          </div>
+        </div>
+
+        <!-- ✅ Graphiques (synchronisés avec les filtres) -->
+        <div class="charts">
+          <div class="chartCard">
+            <p class="chartTitle">Déclarations par année</p>
+            <div class="chartWrap"><canvas id="chartYear"></canvas></div>
+          </div>
+          <div class="chartCard">
+            <p class="chartTitle">Répartition des demandes</p>
+            <div class="chartWrap"><canvas id="chartSplit"></canvas></div>
+          </div>
+          <div class="chartCard">
+            <p class="chartTitle">Statut de traitement</p>
+            <div class="chartWrap"><canvas id="chartStatus"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:90px">Date</th>
+            <th style="width:90px">Type</th>
+            <th>Titre</th>
+            <th style="width:220px">Auteur(s)</th>
+            <th style="width:140px">HAL</th>
+            <th style="width:170px">Communication</th>
+            <th style="width:140px">Statut</th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+          <tr><td colspan="7">
+            <span class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span> Chargement des données…</span>
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="sub" style="margin-top:12px">
+      Astuce : si vous voyez “HAL demandé” ou “Communication demandée”, le labo traite les demandes dans l’ordre (priorité aux échéances).
+    </p>
   </div>
 
-  <!-- Chart.js -->
+  <!-- Chart.js (CDN) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <script>
-    const API_URL = '/.netlify/functions/public-suivi';
-    let charts = [];
+    // --- State ---
+    let ALL = [];
+    let VIEW = [];
 
-    function normalizeBool(v){
-      v = String(v || '').toLowerCase();
-      if (v === 'yes' || v === 'oui' || v === 'true') return 'yes';
-      if (v === 'no' || v === 'non' || v === 'false') return 'no';
-      return '';
+    // Charts instances
+    let CHARTS = { year:null, split:null, status:null };
+
+    // --- Helpers ---
+    const $ = (id) => document.getElementById(id);
+
+    function norm(s){
+      return (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
     }
 
-    function computeStatus(flags){
-      const halWanted = normalizeBool(flags?.hal_create) === 'yes';
-      const commWanted = normalizeBool(flags?.comms_publish) === 'yes';
-      const halDone = normalizeBool(flags?.hal_done) === 'yes';
-      const commDone = normalizeBool(flags?.comms_done) === 'yes';
-
-      if (!halWanted && !commWanted) return 'Non demandé';
-      if ((halWanted && !halDone) || (commWanted && !commDone)) return 'À traiter';
-      return 'Traité';
+    function typeLabel(t){
+      if (t === 'book') return 'Livre';
+      if (t === 'bookSection') return 'Chapitre';
+      return t || '';
     }
 
-    function badge(label, cls){
-      return `<span class="badge ${cls}">${label}</span>`;
+    function yearFromDate(dateStr){
+      const m = (dateStr || '').match(/\b(19|20)\d{2}\b/);
+      return m ? m[0] : '';
+    }
+
+    function joinCreators(creators){
+      if (!Array.isArray(creators)) return '';
+      const names = creators
+        .filter(c => c && (c.creatorType === 'author' || c.creatorType === 'editor' || c.creatorType === 'presenter'))
+        .map(c => {
+          const fn = (c.firstName || '').trim();
+          const ln = (c.lastName || '').trim();
+          return (ln && fn) ? (ln + ' ' + fn) : (ln || fn);
+        })
+        .filter(Boolean);
+      return names.join(', ');
+    }
+
+    function tagYesNo(val){
+      if (val === 'yes') return { txt:'Oui', cls:'ok' };
+      if (val === 'no') return { txt:'Non', cls:'' };
+      return { txt:'—', cls:'' };
+    }
+
+    function statusFor(item){
+      // item.flags: { hal_create, comms_publish, hal_done, comms_done }
+      const f = item.flags || {};
+      const halWanted = f.hal_create === 'yes';
+      const commWanted = f.comms_publish === 'yes';
+      const halDone = f.hal_done === 'yes';
+      const commDone = f.comms_done === 'yes';
+
+      if (!halWanted && !commWanted) return { txt:'Non demandé', cls:'' };
+
+      const needHal = halWanted && !halDone;
+      const needCom = commWanted && !commDone;
+
+      if (needHal || needCom) return { txt:'À traiter', cls:'warn' };
+      return { txt:'Traité', cls:'ok' };
     }
 
     function destroyCharts(){
-      charts.forEach(c => c.destroy());
-      charts = [];
+      if (CHARTS.year) { CHARTS.year.destroy(); CHARTS.year = null; }
+      if (CHARTS.split) { CHARTS.split.destroy(); CHARTS.split = null; }
+      if (CHARTS.status) { CHARTS.status.destroy(); CHARTS.status = null; }
     }
 
     function renderCharts(items){
+      // Items = VIEW (donc graphes synchronisés avec filtres)
       destroyCharts();
 
-      /* === par année === */
-      const byYear = {};
-      items.forEach(i => {
-        const y = i.year || '—';
-        byYear[y] = (byYear[y] || 0) + 1;
-      });
-      const years = Object.keys(byYear).sort();
-      const yearCounts = years.map(y => byYear[y]);
+      // 1) Par année
+      const byYear = new Map();
+      for (const it of items){
+        const y = it.year || '—';
+        byYear.set(y, (byYear.get(y) || 0) + 1);
+      }
+      const years = [...byYear.keys()]
+        .sort((a,b) => {
+          // '—' à la fin
+          if (a === '—') return 1;
+          if (b === '—') return -1;
+          return b.localeCompare(a);
+        });
+      const yearCounts = years.map(y => byYear.get(y));
 
-      /* === répartition demandes === */
+      // 2) Répartition HAL/COM/BOTH/NONE
       let halOnly=0, commOnly=0, both=0, none=0;
-      items.forEach(i => {
-        const f = i.flags || {};
-        const h = normalizeBool(f.hal_create)==='yes';
-        const c = normalizeBool(f.comms_publish)==='yes';
-        if (h && c) both++;
-        else if (h) halOnly++;
-        else if (c) commOnly++;
+      for (const it of items){
+        const f = it.flags || {};
+        const hal = f.hal_create === 'yes';
+        const com = f.comms_publish === 'yes';
+        if (hal && com) both++;
+        else if (hal) halOnly++;
+        else if (com) commOnly++;
         else none++;
+      }
+
+      // 3) Statut global
+      const statusCounts = { 'À traiter':0, 'Traité':0, 'Non demandé':0 };
+      for (const it of items){
+        const s = statusFor(it).txt;
+        statusCounts[s] = (statusCounts[s] || 0) + 1;
+      }
+
+      // Chart defaults (sobres)
+      const commonOpts = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } }
+      };
+
+      CHARTS.year = new Chart($('chartYear'), {
+        type: 'bar',
+        data: {
+          labels: years,
+          datasets: [{ label: 'Déclarations', data: yearCounts }]
+        },
+        options: {
+          ...commonOpts,
+          plugins: { legend: { display:false } },
+          scales: { y: { beginAtZero:true, ticks:{ precision:0 } } }
+        }
       });
 
-      /* === statut global === */
-      const statusCounts = { 'À traiter':0, 'Traité':0, 'Non demandé':0 };
-      items.forEach(i => statusCounts[computeStatus(i.flags||{})]++);
+      CHARTS.split = new Chart($('chartSplit'), {
+        type: 'doughnut',
+        data: {
+          labels: ['HAL seul', 'Com seule', 'HAL + Com', 'Aucune demande'],
+          datasets: [{ data: [halOnly, commOnly, both, none] }]
+        },
+        options: commonOpts
+      });
 
-      charts.push(new Chart(chartByYear, {
-        type:'bar',
-        data:{ labels:years, datasets:[{ data:yearCounts }] },
-        options:{ plugins:{ legend:{ display:false } } }
-      }));
-
-      charts.push(new Chart(chartSplit, {
-        type:'doughnut',
-        data:{
-          labels:['HAL seul','Com seule','HAL + Com','Aucune'],
-          datasets:[{ data:[halOnly,commOnly,both,none] }]
-        }
-      }));
-
-      charts.push(new Chart(chartStatus, {
-        type:'doughnut',
-        data:{
-          labels:['À traiter','Traité','Non demandé'],
-          datasets:[{ data:[
-            statusCounts['À traiter'],
-            statusCounts['Traité'],
-            statusCounts['Non demandé']
-          ]}]
-        }
-      }));
+      CHARTS.status = new Chart($('chartStatus'), {
+        type: 'doughnut',
+        data: {
+          labels: ['À traiter', 'Traité', 'Non demandé'],
+          datasets: [{ data: [statusCounts['À traiter'], statusCounts['Traité'], statusCounts['Non demandé']] }]
+        },
+        options: commonOpts
+      });
     }
 
-    function renderTable(items){
-      rows.innerHTML = items.map(i => {
-        const status = computeStatus(i.flags||{});
-        return `<tr>
-          <td>${i.itemType === 'book' ? 'Livre' : 'Chapitre'}</td>
-          <td>${i.title || ''}</td>
-          <td>${i.year || ''}</td>
-          <td>${normalizeBool(i.flags?.hal_create)==='yes' ? 'Oui' : '—'}</td>
-          <td>${normalizeBool(i.flags?.comms_publish)==='yes' ? 'Oui' : '—'}</td>
-          <td>${
-            status==='Traité' ? badge('Traité','ok') :
-            status==='À traiter' ? badge('À traiter','warn') :
-            badge('Non demandé','muted')
-          }</td>
-        </tr>`;
-      }).join('');
+    function render(){
+      // Filters
+      const q = norm($('q').value);
+      const fType = $('filterType').value;
+      const fNeeds = $('filterNeeds').value;
+      const fYear = $('filterYear').value;
+
+      VIEW = ALL.filter(it => {
+        if (fType !== 'all' && it.itemType !== fType) return false;
+
+        const y = it.year || '';
+        if (fYear !== 'all' && y !== fYear) return false;
+
+        const flags = it.flags || {};
+        const st = statusFor(it);
+
+        if (fNeeds === 'needsAction' && st.txt !== 'À traiter') return false;
+        if (fNeeds === 'halYes' && flags.hal_create !== 'yes') return false;
+        if (fNeeds === 'commsYes' && flags.comms_publish !== 'yes') return false;
+
+        if (!q) return true;
+        const hay = norm([
+          it.title, it.bookTitle, it.publisher, it.place, it.isbn,
+          it.creatorsText
+        ].filter(Boolean).join(' | '));
+        return hay.includes(q);
+      });
+
+      // Stats
+      $('sTotal').textContent = VIEW.length;
+      const need = VIEW.filter(it => statusFor(it).txt === 'À traiter').length;
+      $('sNeed').textContent = need;
+      $('sHal').textContent = VIEW.filter(it => (it.flags?.hal_create === 'yes')).length;
+      $('sComms').textContent = VIEW.filter(it => (it.flags?.comms_publish === 'yes')).length;
+
+      // ✅ Charts (synchronisés)
+      renderCharts(VIEW);
+
+      // Rows
+      const tbody = $('rows');
+      tbody.innerHTML = '';
+
+      if (!VIEW.length){
+        tbody.innerHTML = `<tr><td colspan="7" class="muted">Aucun résultat avec ces filtres.</td></tr>`;
+        return;
+      }
+
+      // Sort: newest year/date first
+      VIEW.sort((a,b) => {
+        const ay = parseInt(a.year || '0', 10);
+        const by = parseInt(b.year || '0', 10);
+        if (by !== ay) return by - ay;
+        return (b.date || '').localeCompare(a.date || '');
+      });
+
+      for (const it of VIEW){
+        const st = statusFor(it);
+        const hal = tagYesNo(it.flags?.hal_create);
+        const comms = tagYesNo(it.flags?.comms_publish);
+
+        const halDone = it.flags?.hal_done === 'yes';
+        const commDone = it.flags?.comms_done === 'yes';
+
+        const halTxt = halDone ? 'Demandé (traité)' : (hal.txt === 'Oui' ? 'Demandé' : hal.txt);
+        const commTxt = commDone ? 'Demandé (traité)' : (comms.txt === 'Oui' ? 'Demandé' : comms.txt);
+
+        const title = it.title || '(sans titre)';
+        const titleHtml = it.zoteroUrl
+          ? `<a href="${it.zoteroUrl}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a>`
+          : escapeHtml(title);
+
+        const extraMini = it.bookTitle ? `<div class="mini muted">Dans : ${escapeHtml(it.bookTitle)}</div>` : '';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="right">${escapeHtml(it.year || '')}</td>
+          <td><span class="tag">${escapeHtml(typeLabel(it.itemType))}</span></td>
+          <td class="title">${titleHtml}${extraMini}</td>
+          <td>${escapeHtml(it.creatorsText || '')}</td>
+          <td>
+            <span class="tag ${hal.cls}">${escapeHtml(halTxt)}</span>
+          </td>
+          <td>
+            <span class="tag ${comms.cls}">${escapeHtml(commTxt)}</span>
+          </td>
+          <td><span class="tag ${st.cls}">${escapeHtml(st.txt)}</span></td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    function escapeHtml(str){
+      return String(str || '')
+        .replaceAll('&','&amp;')
+        .replaceAll('<','&lt;')
+        .replaceAll('>','&gt;')
+        .replaceAll('"','&quot;')
+        .replaceAll("'","&#039;");
+    }
+
+    function fillYears(items){
+      const years = [...new Set(items.map(i => i.year).filter(Boolean))].sort((a,b)=>b.localeCompare(a));
+      const sel = $('filterYear');
+      const cur = sel.value;
+      sel.innerHTML = `<option value="all">Toutes années</option>` + years.map(y => `<option value="${y}">${y}</option>`).join('');
+      sel.value = years.includes(cur) ? cur : 'all';
     }
 
     async function load(){
-      const r = await fetch(API_URL);
-      const data = await r.json();
-      renderCharts(data.items);
-      renderTable(data.items);
+      $('msg').textContent = '';
+      $('rows').innerHTML = `<tr><td colspan="7"><span class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span> Chargement des données…</span></td></tr>`;
+
+      try{
+        const r = await fetch('/.netlify/functions/public-suivi', { cache: 'no-store' });
+        const data = await r.json();
+
+        if (!r.ok) {
+          $('msg').textContent = 'Erreur de chargement.';
+          $('rows').innerHTML = `<tr><td colspan="7" class="muted">Erreur côté serveur.</td></tr>`;
+          return;
+        }
+
+        ALL = (data.items || []).map(it => {
+          const y = it.year || yearFromDate(it.date);
+          return {
+            ...it,
+            year: y || '',
+            creatorsText: it.creatorsText || joinCreators(it.creators || []),
+          };
+        });
+
+        fillYears(ALL);
+
+        const ts = data.fetchedAt ? new Date(data.fetchedAt) : new Date();
+        $('lastUpdate').textContent = `Dernière mise à jour : ${ts.toLocaleString('fr-FR')}`;
+
+        render();
+      } catch(err){
+        console.error(err);
+        $('msg').textContent = 'Erreur réseau.';
+        $('rows').innerHTML = `<tr><td colspan="7" class="muted">Impossible de charger les données.</td></tr>`;
+      }
     }
 
+    // Events
+    ['q','filterType','filterNeeds','filterYear'].forEach(id => $(id).addEventListener('input', render));
+    $('reset').addEventListener('click', () => {
+      $('q').value = '';
+      $('filterType').value = 'all';
+      $('filterNeeds').value = 'all';
+      $('filterYear').value = 'all';
+      render();
+    });
+    $('refresh').addEventListener('click', load);
+
+    // Start
     load();
   </script>
 </body>
