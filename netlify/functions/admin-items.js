@@ -1,14 +1,12 @@
 // netlify/functions/admin-items.js
-// Liste privée des items + flags + key (réservé à l'admin)
-
 exports.handler = async (event) => {
   try {
-    if (!isAuthorized(event)) {
-      return json(401, { error: 'Unauthorized' });
-    }
+    // ✅ Auth Netlify Identity
+    const user = event.clientContext && event.clientContext.user;
+    if (!user) return json(401, { error: 'Unauthorized (not logged in)' });
 
     const apiKey = process.env.ZOTERO_API_KEY;
-    const libraryType = process.env.ZOTERO_LIBRARY_TYPE; // 'users' ou 'groups'
+    const libraryType = process.env.ZOTERO_LIBRARY_TYPE;
     const libraryId = process.env.ZOTERO_LIBRARY_ID;
 
     if (!apiKey || !libraryType || !libraryId) {
@@ -18,10 +16,7 @@ exports.handler = async (event) => {
     const url = `https://api.zotero.org/${libraryType}/${libraryId}/items?limit=200&sort=dateModified&direction=desc`;
 
     const res = await fetch(url, {
-      headers: {
-        'Zotero-API-Key': apiKey,
-        'Zotero-API-Version': '3'
-      }
+      headers: { 'Zotero-API-Key': apiKey, 'Zotero-API-Version': '3' }
     });
 
     const raw = await res.text();
@@ -33,26 +28,23 @@ exports.handler = async (event) => {
       .map(z => z?.data)
       .filter(Boolean)
       .filter(d => d.itemType === 'book' || d.itemType === 'bookSection')
-      .map(d => {
-        const flags = parseDLABFlags(d.extra || '');
-        return {
-          key: d.key, // IMPORTANT pour mettre à jour
-          itemType: d.itemType,
-          title: d.title || '',
-          date: d.date || '',
-          year: extractYear(d.date || ''),
-          creatorsText: (d.creators || [])
-            .filter(c => c && (c.creatorType === 'author' || c.creatorType === 'editor'))
-            .map(c => `${(c.lastName||'').trim()} ${(c.firstName||'').trim()}`.trim())
-            .filter(Boolean)
-            .join(', '),
-          bookTitle: d.bookTitle || '',
-          publisher: d.publisher || '',
-          place: d.place || '',
-          isbn: d.ISBN || d.isbn || '',
-          flags
-        };
-      });
+      .map(d => ({
+        key: d.key,
+        itemType: d.itemType,
+        title: d.title || '',
+        date: d.date || '',
+        year: extractYear(d.date || ''),
+        creatorsText: (d.creators || [])
+          .filter(c => c && (c.creatorType === 'author' || c.creatorType === 'editor'))
+          .map(c => `${(c.lastName||'').trim()} ${(c.firstName||'').trim()}`.trim())
+          .filter(Boolean)
+          .join(', '),
+        bookTitle: d.bookTitle || '',
+        publisher: d.publisher || '',
+        place: d.place || '',
+        isbn: d.ISBN || d.isbn || '',
+        flags: parseDLABFlags(d.extra || '')
+      }));
 
     return json(200, { fetchedAt: new Date().toISOString(), items: filtered });
   } catch (err) {
@@ -60,19 +52,10 @@ exports.handler = async (event) => {
   }
 };
 
-function isAuthorized(event) {
-  const token = (event.headers?.['x-admin-token'] || event.headers?.['X-Admin-Token'] || '').trim();
-  const expected = (process.env.ADMIN_TOKEN || '').trim();
-  return expected && token && token === expected;
-}
-
 function json(statusCode, obj) {
   return {
     statusCode,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': 'no-store'
-    },
+    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
     body: JSON.stringify(obj)
   };
 }
@@ -82,7 +65,6 @@ function extractYear(dateStr) {
   return m ? m[0] : '';
 }
 
-// Parse bloc [DLAB] ... [/DLAB]
 function parseDLABFlags(extra) {
   const s = String(extra || '');
   const start = s.indexOf('[DLAB]');
@@ -91,7 +73,6 @@ function parseDLABFlags(extra) {
 
   const block = s.slice(start + 6, end).trim();
   const flags = {};
-
   block.split('\n').forEach(line => {
     const l = line.trim();
     if (!l || l.startsWith('#')) return;
@@ -102,7 +83,6 @@ function parseDLABFlags(extra) {
     if (!k) return;
     flags[k] = normalizeBool(v);
   });
-
   return flags;
 }
 
