@@ -95,11 +95,12 @@
     <div class="bar">
       <div class="card" style="flex:1;min-width:260px">
         <div class="controls">
-          <input id="q" type="search" placeholder="Rechercher (titre, auteur, éditeur, ISBN…)" />
+          <input id="q" type="search" placeholder="Rechercher (titre, auteur, revue/éditeur, ISBN/DOI…)" />
           <select id="filterType">
             <option value="all">Tous types</option>
             <option value="book">Livres</option>
             <option value="bookSection">Chapitres</option>
+            <option value="journalArticle">Articles</option>
           </select>
           <select id="filterNeeds">
             <option value="all">Toutes demandes</option>
@@ -119,7 +120,7 @@
 
         <div class="stats" style="margin-top:12px">
           <div class="stat">
-            <b id="sTotal">—</b><span>items (livres + chapitres)</span>
+            <b id="sTotal">—</b><span>items (livres + chapitres + articles)</span>
           </div>
           <div class="stat">
             <b id="sNeed">—</b><span>à traiter (HAL ou com demandés)</span>
@@ -197,6 +198,7 @@
     function typeLabel(t){
       if (t === 'book') return 'Livre';
       if (t === 'bookSection') return 'Chapitre';
+      if (t === 'journalArticle') return 'Article';
       return t || '';
     }
 
@@ -346,7 +348,13 @@
 
         if (!q) return true;
         const hay = norm([
-          it.title, it.bookTitle, it.publisher, it.place, it.isbn,
+          it.title,
+          it.bookTitle,
+          it.publicationTitle,
+          it.publisher,
+          it.place,
+          it.isbn,
+          it.doi,
           it.creatorsText
         ].filter(Boolean).join(' | '));
         return hay.includes(q);
@@ -395,7 +403,10 @@
           ? `<a href="${it.zoteroUrl}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a>`
           : escapeHtml(title);
 
-        const extraMini = it.bookTitle ? `<div class="mini muted">Dans : ${escapeHtml(it.bookTitle)}</div>` : '';
+        let extraMini = '';
+        if (it.bookTitle) extraMini += `<div class="mini muted">Dans : ${escapeHtml(it.bookTitle)}</div>`;
+        if (!it.bookTitle && it.publicationTitle) extraMini += `<div class="mini muted">Revue : ${escapeHtml(it.publicationTitle)}</div>`;
+        if (it.doi) extraMini += `<div class="mini muted">DOI : ${escapeHtml(it.doi)}</div>`;
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
