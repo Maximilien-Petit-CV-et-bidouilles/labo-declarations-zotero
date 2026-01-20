@@ -71,7 +71,7 @@ function normalizeDoi(raw) {
 }
 
 async function fetchDoiMetadata(doi) {
-  // 1) OpenAlex (simple et souvent très complet)
+  // 1) OpenAlex
   try {
     const r = await fetch(`https://api.openalex.org/works/https://doi.org/${encodeURIComponent(doi)}`);
     if (r.ok) {
@@ -94,7 +94,7 @@ async function fetchDoiMetadata(doi) {
     }
   } catch (_) {}
 
-  // 2) Crossref (fallback)
+  // 2) Crossref
   const r2 = await fetch(`https://api.crossref.org/works/${encodeURIComponent(doi)}`);
   if (!r2.ok) throw new Error('DOI introuvable.');
   const j = await r2.json();
@@ -118,18 +118,32 @@ function setInputValue(name, value) {
   if (el && value !== undefined && value !== null) el.value = String(value);
 }
 
-function buildExtraWithOptions(userExtra, optHal, optComms) {
+/**
+ * Construit le bloc [DLAB] stocké dans Extra.
+ * On conserve ton texte libre "Extra", et on y ajoute/concatène un bloc normalisé.
+ */
+function buildExtraWithOptions(userExtra, optHal, optComms, axesArr) {
   const base = (userExtra || '').trim();
+
+  const axes = Array.isArray(axesArr) && axesArr.length ? axesArr.join(',') : 'none';
 
   const block =
 `[DLAB]
 hal_create: ${optHal}
 comms_publish: ${optComms}
+axes: ${axes}
 [/DLAB]`;
 
-  // Si l'utilisateur a déjà du texte, on ajoute une ligne vide pour lisibilité
   if (base) return `${base}\n\n${block}`;
   return block;
+}
+
+function getAxesFromForm(form) {
+  const axes = [];
+  if (form.axisPICMAP?.checked) axes.push('PICMAP');
+  if (form.axisMOPTIS?.checked) axes.push('MOPTIS');
+  if (form.axisOCSO?.checked) axes.push('OCSO');
+  return axes;
 }
 
 // --- Init
@@ -164,20 +178,14 @@ if (doiBtn) {
 
       const meta = await fetchDoiMetadata(doi);
 
-      // Titre
       if (meta.title) setInputValue('title', meta.title);
-      // Revue
       if (meta.publication) setInputValue('articlePublication', meta.publication);
-      // Date
       if (meta.date) setInputValue('articleDate', meta.date);
-      // Volume / issue / pages
       if (meta.volume) setInputValue('articleVolume', meta.volume);
       if (meta.issue) setInputValue('articleIssue', meta.issue);
       if (meta.pages) setInputValue('articlePages', meta.pages);
-      // DOI normalisé
       setInputValue('articleDoi', meta.doi || doi);
 
-      // Auteurs (remplace la liste actuelle)
       if (Array.isArray(meta.authors) && meta.authors.length) {
         const list = document.getElementById('authors-list');
         list.innerHTML = '';
@@ -224,6 +232,9 @@ form.addEventListener('submit', async (e) => {
       return;
     }
 
+    // ✅ Axes
+    const axes = getAxesFromForm(form);
+
     // Lire les bons champs (évite les doublons)
     const dateValue = isSection
       ? (form.sectionDate?.value || '').trim()
@@ -250,7 +261,8 @@ form.addEventListener('submit', async (e) => {
     const extraValue = buildExtraWithOptions(
       (form.extra?.value || '').trim(),
       optHal,
-      optComms
+      optComms,
+      axes
     );
 
     const payload = {
@@ -270,12 +282,14 @@ form.addEventListener('submit', async (e) => {
       seriesNumber: (form.seriesNumber?.value || '').trim(),
       volume: (form.volume?.value || '').trim(),
       edition: (form.edition?.value || '').trim(),
+
       // Article
       publication: (form.articlePublication?.value || '').trim(),
       articleVolume: (form.articleVolume?.value || '').trim(),
       articleIssue: (form.articleIssue?.value || '').trim(),
       articlePages: (form.articlePages?.value || '').trim(),
       doi: normalizeDoi((form.articleDoi?.value || '').trim()),
+
       extra: extraValue
     };
 
