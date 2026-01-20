@@ -1,9 +1,9 @@
 /* ==========================================================
-   assets/cv.js — Option 2a (Markdown blocks in-CV)
+   assets/cv.js — Option 2a (Markdown blocks in-CV) + DOCX Markdown
    - Publications via /.netlify/functions/public-suivi
    - Filtres + tri
    - Blocs texte en Markdown (Edit/Aperçu) sauvegardés en localStorage
-   - Export HTML / PDF (html2pdf) / DOCX
+   - Export HTML / PDF (html2pdf) / DOCX (docx) avec **gras**, *italique*, listes, liens
    ========================================================== */
 
 (function () {
@@ -92,11 +92,10 @@
   function mdToHtml(md) {
     const src = String(md || '');
     if (window.marked && typeof window.marked.parse === 'function') {
-      // Prevent raw HTML injection by stripping tags before parsing (simple guard)
+      // Simple guard: remove raw HTML tags before parsing
       const noHtml = src.replace(/<[^>]*>/g, '');
       return window.marked.parse(noHtml, { gfm: true, breaks: true });
     }
-    // Fallback: plain text with <br>
     return escapeHtml(src).replace(/\n/g, '<br>');
   }
 
@@ -138,7 +137,6 @@
   }
 
   function getDefaultMd(block) {
-    // defaults are stored as HTML-escaped newlines in attribute
     const d = block.getAttribute('data-md-default');
     if (!d) return '';
     return d
@@ -160,15 +158,12 @@
 
       if (!key || !edit || !preview) return;
 
-      const initial = (typeof store[key] === 'string')
-        ? store[key]
-        : getDefaultMd(block);
+      const initial = (typeof store[key] === 'string') ? store[key] : getDefaultMd(block);
 
       edit.value = initial;
       preview.innerHTML = mdToHtml(initial);
 
       function setMode(mode) {
-        // mode: 'edit' or 'preview'
         tabs.forEach(t => {
           const isActive = t.getAttribute('data-tab') === mode;
           t.classList.toggle('active', isActive);
@@ -184,10 +179,9 @@
         }
       }
 
-      // Default mode: preview
+      // Default: preview
       setMode('preview');
 
-      // Tab click
       tabs.forEach((t) => {
         t.addEventListener('click', () => {
           const mode = t.getAttribute('data-tab');
@@ -389,19 +383,15 @@
   function buildExportClone() {
     const clone = elCvRoot.cloneNode(true);
 
-    // Replace mdblocks by their preview content only
+    // Replace mdblocks by preview content only (remove tabs + textarea)
     clone.querySelectorAll('.mdblock').forEach((b) => {
       const prev = b.querySelector('.mdpreview');
       const edit = b.querySelector('.mdedit');
       const tabs = b.querySelector('.mdtabs');
       if (tabs) tabs.remove();
       if (edit) edit.remove();
+      if (prev) prev.hidden = false;
 
-      if (prev) {
-        // Ensure preview visible
-        prev.hidden = false;
-      }
-      // Keep b container but remove its border in exports
       b.style.border = 'none';
       b.style.padding = '0';
     });
@@ -511,7 +501,7 @@
     }
   }
 
-  // ---------- Export DOCX (riche)
+  // ---------- Export DOCX (docx) — Preserve Markdown formatting for text blocks
   async function exportDocx() {
     try {
       if (!window.docx || !window.docx.Document) {
@@ -524,49 +514,145 @@
       const name = ($('#cvName')?.textContent || 'Nom Prénom').trim();
       const contact = ($('#cvContact')?.textContent || '').trim();
 
-      // Helper: get markdown source for a mdblock by key
       const mdStore = loadMdStore();
       function mdText(key) {
         if (typeof mdStore[key] === 'string') return mdStore[key].trim();
-        // fallback: read current textarea
         const b = document.querySelector(`.mdblock[data-md-key="${CSS.escape(key)}"]`);
         const t = b?.querySelector('.mdedit');
         return (t?.value || '').trim();
       }
 
-      // Convert markdown to plain text for DOCX (lightweight)
-      function mdToPlain(md) {
-        // very simple: remove links formatting, emphasis, code fences
-        let t = String(md || '');
-        t = t.replace(/\r/g, '');
-        t = t.replace(/`{3}[\s\S]*?`{3}/g, '');          // fenced code blocks
-        t = t.replace(/`([^`]+)`/g, '$1');              // inline code
-        t = t.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)'); // links
-        t = t.replace(/\*\*([^*]+)\*\*/g, '$1');        // bold
-        t = t.replace(/\*([^*]+)\*/g, '$1');            // italic
-        t = t.replace(/#+\s*/g, '');                    // headings
-        return t.trim();
+      function mdToLinesPreserveMarkdown(md) {
+        // Remove fenced code blocks; keep inline markdown
+        let t = String(md || '').replace(/\r/g, '');
+        t = t.replace(/`{3}[\s\S]*?`{3}/g, '');
+        return t.split('\n');
       }
 
-      // For lists: lines starting with "- " become separate paragraphs
       function paragraphsFromMd(md) {
-        const plain = mdToPlain(md);
-        const lines = plain.split('\n').map(x => x.trim());
-        const out = [];
+        const lines = mdToLinesPreserveMarkdown(md).map(x => x.trim());
+        const paras = [];
+
         for (const line of lines) {
           if (!line) continue;
-          if (/^[-*]\s+/.test(line)) out.push(line.replace(/^[-*]\s+/, '• '));
-          else out.push(line);
+
+          // Bullet "- item" or "* item"
+          const m = line.match(/^[-*]\s+(.*)$/);
+          if (m) {
+            paras.push({ type: 'bullet', text: m[1] });
+            continue;
+          }
+
+          // Headings "#", "##", "###"
+          const h = line.match(/^(#{1,3})\s+(.*)$/);
+          if (h) {
+            paras.push({ type: 'heading', level: h[1].length, text: h[2] });
+            continue;
+          }
+
+          paras.push({ type: 'p', text: line });
         }
-        return out;
+
+        return paras;
+      }
+
+      function runsFromInlineMarkdown(text) {
+        // Parse simple inline markdown: **bold**, *italic*, `code`, [label](url)
+        const src = String(text || '');
+        const runs = [];
+
+        const push = (t, opts = {}) => {
+          if (!t) return;
+          runs.push(new TextRun({ text: t, ...opts }));
+        };
+
+        let i = 0;
+        while (i < src.length) {
+          // Link [label](url)
+          if (src[i] === '[') {
+            const close = src.indexOf(']', i + 1);
+            const openPar = src.indexOf('(', close + 1);
+            const closePar = src.indexOf(')', openPar + 1);
+            if (close !== -1 && openPar === close + 1 && closePar !== -1) {
+              const label = src.slice(i + 1, close);
+              const url = src.slice(openPar + 1, closePar);
+              push(label, { underline: {} });
+              push(` (${url})`);
+              i = closePar + 1;
+              continue;
+            }
+          }
+
+          // Bold **text**
+          if (src[i] === '*' && src[i + 1] === '*') {
+            const end = src.indexOf('**', i + 2);
+            if (end !== -1) {
+              const inner = src.slice(i + 2, end);
+              push(inner, { bold: true });
+              i = end + 2;
+              continue;
+            }
+          }
+
+          // Italic *text*
+          if (src[i] === '*') {
+            const end = src.indexOf('*', i + 1);
+            if (end !== -1) {
+              const inner = src.slice(i + 1, end);
+              push(inner, { italics: true });
+              i = end + 1;
+              continue;
+            }
+          }
+
+          // Inline code `code`
+          if (src[i] === '`') {
+            const end = src.indexOf('`', i + 1);
+            if (end !== -1) {
+              const inner = src.slice(i + 1, end);
+              push(inner, { font: 'Courier New' });
+              i = end + 1;
+              continue;
+            }
+          }
+
+          // Default: consume until next special token
+          const nextCandidates = [];
+          const n1 = src.indexOf('[', i);
+          if (n1 !== -1) nextCandidates.push(n1);
+          const n2 = src.indexOf('**', i);
+          if (n2 !== -1) nextCandidates.push(n2);
+          const n3 = src.indexOf('*', i);
+          if (n3 !== -1) nextCandidates.push(n3);
+          const n4 = src.indexOf('`', i);
+          if (n4 !== -1) nextCandidates.push(n4);
+
+          const next = nextCandidates.length ? Math.min(...nextCandidates) : -1;
+
+          if (next === -1) {
+            push(src.slice(i));
+            break;
+          } else if (next === i) {
+            push(src[i]);
+            i += 1;
+          } else {
+            push(src.slice(i, next));
+            i = next;
+          }
+        }
+
+        return runs;
       }
 
       const sections = [
-        { title: 'Présentation', lines: paragraphsFromMd(mdText('cv.presentation')) },
-        { title: 'Titres et fonctions', lines: paragraphsFromMd(mdText('cv.titles')) },
-        { title: 'Principaux diplômes', lines: paragraphsFromMd(mdText('cv.degrees')) },
-        { title: 'Productions principales en recherche', lines: (elPubList?.innerText || '').split('\n').map(x => x.trim()).filter(Boolean) },
-        { title: 'Investissement pédagogique et diffusion de la connaissance', lines: paragraphsFromMd(mdText('cv.teaching')) },
+        { title: 'Présentation', parts: paragraphsFromMd(mdText('cv.presentation')) },
+        { title: 'Titres et fonctions', parts: paragraphsFromMd(mdText('cv.titles')) },
+        { title: 'Principaux diplômes', parts: paragraphsFromMd(mdText('cv.degrees')) },
+        {
+          title: 'Productions principales en recherche',
+          parts: (elPubList?.innerText || '').split('\n').map(x => x.trim()).filter(Boolean).map(t => ({ type: 'p', text: t }))
+        },
+        { title: 'Investissement pédagogique et diffusion de la connaissance', parts: paragraphsFromMd(mdText('cv.teaching')) },
       ];
 
       const children = [];
@@ -575,18 +661,39 @@
       children.push(new Paragraph({ text: ' ' }));
 
       for (const s of sections) {
-        if (!s.lines || s.lines.length === 0) continue;
+        if (!s.parts || s.parts.length === 0) continue;
+
         children.push(new Paragraph({ text: s.title, heading: HeadingLevel.HEADING_2 }));
-        for (const line of s.lines) {
-          children.push(new Paragraph({ children: [new TextRun(line)] }));
+
+        for (const part of s.parts) {
+          if (!part) continue;
+
+          if (part.type === 'bullet') {
+            children.push(new Paragraph({
+              children: runsFromInlineMarkdown(part.text),
+              bullet: { level: 0 }
+            }));
+            continue;
+          }
+
+          if (part.type === 'heading') {
+            const level = part.level === 1 ? HeadingLevel.HEADING_2 : HeadingLevel.HEADING_3;
+            children.push(new Paragraph({ text: part.text, heading: level }));
+            continue;
+          }
+
+          children.push(new Paragraph({
+            children: runsFromInlineMarkdown(part.text || '')
+          }));
         }
+
         children.push(new Paragraph({ text: ' ' }));
       }
 
       const doc = new Document({ sections: [{ properties: {}, children }] });
       const blob = await Packer.toBlob(doc);
       downloadBlob(blob, safeFilenameBase(name) + '.docx');
-      setStatus('✅ Export DOCX généré.');
+      setStatus('✅ Export DOCX généré (Markdown conservé).');
     } catch (e) {
       setStatus('❌ Export DOCX impossible : ' + (e?.message || e), false);
       console.error('[CV] exportDocx error:', e);
