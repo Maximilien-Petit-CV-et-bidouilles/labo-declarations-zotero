@@ -5,7 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Back-office — Suivi HAL / Communication</title>
   <style>
-    :root{--bg:#f5f5f8;--card:#fff;--text:#222;--muted:#666;--border:#ddd;--accent:#2c7be5;--ok:#1b7c3a;--warn:#b26a00;--bad:#b32020;--chip:#f2f6ff;--chip-border:#cfe0ff;}
+    :root{
+      --bg:#f5f5f8;--card:#fff;--text:#222;--muted:#666;--border:#ddd;
+      --accent:#2c7be5;--ok:#1b7c3a;--warn:#b26a00;--bad:#b32020;
+      --chip:#f2f6ff;--chip-border:#cfe0ff;
+    }
     *{box-sizing:border-box}
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--text)}
     .wrap{max-width:1150px;margin:28px auto;padding:0 16px}
@@ -71,6 +75,15 @@
           <option value="book">Livres</option>
           <option value="bookSection">Chapitres</option>
           <option value="journalArticle">Articles</option>
+        </select>
+
+        <!-- ✅ Filtre Axe -->
+        <select id="filterAxis" class="hidden">
+          <option value="all">Tous axes</option>
+          <option value="PICMAP">PICMAP</option>
+          <option value="MOPTIS">MOPTIS</option>
+          <option value="OCSO">OCSO</option>
+          <option value="none">Sans axe</option>
         </select>
       </div>
       <div class="msg" id="msg">🔒 Non connecté.</div>
@@ -140,7 +153,7 @@
     }
 
     function showAuthedUI(isAuthed){
-      ['logout','refresh','q','filterNeed','filterType'].forEach(id => $(id).classList.toggle('hidden', !isAuthed));
+      ['logout','refresh','q','filterNeed','filterType','filterAxis'].forEach(id => $(id).classList.toggle('hidden', !isAuthed));
       $('login').classList.toggle('hidden', isAuthed);
     }
 
@@ -149,9 +162,7 @@
       if (!user) throw new Error('Not authenticated');
 
       const token = await user.jwt();
-      const headers = Object.assign({}, options.headers || {}, {
-        'Authorization': 'Bearer ' + token
-      });
+      const headers = Object.assign({}, options.headers || {}, { 'Authorization': 'Bearer ' + token });
 
       return fetch(url, { ...options, headers, cache: 'no-store' });
     }
@@ -169,11 +180,7 @@
         return;
       }
 
-      ALL = (data.items || []).map(it => ({
-        ...it,
-        year: it.year || yearFromDate(it.date),
-      }));
-
+      ALL = (data.items || []).map(it => ({ ...it, year: it.year || yearFromDate(it.date) }));
       setMsg(`✅ ${ALL.length} item(s) chargés. (sync: ${new Date(data.fetchedAt).toLocaleString('fr-FR')})`);
       render();
     }
@@ -182,6 +189,7 @@
       const q = norm($('q').value);
       const fNeed = $('filterNeed').value;
       const fType = $('filterType').value;
+      const fAxis = $('filterAxis').value; // ✅
 
       const rows = ALL.filter(it => {
         if (fType !== 'all' && it.itemType !== fType) return false;
@@ -192,6 +200,13 @@
         if (fNeed === 'needsAction' && st.txt !== 'À traiter') return false;
         if (fNeed === 'hal' && flags.hal_create !== 'yes') return false;
         if (fNeed === 'comms' && flags.comms_publish !== 'yes') return false;
+
+        // ✅ Filtre Axe
+        const axes = parseAxes(flags);
+        if (fAxis !== 'all') {
+          if (fAxis === 'none' && axes.length) return false;
+          if (fAxis !== 'none' && !axes.includes(fAxis)) return false;
+        }
 
         if (!q) return true;
 
@@ -207,7 +222,7 @@
           it.volume,
           it.issue,
           it.pages,
-          axesStr,           // ✅ axes dans la recherche
+          axesStr,
           it.creatorsText
         ].filter(Boolean).join(' | '));
 
@@ -350,7 +365,9 @@
     $('login').addEventListener('click', () => netlifyIdentity.open());
     $('logout').addEventListener('click', () => netlifyIdentity.logout());
     $('refresh').addEventListener('click', load);
-    ['q','filterNeed','filterType'].forEach(id => $(id).addEventListener('input', render));
+
+    // ✅ écouter aussi filterAxis
+    ['q','filterNeed','filterType','filterAxis'].forEach(id => $(id).addEventListener('input', render));
 
     netlifyIdentity.on('init', user => {
       showAuthedUI(!!user);
