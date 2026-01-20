@@ -8,6 +8,7 @@
     :root{
       --bg:#f5f5f8; --card:#fff; --text:#222; --muted:#666; --border:#ddd;
       --accent:#2c7be5; --ok:#1b7c3a; --warn:#b26a00; --bad:#b32020;
+      --chip:#f2f6ff; --chip-border:#cfe0ff;
     }
     *{box-sizing:border-box}
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--text)}
@@ -72,6 +73,26 @@
     .mini{font-size:.82rem}
     .right{white-space:nowrap}
 
+    /* ✅ Axes chips */
+    .axes{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      margin-top:6px;
+    }
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      padding:3px 8px;
+      border-radius:999px;
+      border:1px solid var(--chip-border);
+      background:var(--chip);
+      font-size:.78rem;
+      font-weight:650;
+      color:#1d3c76;
+      white-space:nowrap;
+    }
+
     .statusline{margin-top:10px;color:var(--muted);font-size:.9rem;white-space:pre-wrap}
     .loading{display:inline-flex;gap:8px;align-items:center}
     .dot{width:8px;height:8px;border-radius:99px;background:var(--accent);display:inline-block;animation:pulse 1s infinite ease-in-out}
@@ -95,7 +116,7 @@
     <div class="bar">
       <div class="card" style="flex:1;min-width:260px">
         <div class="controls">
-          <input id="q" type="search" placeholder="Rechercher (titre, auteur, revue, éditeur, ISBN, DOI…)" />
+          <input id="q" type="search" placeholder="Rechercher (titre, auteur, revue, axes, éditeur, ISBN, DOI…)" />
           <select id="filterType">
             <option value="all">Tous types</option>
             <option value="book">Livres</option>
@@ -133,7 +154,6 @@
           </div>
         </div>
 
-        <!-- ✅ Graphiques (synchronisés avec les filtres) -->
         <div class="charts">
           <div class="chartCard">
             <p class="chartTitle">Déclarations par année</p>
@@ -177,18 +197,13 @@
     </p>
   </div>
 
-  <!-- Chart.js (CDN) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <script>
-    // --- State ---
     let ALL = [];
     let VIEW = [];
-
-    // Charts instances
     let CHARTS = { year:null, split:null, status:null };
 
-    // --- Helpers ---
     const $ = (id) => document.getElementById(id);
 
     function norm(s){
@@ -227,7 +242,6 @@
     }
 
     function statusFor(item){
-      // item.flags: { hal_create, comms_publish, hal_done, comms_done }
       const f = item.flags || {};
       const halWanted = f.hal_create === 'yes';
       const commWanted = f.comms_publish === 'yes';
@@ -243,6 +257,12 @@
       return { txt:'Traité', cls:'ok' };
     }
 
+    function parseAxes(flags){
+      const raw = (flags && flags.axes) ? String(flags.axes).trim() : '';
+      if (!raw || raw === 'none') return [];
+      return raw.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
     function destroyCharts(){
       if (CHARTS.year) { CHARTS.year.destroy(); CHARTS.year = null; }
       if (CHARTS.split) { CHARTS.split.destroy(); CHARTS.split = null; }
@@ -250,10 +270,8 @@
     }
 
     function renderCharts(items){
-      // Items = VIEW (donc graphes synchronisés avec filtres)
       destroyCharts();
 
-      // 1) Par année
       const byYear = new Map();
       for (const it of items){
         const y = it.year || '—';
@@ -261,14 +279,12 @@
       }
       const years = [...byYear.keys()]
         .sort((a,b) => {
-          // '—' à la fin
           if (a === '—') return 1;
           if (b === '—') return -1;
           return b.localeCompare(a);
         });
       const yearCounts = years.map(y => byYear.get(y));
 
-      // 2) Répartition HAL/COM/BOTH/NONE
       let halOnly=0, commOnly=0, both=0, none=0;
       for (const it of items){
         const f = it.flags || {};
@@ -280,14 +296,12 @@
         else none++;
       }
 
-      // 3) Statut global
       const statusCounts = { 'À traiter':0, 'Traité':0, 'Non demandé':0 };
       for (const it of items){
         const s = statusFor(it).txt;
         statusCounts[s] = (statusCounts[s] || 0) + 1;
       }
 
-      // Chart defaults (sobres)
       const commonOpts = {
         responsive: true,
         maintainAspectRatio: false,
@@ -296,38 +310,24 @@
 
       CHARTS.year = new Chart($('chartYear'), {
         type: 'bar',
-        data: {
-          labels: years,
-          datasets: [{ label: 'Déclarations', data: yearCounts }]
-        },
-        options: {
-          ...commonOpts,
-          plugins: { legend: { display:false } },
-          scales: { y: { beginAtZero:true, ticks:{ precision:0 } } }
-        }
+        data: { labels: years, datasets: [{ label: 'Déclarations', data: yearCounts }] },
+        options: { ...commonOpts, plugins: { legend: { display:false } }, scales: { y: { beginAtZero:true, ticks:{ precision:0 } } } }
       });
 
       CHARTS.split = new Chart($('chartSplit'), {
         type: 'doughnut',
-        data: {
-          labels: ['HAL seul', 'Com seule', 'HAL + Com', 'Aucune demande'],
-          datasets: [{ data: [halOnly, commOnly, both, none] }]
-        },
+        data: { labels: ['HAL seul', 'Com seule', 'HAL + Com', 'Aucune demande'], datasets: [{ data: [halOnly, commOnly, both, none] }] },
         options: commonOpts
       });
 
       CHARTS.status = new Chart($('chartStatus'), {
         type: 'doughnut',
-        data: {
-          labels: ['À traiter', 'Traité', 'Non demandé'],
-          datasets: [{ data: [statusCounts['À traiter'], statusCounts['Traité'], statusCounts['Non demandé']] }]
-        },
+        data: { labels: ['À traiter', 'Traité', 'Non demandé'], datasets: [{ data: [statusCounts['À traiter'], statusCounts['Traité'], statusCounts['Non demandé']] }] },
         options: commonOpts
       });
     }
 
     function render(){
-      // Filters
       const q = norm($('q').value);
       const fType = $('filterType').value;
       const fNeeds = $('filterNeeds').value;
@@ -347,6 +347,8 @@
         if (fNeeds === 'commsYes' && flags.comms_publish !== 'yes') return false;
 
         if (!q) return true;
+
+        const axesStr = (flags.axes && flags.axes !== 'none') ? flags.axes : '';
         const hay = norm([
           it.title,
           it.bookTitle,
@@ -358,22 +360,20 @@
           it.volume,
           it.issue,
           it.pages,
+          axesStr,              // ✅ axes dans la recherche
           it.creatorsText
         ].filter(Boolean).join(' | '));
         return hay.includes(q);
       });
 
-      // Stats
       $('sTotal').textContent = VIEW.length;
       const need = VIEW.filter(it => statusFor(it).txt === 'À traiter').length;
       $('sNeed').textContent = need;
       $('sHal').textContent = VIEW.filter(it => (it.flags?.hal_create === 'yes')).length;
       $('sComms').textContent = VIEW.filter(it => (it.flags?.comms_publish === 'yes')).length;
 
-      // ✅ Charts (synchronisés)
       renderCharts(VIEW);
 
-      // Rows
       const tbody = $('rows');
       tbody.innerHTML = '';
 
@@ -382,7 +382,6 @@
         return;
       }
 
-      // Sort: newest year/date first
       VIEW.sort((a,b) => {
         const ay = parseInt(a.year || '0', 10);
         const by = parseInt(b.year || '0', 10);
@@ -412,22 +411,22 @@
         } else if (it.publicationTitle) {
           extraMini += `<div class="mini muted">Revue : ${escapeHtml(it.publicationTitle)}</div>`;
         }
-        if (it.doi) {
-          extraMini += `<div class="mini muted">DOI : ${escapeHtml(it.doi)}</div>`;
+        if (it.doi) extraMini += `<div class="mini muted">DOI : ${escapeHtml(it.doi)}</div>`;
+
+        const axes = parseAxes(it.flags || {});
+        let axesHtml = '';
+        if (axes.length) {
+          axesHtml = `<div class="axes">` + axes.map(a => `<span class="chip">${escapeHtml(a)}</span>`).join('') + `</div>`;
         }
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td class="right">${escapeHtml(it.year || '')}</td>
           <td><span class="tag">${escapeHtml(typeLabel(it.itemType))}</span></td>
-          <td class="title">${titleHtml}${extraMini}</td>
+          <td class="title">${titleHtml}${extraMini}${axesHtml}</td>
           <td>${escapeHtml(it.creatorsText || '')}</td>
-          <td>
-            <span class="tag ${hal.cls}">${escapeHtml(halTxt)}</span>
-          </td>
-          <td>
-            <span class="tag ${comms.cls}">${escapeHtml(commTxt)}</span>
-          </td>
+          <td><span class="tag ${hal.cls}">${escapeHtml(halTxt)}</span></td>
+          <td><span class="tag ${comms.cls}">${escapeHtml(commTxt)}</span></td>
           <td><span class="tag ${st.cls}">${escapeHtml(st.txt)}</span></td>
         `;
         tbody.appendChild(tr);
@@ -487,7 +486,6 @@
       }
     }
 
-    // Events
     ['q','filterType','filterNeeds','filterYear'].forEach(id => $(id).addEventListener('input', render));
     $('reset').addEventListener('click', () => {
       $('q').value = '';
@@ -498,7 +496,6 @@
     });
     $('refresh').addEventListener('click', load);
 
-    // Start
     load();
   </script>
 </body>
