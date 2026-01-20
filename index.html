@@ -69,6 +69,31 @@
       font-size: .85rem;
     }
 
+    /* ✅ AXES */
+    .checks{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px 14px;
+      margin-top:6px;
+    }
+    .check{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:6px 10px;
+      border:1px solid var(--border);
+      border-radius:999px;
+      background:#fff;
+      font-weight:600;
+      font-size:.85rem;
+      cursor:pointer;
+      user-select:none;
+    }
+    .check input{
+      width:16px;height:16px;
+      margin:0;
+    }
+
     footer{margin-top:18px;color:var(--muted);font-size:.8rem}
   </style>
 </head>
@@ -189,7 +214,7 @@
         </div>
       </div>
 
-      <!-- ====== OPTIONS (HAL / COMMS) ====== -->
+      <!-- ====== OPTIONS (HAL / COMMS / AXES) ====== -->
       <div class="opts">
         <h3>Options</h3>
         <p>Ces choix seront enregistrés dans Zotero (champ “Extra”).</p>
@@ -212,6 +237,19 @@
               <option value="no">Non</option>
             </select>
           </label>
+        </div>
+
+        <!-- ✅ Nouvelle option AXES -->
+        <div style="margin-top:10px">
+          <div style="font-weight:700;font-size:.9rem;margin:0 0 6px">
+            Est-ce que votre publication/événement est rattachée à un axe thématique de recherche ?
+          </div>
+          <div class="checks">
+            <label class="check"><input type="checkbox" name="axisPICMAP" value="PICMAP"> PICMAP</label>
+            <label class="check"><input type="checkbox" name="axisMOPTIS" value="MOPTIS"> MOPTIS</label>
+            <label class="check"><input type="checkbox" name="axisOCSO" value="OCSO"> OCSO</label>
+          </div>
+          <div class="small-muted" style="margin-top:6px">Vous pouvez cocher plusieurs axes.</div>
         </div>
       </div>
 
