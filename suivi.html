@@ -20,7 +20,7 @@
     .bar{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
     .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px}
 
-    /* ✅ on passe à 5 colonnes de filtres */
+    /* 5 colonnes de filtres */
     .controls{display:grid;grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr;gap:10px}
     @media (max-width: 1100px){ .controls{grid-template-columns:1fr 1fr 1fr} }
     @media (max-width: 800px){ .controls{grid-template-columns:1fr 1fr} }
@@ -76,7 +76,7 @@
     .mini{font-size:.82rem}
     .right{white-space:nowrap}
 
-    /* ✅ Axes chips */
+    /* Axes chips */
     .axes{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
     .chip{
       display:inline-flex;align-items:center;padding:3px 8px;border-radius:999px;
@@ -121,7 +121,7 @@
             <option value="commsYes">Com demandé</option>
           </select>
 
-          <!-- ✅ Filtre Axe -->
+          <!-- Filtre Axe -->
           <select id="filterAxis">
             <option value="all">Tous axes</option>
             <option value="PICMAP">PICMAP</option>
@@ -258,10 +258,15 @@
       return { txt:'Traité', cls:'ok' };
     }
 
+    // ✅ Robust parse: accepte , ; | et normalise en MAJ
     function parseAxes(flags){
       const raw = (flags && flags.axes) ? String(flags.axes).trim() : '';
       if (!raw || raw === 'none') return [];
-      return raw.split(',').map(s => s.trim()).filter(Boolean);
+      return raw
+        .split(/[,;|]/)
+        .map(s => s.trim())
+        .filter(Boolean)
+        .map(s => s.toUpperCase());
     }
 
     function destroyCharts(){
@@ -332,7 +337,7 @@
       const q = norm($('q').value);
       const fType = $('filterType').value;
       const fNeeds = $('filterNeeds').value;
-      const fAxis = $('filterAxis').value;   // ✅
+      const fAxis = $('filterAxis').value;   // PICMAP/MOPTIS/OCSO/none/all
       const fYear = $('filterYear').value;
 
       VIEW = ALL.filter(it => {
@@ -348,16 +353,17 @@
         if (fNeeds === 'halYes' && flags.hal_create !== 'yes') return false;
         if (fNeeds === 'commsYes' && flags.comms_publish !== 'yes') return false;
 
-        // ✅ Filtre Axe
+        // ✅ Filtre Axe (robuste)
         const axes = parseAxes(flags);
-        if (fAxis !== 'all') {
-          if (fAxis === 'none' && axes.length) return false;
-          if (fAxis !== 'none' && !axes.includes(fAxis)) return false;
+        const axisSel = String(fAxis || 'all').toUpperCase();
+        if (axisSel !== 'ALL') {
+          if (axisSel === 'NONE' && axes.length) return false;
+          if (axisSel !== 'NONE' && !axes.includes(axisSel)) return false;
         }
 
         if (!q) return true;
 
-        const axesStr = (flags.axes && flags.axes !== 'none') ? flags.axes : '';
+        const axesStr = (flags.axes && flags.axes !== 'none') ? String(flags.axes) : '';
         const hay = norm([
           it.title,
           it.bookTitle,
@@ -494,14 +500,15 @@
       }
     }
 
-    // ✅ écouter aussi filterAxis
-    ['q','filterType','filterNeeds','filterAxis','filterYear'].forEach(id => $(id).addEventListener('input', render));
+    // ✅ listeners robustes : input pour champ texte, change pour selects
+    $('q').addEventListener('input', render);
+    ['filterType','filterNeeds','filterAxis','filterYear'].forEach(id => $(id).addEventListener('change', render));
 
     $('reset').addEventListener('click', () => {
       $('q').value = '';
       $('filterType').value = 'all';
       $('filterNeeds').value = 'all';
-      $('filterAxis').value = 'all'; // ✅
+      $('filterAxis').value = 'all';
       $('filterYear').value = 'all';
       render();
     });
