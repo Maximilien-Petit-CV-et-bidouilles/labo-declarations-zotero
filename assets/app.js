@@ -58,6 +58,64 @@ function togglePubType(pubType) {
     pubType === 'book' ? 'block' : 'none';
   document.getElementById('section-fields').style.display =
     pubType === 'bookSection' ? 'block' : 'none';
+  const article = document.getElementById('article-fields');
+  if (article) article.style.display = pubType === 'journalArticle' ? 'block' : 'none';
+}
+
+function normalizeDoi(raw) {
+  return String(raw || '')
+    .trim()
+    .replace(/^https?:\/\/doi\.org\//i, '')
+    .replace(/^doi:\s*/i, '')
+    .trim();
+}
+
+async function fetchDoiMetadata(doi) {
+  // 1) OpenAlex (simple et souvent très complet)
+  try {
+    const r = await fetch(`https://api.openalex.org/works/https://doi.org/${encodeURIComponent(doi)}`);
+    if (r.ok) {
+      const w = await r.json();
+      return {
+        title: w?.title || '',
+        authors: (w?.authorships || []).map(a => ({
+          firstName: (a?.author?.display_name || '').split(' ').slice(0, -1).join(' '),
+          lastName: (a?.author?.display_name || '').split(' ').slice(-1).join(' ')
+        })).filter(a => a.firstName || a.lastName),
+        publication: w?.host_venue?.display_name || '',
+        date: w?.publication_year ? String(w.publication_year) : '',
+        volume: w?.biblio?.volume || '',
+        issue: w?.biblio?.issue || '',
+        pages: (w?.biblio?.first_page && w?.biblio?.last_page)
+          ? `${w.biblio.first_page}-${w.biblio.last_page}`
+          : (w?.biblio?.page || ''),
+        doi
+      };
+    }
+  } catch (_) {}
+
+  // 2) Crossref (fallback)
+  const r2 = await fetch(`https://api.crossref.org/works/${encodeURIComponent(doi)}`);
+  if (!r2.ok) throw new Error('DOI introuvable.');
+  const j = await r2.json();
+  const m = j?.message || {};
+  const year = m?.issued?.['date-parts']?.[0]?.[0];
+  return {
+    title: (m?.title || [])[0] || '',
+    authors: (m?.author || []).map(a => ({ firstName: a?.given || '', lastName: a?.family || '' }))
+      .filter(a => a.firstName || a.lastName),
+    publication: (m?.['container-title'] || [])[0] || '',
+    date: year ? String(year) : '',
+    volume: m?.volume || '',
+    issue: m?.issue || '',
+    pages: m?.page || '',
+    doi: m?.DOI || doi
+  };
+}
+
+function setInputValue(name, value) {
+  const el = document.querySelector(`[name="${name}"]`);
+  if (el && value !== undefined && value !== null) el.value = String(value);
 }
 
 function buildExtraWithOptions(userExtra, optHal, optComms) {
@@ -88,6 +146,54 @@ pubTypeSelect.addEventListener('change', (e) => {
 });
 togglePubType(pubTypeSelect.value);
 
+// --- DOI prefill (Article)
+const doiBtn = document.getElementById('doi-prefill');
+if (doiBtn) {
+  doiBtn.addEventListener('click', async () => {
+    try {
+      const doiEl = document.getElementById('articleDoi');
+      const raw = (doiEl?.value || '').trim();
+      const doi = normalizeDoi(raw);
+      if (!doi) {
+        setStatus('❌ Merci de renseigner un DOI.', 'err');
+        return;
+      }
+
+      setStatus('⏳ Récupération des métadonnées via DOI…');
+      doiBtn.disabled = true;
+
+      const meta = await fetchDoiMetadata(doi);
+
+      // Titre
+      if (meta.title) setInputValue('title', meta.title);
+      // Revue
+      if (meta.publication) setInputValue('articlePublication', meta.publication);
+      // Date
+      if (meta.date) setInputValue('articleDate', meta.date);
+      // Volume / issue / pages
+      if (meta.volume) setInputValue('articleVolume', meta.volume);
+      if (meta.issue) setInputValue('articleIssue', meta.issue);
+      if (meta.pages) setInputValue('articlePages', meta.pages);
+      // DOI normalisé
+      setInputValue('articleDoi', meta.doi || doi);
+
+      // Auteurs (remplace la liste actuelle)
+      if (Array.isArray(meta.authors) && meta.authors.length) {
+        const list = document.getElementById('authors-list');
+        list.innerHTML = '';
+        meta.authors.forEach(a => addAuthorRow(a.firstName || '', a.lastName || ''));
+      }
+
+      setStatus('✅ Métadonnées récupérées. Vérifiez/complétez si nécessaire.', 'ok');
+      setTimeout(() => clearStatus(), 2500);
+    } catch (e) {
+      setStatus('❌ Impossible de préremplir à partir du DOI (métadonnées indisponibles).', 'err');
+    } finally {
+      doiBtn.disabled = false;
+    }
+  });
+}
+
 // --- Submit
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -107,6 +213,7 @@ form.addEventListener('submit', async (e) => {
 
     const pubType = form.pubType.value;
     const isSection = pubType === 'bookSection';
+    const isArticle = pubType === 'journalArticle';
 
     // Options obligatoires
     const optHal = (form.optHal?.value || '').trim();     // yes/no
@@ -120,15 +227,21 @@ form.addEventListener('submit', async (e) => {
     // Lire les bons champs (évite les doublons)
     const dateValue = isSection
       ? (form.sectionDate?.value || '').trim()
-      : (form.date?.value || '').trim();
+      : isArticle
+        ? (form.articleDate?.value || '').trim()
+        : (form.date?.value || '').trim();
 
     const publisherValue = isSection
       ? (form.sectionPublisher?.value || '').trim()
-      : (form.publisher?.value || '').trim();
+      : isArticle
+        ? (form.articlePublisher?.value || '').trim()
+        : (form.publisher?.value || '').trim();
 
     const placeValue = isSection
       ? (form.sectionPlace?.value || '').trim()
-      : (form.place?.value || '').trim();
+      : isArticle
+        ? (form.articlePlace?.value || '').trim()
+        : (form.place?.value || '').trim();
 
     const isbnValue = isSection
       ? (form.sectionIsbn?.value || '').trim()
@@ -157,15 +270,26 @@ form.addEventListener('submit', async (e) => {
       seriesNumber: (form.seriesNumber?.value || '').trim(),
       volume: (form.volume?.value || '').trim(),
       edition: (form.edition?.value || '').trim(),
+      // Article
+      publication: (form.articlePublication?.value || '').trim(),
+      articleVolume: (form.articleVolume?.value || '').trim(),
+      articleIssue: (form.articleIssue?.value || '').trim(),
+      articlePages: (form.articlePages?.value || '').trim(),
+      doi: normalizeDoi((form.articleDoi?.value || '').trim()),
       extra: extraValue
     };
 
     // Validation minimale
     if (!payload.title) throw new Error('Titre manquant.');
     if (!payload.date) throw new Error('Date manquante.');
-    if (!payload.publisher) throw new Error('Publisher manquant.');
-    if (!payload.place) throw new Error('Place manquante.');
-    if (pubType === 'bookSection' && !payload.bookTitle) throw new Error('Book Title manquant (chapitre).');
+    if (pubType === 'book' && !payload.publisher) throw new Error('Publisher manquant.');
+    if (pubType === 'book' && !payload.place) throw new Error('Place manquante.');
+    if (pubType === 'bookSection') {
+      if (!payload.publisher) throw new Error('Publisher manquant.');
+      if (!payload.place) throw new Error('Place manquante.');
+      if (!payload.bookTitle) throw new Error('Book Title manquant (chapitre).');
+    }
+    if (pubType === 'journalArticle' && !payload.publication) throw new Error('Publication (revue) manquante.');
 
     const r = await fetch('/.netlify/functions/zotero-create-item', {
       method: 'POST',
