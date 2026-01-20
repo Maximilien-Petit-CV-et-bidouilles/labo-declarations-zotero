@@ -4,7 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Back-office — Suivi HAL / Communication</title>
-
   <style>
     :root{
       --bg:#f5f5f8;--card:#fff;--text:#222;--muted:#666;--border:#ddd;
@@ -17,30 +16,25 @@
     header{display:flex;gap:12px;align-items:flex-end;justify-content:space-between;flex-wrap:wrap}
     h1{margin:0;font-size:1.35rem}
     .sub{margin:6px 0 0;color:var(--muted);font-size:.92rem}
-
     .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:14px}
     .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-
-    input,button,select{
-      font:inherit;padding:9px 10px;border-radius:10px;border:1px solid var(--border);background:#fff
-    }
+    input,button,select{font:inherit;padding:9px 10px;border-radius:10px;border:1px solid var(--border);background:#fff}
     button{cursor:pointer}
     button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:650}
     button.danger{background:#fff;border-color:rgba(179,32,32,.5);color:var(--bad);font-weight:650}
-
+    button[disabled]{opacity:.7;cursor:default}
     .msg{margin-top:10px;color:var(--muted);font-size:.9rem;white-space:pre-wrap}
 
     table{width:100%;border-collapse:separate;border-spacing:0;margin-top:10px}
-    th,td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top}
+    th,td{padding:10px 10px;border-bottom:1px solid var(--border);vertical-align:top}
     th{font-size:.82rem;color:var(--muted);text-align:left;white-space:nowrap}
     td{font-size:.92rem}
-
     .title{font-weight:650}
     .mini{font-size:.82rem;color:var(--muted);margin-top:4px}
     .tag{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;border:1px solid var(--border);font-size:.82rem;background:#fff;white-space:nowrap}
     .tag.ok{border-color:rgba(27,124,58,.35);background:rgba(27,124,58,.08);color:var(--ok)}
     .tag.warn{border-color:rgba(178,106,0,.35);background:rgba(178,106,0,.08);color:var(--warn)}
-
+    .tag.bad{border-color:rgba(179,32,32,.35);background:rgba(179,32,32,.08);color:var(--bad)}
     .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
     .chk{display:flex;gap:8px;align-items:center}
     .chk input{width:18px;height:18px;padding:0}
@@ -52,239 +46,376 @@
     .chip{
       display:inline-flex;align-items:center;padding:3px 8px;border-radius:999px;
       border:1px solid var(--chip-border);background:var(--chip);
-      font-size:.78rem;font-weight:650;color:#1d3c76;
+      font-size:.78rem;font-weight:650;color:#1d3c76;white-space:nowrap;
     }
   </style>
 </head>
-
 <body>
-<div class="wrap">
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Back-office — Suivi HAL & Communication</h1>
+        <p class="sub">Connexion via Netlify Identity. Mise à jour des flags dans Zotero (Extra → bloc [DLAB]).</p>
+      </div>
+      <div class="row">
+        <button id="login" class="primary">Se connecter</button>
+        <button id="logout" class="danger hidden">Se déconnecter</button>
+        <button id="refresh" class="primary hidden">Rafraîchir</button>
+      </div>
+    </header>
 
-  <header>
-    <div>
-      <h1>Back-office — Suivi HAL & Communication</h1>
-      <p class="sub">Modification des statuts directement dans Zotero (champ Extra).</p>
+    <div class="card">
+      <div class="row">
+        <input id="q" class="hidden" type="search" placeholder="Rechercher (titre, auteur, revue, axes, ISBN, DOI…)" style="flex:1;min-width:240px" />
+
+        <select id="filterNeed" class="hidden">
+          <option value="all">Tout</option>
+          <option value="needsAction">À traiter</option>
+          <option value="hal">HAL demandé</option>
+          <option value="comms">Com demandée</option>
+        </select>
+
+        <select id="filterType" class="hidden">
+          <option value="all">Tous types</option>
+          <option value="book">Livres</option>
+          <option value="bookSection">Chapitres</option>
+          <option value="journalArticle">Articles</option>
+        </select>
+
+        <!-- ✅ Filtre Axe -->
+        <select id="filterAxis" class="hidden">
+          <option value="all">Tous axes</option>
+          <option value="PICMAP">PICMAP</option>
+          <option value="MOPTIS">MOPTIS</option>
+          <option value="OCSO">OCSO</option>
+          <option value="none">Sans axe</option>
+        </select>
+      </div>
+
+      <div class="msg" id="msg">🔒 Non connecté.</div>
     </div>
-    <div class="row">
-      <button id="login" class="primary">Se connecter</button>
-      <button id="logout" class="danger hidden">Se déconnecter</button>
-      <button id="refresh" class="primary hidden">Rafraîchir</button>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:80px">Année</th>
+            <th style="width:90px">Type</th>
+            <th>Titre</th>
+            <th style="width:230px">Auteur(s)</th>
+            <th style="width:170px">HAL</th>
+            <th style="width:200px">Communication</th>
+            <th style="width:210px">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+          <tr><td colspan="7" class="mini">Connecte-toi via Netlify Identity.</td></tr>
+        </tbody>
+      </table>
     </div>
-  </header>
-
-  <div class="card">
-    <div class="row">
-      <input id="q" class="hidden" type="search" placeholder="Recherche (titre, auteur, revue, axes…)" style="flex:1;min-width:240px">
-
-      <select id="filterNeed" class="hidden">
-        <option value="all">Toutes demandes</option>
-        <option value="needsAction">À traiter</option>
-        <option value="hal">HAL demandée</option>
-        <option value="comms">Com demandée</option>
-      </select>
-
-      <select id="filterType" class="hidden">
-        <option value="all">Tous types</option>
-        <option value="book">Livre</option>
-        <option value="bookSection">Chapitre</option>
-        <option value="journalArticle">Article</option>
-      </select>
-
-      <!-- Filtre Axe -->
-      <select id="filterAxis" class="hidden">
-        <option value="all">Tous axes</option>
-        <option value="PICMAP">PICMAP</option>
-        <option value="MOPTIS">MOPTIS</option>
-        <option value="OCSO">OCSO</option>
-        <option value="none">Sans axe</option>
-      </select>
-    </div>
-
-    <div class="msg" id="msg">🔒 Non connecté.</div>
   </div>
 
-  <div class="card">
-    <table>
-      <thead>
-        <tr>
-          <th style="width:80px">Année</th>
-          <th style="width:90px">Type</th>
-          <th>Titre</th>
-          <th style="width:220px">Auteur(s)</th>
-          <th style="width:160px">HAL</th>
-          <th style="width:190px">Communication</th>
-          <th style="width:210px">Actions</th>
-        </tr>
-      </thead>
-      <tbody id="rows">
-        <tr><td colspan="7" class="mini">Connexion requise.</td></tr>
-      </tbody>
-    </table>
-  </div>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <script>
+    let ALL = [];
+    const $ = (id) => document.getElementById(id);
 
-</div>
+    function norm(s){
+      return (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    }
+    function escapeHtml(str){
+      return String(str || '')
+        .replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')
+        .replaceAll('"','&quot;').replaceAll("'","&#039;");
+    }
+    function typeLabel(t){
+      if (t === 'book') return 'Livre';
+      if (t === 'bookSection') return 'Chapitre';
+      if (t === 'journalArticle') return 'Article';
+      return (t || '');
+    }
+    function yearFromDate(dateStr){
+      const m = String(dateStr || '').match(/\b(19|20)\d{2}\b/);
+      return m ? m[0] : '';
+    }
+    function statusFor(flags){
+      const halWanted = flags?.hal_create === 'yes';
+      const commWanted = flags?.comms_publish === 'yes';
+      const halDone = flags?.hal_done === 'yes';
+      const commDone = flags?.comms_done === 'yes';
+      if (!halWanted && !commWanted) return {txt:'Non demandé', cls:''};
+      const needHal = halWanted && !halDone;
+      const needCom = commWanted && !commDone;
+      if (needHal || needCom) return {txt:'À traiter', cls:'warn'};
+      return {txt:'Traité', cls:'ok'};
+    }
+    function setMsg(t){ $('msg').textContent = t || ''; }
 
-<script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-<script>
-  let ALL = [];
-  const $ = id => document.getElementById(id);
-
-  function norm(s){
-    return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  }
-
-  function yearFromDate(d){
-    const m = String(d||'').match(/\b(19|20)\d{2}\b/);
-    return m ? m[0] : '';
-  }
-
-  function statusFor(flags){
-    const halW = flags?.hal_create === 'yes';
-    const comW = flags?.comms_publish === 'yes';
-    const halD = flags?.hal_done === 'yes';
-    const comD = flags?.comms_done === 'yes';
-    if (!halW && !comW) return {txt:'Non demandé', cls:''};
-    if ((halW && !halD) || (comW && !comD)) return {txt:'À traiter', cls:'warn'};
-    return {txt:'Traité', cls:'ok'};
-  }
-
-  /* ✅ parse axes robuste */
-  function parseAxes(flags){
-    const raw = flags?.axes ? String(flags.axes).trim() : '';
-    if (!raw || raw === 'none') return [];
-    return raw
-      .split(/[,;|]/)
-      .map(s => s.trim())
-      .filter(Boolean)
-      .map(s => s.toUpperCase());
-  }
-
-  function showAuthed(ok){
-    ['logout','refresh','q','filterNeed','filterType','filterAxis']
-      .forEach(id => $(id).classList.toggle('hidden', !ok));
-    $('login').classList.toggle('hidden', ok);
-  }
-
-  async function authedFetch(url, opts={}){
-    const u = netlifyIdentity.currentUser();
-    if (!u) throw new Error();
-    const t = await u.jwt();
-    return fetch(url,{
-      ...opts,
-      headers:{...(opts.headers||{}),'Authorization':'Bearer '+t},
-      cache:'no-store'
-    });
-  }
-
-  async function load(){
-    $('msg').textContent = '⏳ Chargement…';
-    $('rows').innerHTML = `<tr><td colspan="7" class="mini">Chargement…</td></tr>`;
-
-    const r = await authedFetch('/.netlify/functions/admin-items');
-    const d = await r.json().catch(()=>({}));
-
-    if (!r.ok){
-      $('msg').textContent = '❌ Erreur d’accès';
-      return;
+    // ✅ parse axes robuste + MAJ
+    function parseAxes(flags){
+      const raw = (flags && flags.axes) ? String(flags.axes).trim() : '';
+      if (!raw || raw === 'none') return [];
+      return raw
+        .split(/[,;|]/)
+        .map(s => s.trim())
+        .filter(Boolean)
+        .map(s => s.toUpperCase());
     }
 
-    ALL = (d.items||[]).map(it=>({...it,year:it.year||yearFromDate(it.date)}));
-    $('msg').textContent = `✅ ${ALL.length} item(s) chargés`;
-    render();
-  }
+    function showAuthedUI(isAuthed){
+      ['logout','refresh','q','filterNeed','filterType','filterAxis'].forEach(id => $(id).classList.toggle('hidden', !isAuthed));
+      $('login').classList.toggle('hidden', isAuthed);
+    }
 
-  function render(){
-    const q = norm($('q').value);
-    const fNeed = $('filterNeed').value;
-    const fType = $('filterType').value;
-    const fAxis = $('filterAxis').value.toUpperCase();
+    async function authedFetch(url, options = {}){
+      const user = netlifyIdentity.currentUser();
+      if (!user) throw new Error('Not authenticated');
 
-    const rows = ALL.filter(it=>{
-      if (fType!=='all' && it.itemType!==fType) return false;
+      const token = await user.jwt();
+      const headers = Object.assign({}, options.headers || {}, {
+        'Authorization': 'Bearer ' + token
+      });
 
-      const flags = it.flags||{};
-      const st = statusFor(flags);
+      return fetch(url, { ...options, headers, cache: 'no-store' });
+    }
 
-      if (fNeed==='needsAction' && st.txt!=='À traiter') return false;
-      if (fNeed==='hal' && flags.hal_create!=='yes') return false;
-      if (fNeed==='comms' && flags.comms_publish!=='yes') return false;
+    async function load(){
+      setMsg('⏳ Chargement…');
+      $('rows').innerHTML = `<tr><td colspan="7" class="mini">Chargement…</td></tr>`;
 
-      const axes = parseAxes(flags);
-      if (fAxis!=='ALL'){
-        if (fAxis==='NONE' && axes.length) return false;
-        if (fAxis!=='NONE' && !axes.includes(fAxis)) return false;
+      const r = await authedFetch('/.netlify/functions/admin-items');
+      const data = await r.json().catch(()=>({}));
+
+      if (!r.ok){
+        setMsg('❌ Erreur: ' + (data?.error || 'accès refusé'));
+        $('rows').innerHTML = `<tr><td colspan="7" class="mini">Erreur serveur.</td></tr>`;
+        return;
       }
 
-      if (!q) return true;
+      ALL = (data.items || []).map(it => ({
+        ...it,
+        year: it.year || yearFromDate(it.date),
+      }));
 
-      const hay = norm([
-        it.title,it.bookTitle,it.publicationTitle,it.publisher,
-        it.place,it.isbn,it.doi,it.creatorsText,(flags.axes||'')
-      ].join(' '));
-
-      return hay.includes(q);
-    });
-
-    const tb = $('rows');
-    tb.innerHTML = '';
-
-    if (!rows.length){
-      tb.innerHTML = `<tr><td colspan="7" class="mini">Aucun résultat.</td></tr>`;
-      return;
+      setMsg(`✅ ${ALL.length} item(s) chargés. (sync: ${new Date(data.fetchedAt).toLocaleString('fr-FR')})`);
+      render();
     }
 
-    rows.sort((a,b)=>(b.year||0)-(a.year||0));
+    function render(){
+      const q = norm($('q').value);
+      const fNeed = $('filterNeed').value;
+      const fType = $('filterType').value;
+      const fAxis = $('filterAxis').value; // ✅
 
-    for (const it of rows){
-      const flags = it.flags||{};
-      const st = statusFor(flags);
-      const axes = parseAxes(flags);
-      const axesHtml = axes.length
-        ? `<div class="axes">${axes.map(a=>`<span class="chip">${a}</span>`).join('')}</div>`
-        : '';
+      const rows = ALL.filter(it => {
+        if (fType !== 'all' && it.itemType !== fType) return false;
 
-      tb.insertAdjacentHTML('beforeend',`
-        <tr>
-          <td class="right">${it.year||''}</td>
-          <td><span class="tag">${it.itemType}</span></td>
+        const flags = it.flags || {};
+        const st = statusFor(flags);
+
+        if (fNeed === 'needsAction' && st.txt !== 'À traiter') return false;
+        if (fNeed === 'hal' && flags.hal_create !== 'yes') return false;
+        if (fNeed === 'comms' && flags.comms_publish !== 'yes') return false;
+
+        // ✅ Filtre Axe
+        const axes = parseAxes(flags);
+        const axisSel = String(fAxis || 'all').toUpperCase();
+        if (axisSel !== 'ALL') {
+          if (axisSel === 'NONE' && axes.length) return false;
+          if (axisSel !== 'NONE' && !axes.includes(axisSel)) return false;
+        }
+
+        if (!q) return true;
+
+        const axesStr = (flags.axes && flags.axes !== 'none') ? String(flags.axes) : '';
+        const hay = norm([
+          it.title,
+          it.bookTitle,
+          it.publicationTitle,
+          it.publisher,
+          it.place,
+          it.isbn,
+          it.doi,
+          it.volume,
+          it.issue,
+          it.pages,
+          axesStr,
+          it.creatorsText
+        ].filter(Boolean).join(' | '));
+
+        return hay.includes(q);
+      });
+
+      rows.sort((a,b) => {
+        const ay = parseInt(a.year || '0',10);
+        const by = parseInt(b.year || '0',10);
+        if (by !== ay) return by - ay;
+        return (b.date || '').localeCompare(a.date || '');
+      });
+
+      const tbody = $('rows');
+      tbody.innerHTML = '';
+
+      if (!rows.length){
+        tbody.innerHTML = `<tr><td colspan="7" class="mini">Aucun résultat.</td></tr>`;
+        return;
+      }
+
+      for (const it of rows){
+        const flags = it.flags || {};
+        const st = statusFor(flags);
+
+        const halWanted = flags.hal_create === 'yes';
+        const commWanted = flags.comms_publish === 'yes';
+        const halDone = flags.hal_done === 'yes';
+        const commDone = flags.comms_done === 'yes';
+
+        let infoTop = '';
+        let infoBottom = '';
+
+        if (it.itemType === 'bookSection' && it.bookTitle) {
+          infoTop = `<div class="mini">Dans : ${escapeHtml(it.bookTitle)}</div>`;
+        } else if (it.itemType === 'journalArticle' && it.publicationTitle) {
+          infoTop = `<div class="mini">Revue : ${escapeHtml(it.publicationTitle)}</div>`;
+        }
+
+        if (it.itemType === 'journalArticle') {
+          const parts = [];
+          if (it.volume) parts.push('vol. ' + escapeHtml(it.volume));
+          if (it.issue) parts.push('n° ' + escapeHtml(it.issue));
+          if (it.pages) parts.push('pp. ' + escapeHtml(it.pages));
+          if (it.doi) parts.push('DOI ' + escapeHtml(it.doi));
+          infoBottom = parts.length ? `<div class="mini">${parts.join(' — ')}</div>` : '';
+        } else {
+          const parts = [];
+          if (it.publisher) parts.push(escapeHtml(it.publisher));
+          if (it.place) parts.push(escapeHtml(it.place));
+          if (it.isbn) parts.push('ISBN ' + escapeHtml(it.isbn));
+          infoBottom = parts.length ? `<div class="mini">${parts.join(' — ')}</div>` : '';
+        }
+
+        const axes = parseAxes(flags);
+        const axesHtml = axes.length
+          ? `<div class="axes">` + axes.map(a => `<span class="chip">${escapeHtml(a)}</span>`).join('') + `</div>`
+          : '';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="right">${escapeHtml(it.year || '')}</td>
+          <td><span class="tag">${escapeHtml(typeLabel(it.itemType))}</span></td>
           <td>
-            <div class="title">${it.title||'(sans titre)'}</div>
+            <div class="title">${escapeHtml(it.title || '(sans titre)')}</div>
+            ${infoTop}
+            ${infoBottom}
             ${axesHtml}
           </td>
-          <td>${it.creatorsText||''}</td>
-          <td><span class="tag">${flags.hal_create==='yes'?'Demandé':'Non'}</span></td>
-          <td><span class="tag">${flags.comms_publish==='yes'?'Demandé':'Non'}</span></td>
-          <td><span class="tag ${st.cls}">${st.txt}</span></td>
-        </tr>
-      `);
+          <td>${escapeHtml(it.creatorsText || '')}</td>
+
+          <td>
+            <div class="tag ${halWanted ? 'warn' : ''}">
+              ${halWanted ? (halDone ? 'Demandé (traité)' : 'Demandé') : 'Non'}
+            </div>
+            ${halWanted ? `
+              <div class="chk mini" style="margin-top:8px">
+                <input type="checkbox" data-k="${it.key}" data-field="hal_done" ${halDone ? 'checked' : ''}/>
+                <span>HAL traité</span>
+              </div>
+            ` : `<div class="mini muted">—</div>`}
+          </td>
+
+          <td>
+            <div class="tag ${commWanted ? 'warn' : ''}">
+              ${commWanted ? (commDone ? 'Demandé (traité)' : 'Demandé') : 'Non'}
+            </div>
+            ${commWanted ? `
+              <div class="chk mini" style="margin-top:8px">
+                <input type="checkbox" data-k="${it.key}" data-field="comms_done" ${commDone ? 'checked' : ''}/>
+                <span>Com traitée</span>
+              </div>
+            ` : `<div class="mini muted">—</div>`}
+          </td>
+
+          <td>
+            <div class="actions">
+              <button class="primary" data-save="${it.key}">Enregistrer</button>
+              <span class="tag ${st.cls}">${escapeHtml(st.txt)}</span>
+            </div>
+            <div class="mini muted">Key: ${escapeHtml(it.key)}</div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      }
+
+      // Bind actions
+      tbody.querySelectorAll('button[data-save]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const key = btn.getAttribute('data-save');
+          await saveRow(key, btn);
+        });
+      });
     }
-  }
 
-  /* listeners robustes */
-  $('q').addEventListener('input', render);
-  ['filterNeed','filterType','filterAxis'].forEach(id =>
-    $(id).addEventListener('change', render)
-  );
+    async function saveRow(key, btn){
+      const checks = [...document.querySelectorAll(`input[type="checkbox"][data-k="${key}"]`)];
+      const payload = { key };
+      for (const c of checks){
+        const field = c.getAttribute('data-field');
+        payload[field] = c.checked ? 'yes' : 'no';
+      }
 
-  $('login').onclick = () => netlifyIdentity.open();
-  $('logout').onclick = () => netlifyIdentity.logout();
-  $('refresh').onclick = load;
+      btn.disabled = true;
+      const old = btn.textContent;
+      btn.textContent = 'Enregistrement…';
+      setMsg('⏳ Mise à jour Zotero…');
 
-  netlifyIdentity.on('init', u=>{
-    showAuthed(!!u);
-    $('msg').textContent = u ? 'Connecté.' : '🔒 Non connecté.';
-  });
-  netlifyIdentity.on('login', u=>{
-    showAuthed(true);
-    netlifyIdentity.close();
-    load();
-  });
-  netlifyIdentity.on('logout', ()=>{
-    showAuthed(false);
-    ALL=[];
-    $('rows').innerHTML='<tr><td colspan="7" class="mini">Déconnecté.</td></tr>';
-  });
-  netlifyIdentity.init();
-</script>
+      try{
+        const r = await authedFetch('/.netlify/functions/admin-update-status', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await r.json().catch(()=>({}));
+
+        if (!r.ok){
+          setMsg('❌ Erreur: ' + (data?.error || 'mise à jour impossible'));
+        } else {
+          setMsg('✅ Mis à jour.');
+          await load();
+        }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = old;
+      }
+    }
+
+    $('login').addEventListener('click', () => netlifyIdentity.open());
+    $('logout').addEventListener('click', () => netlifyIdentity.logout());
+    $('refresh').addEventListener('click', load);
+
+    // ✅ listeners robustes : input pour texte, change pour selects
+    $('q').addEventListener('input', render);
+    ['filterNeed','filterType','filterAxis'].forEach(id => $(id).addEventListener('change', render));
+
+    netlifyIdentity.on('init', user => {
+      showAuthedUI(!!user);
+      setMsg(user ? '✅ Connecté. Clique “Rafraîchir”.' : '🔒 Non connecté.');
+    });
+
+    netlifyIdentity.on('login', user => {
+      showAuthedUI(true);
+      netlifyIdentity.close();
+      setMsg('✅ Connecté. Chargement…');
+      load();
+    });
+
+    netlifyIdentity.on('logout', () => {
+      showAuthedUI(false);
+      ALL = [];
+      $('rows').innerHTML = `<tr><td colspan="7" class="mini">Déconnecté.</td></tr>`;
+      setMsg('🔒 Déconnecté.');
+    });
+
+    netlifyIdentity.init();
+  </script>
 </body>
 </html>
