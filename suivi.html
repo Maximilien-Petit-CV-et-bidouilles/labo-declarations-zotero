@@ -95,7 +95,7 @@
     <div class="bar">
       <div class="card" style="flex:1;min-width:260px">
         <div class="controls">
-          <input id="q" type="search" placeholder="Rechercher (titre, auteur, revue/éditeur, ISBN/DOI…)" />
+          <input id="q" type="search" placeholder="Rechercher (titre, auteur, revue, éditeur, ISBN, DOI…)" />
           <select id="filterType">
             <option value="all">Tous types</option>
             <option value="book">Livres</option>
@@ -355,6 +355,9 @@
           it.place,
           it.isbn,
           it.doi,
+          it.volume,
+          it.issue,
+          it.pages,
           it.creatorsText
         ].filter(Boolean).join(' | '));
         return hay.includes(q);
@@ -404,9 +407,14 @@
           : escapeHtml(title);
 
         let extraMini = '';
-        if (it.bookTitle) extraMini += `<div class="mini muted">Dans : ${escapeHtml(it.bookTitle)}</div>`;
-        if (!it.bookTitle && it.publicationTitle) extraMini += `<div class="mini muted">Revue : ${escapeHtml(it.publicationTitle)}</div>`;
-        if (it.doi) extraMini += `<div class="mini muted">DOI : ${escapeHtml(it.doi)}</div>`;
+        if (it.bookTitle) {
+          extraMini += `<div class="mini muted">Dans : ${escapeHtml(it.bookTitle)}</div>`;
+        } else if (it.publicationTitle) {
+          extraMini += `<div class="mini muted">Revue : ${escapeHtml(it.publicationTitle)}</div>`;
+        }
+        if (it.doi) {
+          extraMini += `<div class="mini muted">DOI : ${escapeHtml(it.doi)}</div>`;
+        }
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
