@@ -311,69 +311,83 @@
     }
   }
 
-  // ✅ PDF "propre" via html2pdf.js (robuste + messages clairs)
-  async function exportPdf() {
-    let wrap = null;
-    try {
-      if (!window.html2pdf) {
-        setStatus('❌ Export PDF impossible : html2pdf.js ne s’est pas chargé (CDN bloqué ?).', false);
-        return;
-      }
-      if (!elCvRoot) {
-        setStatus('❌ Export PDF impossible : zone CV introuvable (#cvRoot).', false);
-        return;
-      }
-
-      setStatus('⏳ Génération du PDF…');
-
-      // Clone “propre”
-      const clone = elCvRoot.cloneNode(true);
-      clone.style.border = 'none';
-      clone.style.borderRadius = '0';
-      clone.style.padding = '0';
-      clone.style.background = '#fff';
-      clone.querySelectorAll('.pill').forEach(n => n.remove());
-
-      // Eviter coupures pubs
-      clone.querySelectorAll('#pubList li').forEach(li => {
-        li.style.breakInside = 'avoid';
-        li.style.pageBreakInside = 'avoid';
-      });
-
-      // Container hors-écran (html2canvas a besoin que ce soit dans le DOM)
-      wrap = document.createElement('div');
-      wrap.style.position = 'fixed';
-      wrap.style.left = '-99999px';
-      wrap.style.top = '0';
-      wrap.style.width = '794px';     // ~A4 à 96dpi
-      wrap.style.background = '#fff';
-      wrap.style.padding = '24px';
-      wrap.appendChild(clone);
-      document.body.appendChild(wrap);
-
-      const name = ($('#cvName')?.textContent || 'CV').trim();
-      const filename = safeFilenameBase(name) + '.pdf';
-
-      const opt = {
-        margin: [10, 10, 12, 10], // mm
-        filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#fff' },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-      };
-
-      // NOTE: window.html2pdf() renvoie un worker
-      await window.html2pdf().set(opt).from(wrap).save();
-
-      setStatus('✅ PDF généré.');
-    } catch (e) {
-      setStatus('❌ Export PDF impossible : ' + (e?.message || e), false);
-      console.error('[CV] exportPdf error:', e);
-    } finally {
-      try { if (wrap && wrap.remove) wrap.remove(); } catch {}
+  // ✅ PDF "propre" via html2pdf.js — FIX page blanche (ne pas sortir l'élément du viewport)
+async function exportPdf() {
+  let wrap = null;
+  try {
+    if (!window.html2pdf) {
+      setStatus('❌ Export PDF impossible : html2pdf.js ne s’est pas chargé (CDN bloqué ?).', false);
+      return;
     }
+    if (!elCvRoot) {
+      setStatus('❌ Export PDF impossible : zone CV introuvable (#cvRoot).', false);
+      return;
+    }
+
+    setStatus('⏳ Génération du PDF…');
+
+    // Clone propre
+    const clone = elCvRoot.cloneNode(true);
+    clone.style.border = 'none';
+    clone.style.borderRadius = '0';
+    clone.style.padding = '0';
+    clone.style.background = '#fff';
+    clone.style.boxShadow = 'none';
+    clone.querySelectorAll('.pill').forEach(n => n.remove());
+
+    // Eviter coupures pubs
+    clone.querySelectorAll('#pubList li').forEach(li => {
+      li.style.breakInside = 'avoid';
+      li.style.pageBreakInside = 'avoid';
+    });
+
+    // Wrapper DANS le viewport mais invisible (sinon html2canvas peut rendre blanc)
+    wrap = document.createElement('div');
+    wrap.id = 'pdf-staging';
+    wrap.style.position = 'absolute';
+    wrap.style.left = '0';
+    wrap.style.top = '0';
+    wrap.style.width = '794px';      // ~A4 @96dpi
+    wrap.style.padding = '24px';
+    wrap.style.background = '#fff';
+    wrap.style.opacity = '0';
+    wrap.style.pointerEvents = 'none';
+    wrap.style.zIndex = '-1';
+
+    wrap.appendChild(clone);
+    document.body.appendChild(wrap);
+
+    // Laisser le navigateur “peindre” le DOM avant capture
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+    const name = ($('#cvName')?.textContent || 'CV').trim();
+    const filename = safeFilenameBase(name) + '.pdf';
+
+    const opt = {
+      margin: [10, 10, 12, 10], // mm
+      filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: {
+        scale: 2,
+        backgroundColor: '#fff',
+        useCORS: true,
+        logging: false
+      },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+
+    // IMPORTANT : capturer le clone, pas le wrapper
+    await window.html2pdf().set(opt).from(clone).save();
+
+    setStatus('✅ PDF généré.');
+  } catch (e) {
+    setStatus('❌ Export PDF impossible : ' + (e?.message || e), false);
+    console.error('[CV] exportPdf error:', e);
+  } finally {
+    try { if (wrap && wrap.remove) wrap.remove(); } catch {}
   }
+}
 
   // ✅ DOCX : version “riche” (comme avant)
   async function exportDocx() {
