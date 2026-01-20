@@ -96,6 +96,81 @@
       .card{display:none}
       .cv{border:none}
     }
+    @page{
+  size: A4;
+  margin: 14mm 14mm 14mm 14mm;
+}
+
+@media print{
+  :root{ --bg:#fff; --card:#fff; --text:#111; --muted:#333; --border:#bbb; --accent:#000; --accent-soft:#fff; }
+
+  body{ background:#fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page{ margin:0; max-width:none; padding:0; }
+
+  /* On n'imprime pas les contrôles */
+  .card, header p, header a { display:none !important; }
+  header{ margin:0 0 8mm 0; }
+
+  /* Zone CV */
+  .cv{
+    border:none !important;
+    border-radius:0 !important;
+    padding:0 !important;
+  }
+
+  /* Typo plus "papier" */
+  .cv h2{ font-size:18pt; margin:0 0 2mm 0; }
+  .cv small{ font-size:10pt; color:var(--muted); }
+  .section h3{ font-size:12pt; margin:0 0 2mm 0; }
+  .editable{ padding:0 !important; border:none !important; background:transparent !important; }
+  .section{ border-top:1px solid #ddd; padding-top:4mm; margin-top:4mm; }
+
+  /* Publications : éviter les coupures moches */
+  .pubs{ padding-left:5mm; }
+  .pubs li{
+    margin:0 0 2.2mm 0;
+    line-height:1.25;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Mise en page "académique" en 2 colonnes sur A4 */
+  #cvRoot{
+    display:grid;
+    grid-template-columns: 62mm 1fr;
+    column-gap: 8mm;
+    align-items:start;
+  }
+
+  /* On restructure : titre + contact en haut sur toute la largeur */
+  .cv-title{
+    grid-column: 1 / -1;
+    display:block !important;
+    margin-bottom: 3mm;
+    padding-bottom: 3mm;
+    border-bottom: 1px solid #ddd;
+  }
+
+  /* Sections : on met certaines à gauche (courtes) */
+  .section:nth-of-type(1),
+  .section:nth-of-type(2),
+  .section:nth-of-type(3),
+  .section:nth-of-type(5){
+    grid-column: 1;
+  }
+
+  /* Publications à droite */
+  .section:nth-of-type(4){
+    grid-column: 2;
+    border-top:none;
+    padding-top:0;
+    margin-top:0;
+  }
+
+  /* Petit nettoyage */
+  .pill{ display:none !important; }
+}
+
   </style>
 </head>
 <body>
