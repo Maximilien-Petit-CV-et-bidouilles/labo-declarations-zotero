@@ -12,7 +12,6 @@ exports.handler = async () => {
     }
 
     // Récupère les items triés par date de modification (desc), limite raisonnable.
-    // Tu peux augmenter limit si besoin.
     const url = `https://api.zotero.org/${libraryType}/${libraryId}/items?limit=200&sort=dateModified&direction=desc`;
 
     const res = await fetch(url, {
@@ -29,11 +28,11 @@ exports.handler = async () => {
 
     const items = JSON.parse(raw);
 
-    // On ne garde que livres + chapitres
+    // On ne garde que livres + chapitres + articles
     const filtered = items
       .map(z => z?.data)
       .filter(Boolean)
-      .filter(d => d.itemType === 'book' || d.itemType === 'bookSection')
+      .filter(d => d.itemType === 'book' || d.itemType === 'bookSection' || d.itemType === 'journalArticle')
       .map(d => {
         const flags = parseDLABFlags(d.extra || '');
 
@@ -51,9 +50,14 @@ exports.handler = async () => {
 
           // Champs utiles au tableau
           bookTitle: d.bookTitle || '',
+          publicationTitle: d.publicationTitle || d.journalAbbreviation || '',
           publisher: d.publisher || '',
           place: d.place || '',
           isbn: d.ISBN || d.isbn || '',
+          doi: d.DOI || d.doi || '',
+          volume: d.volume || '',
+          issue: d.issue || '',
+          pages: d.pages || '',
           flags,
 
           // Lien public (si bibliothèque publique). Sinon, on renvoie rien.
@@ -75,7 +79,6 @@ function json(statusCode, obj) {
     statusCode,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      // Cache léger côté navigateur (tu peux mettre 0 si tu veux du temps réel)
       'Cache-Control': 'public, max-age=60'
     },
     body: JSON.stringify(obj)
@@ -111,7 +114,6 @@ function parseDLABFlags(extra) {
     const k = l.slice(0, idx).trim();
     const v = l.slice(idx + 1).trim().toLowerCase();
     if (!k) return;
-    // on accepte yes/no/true/false/oui/non
     flags[k] = normalizeBool(v);
   });
 
@@ -121,15 +123,11 @@ function parseDLABFlags(extra) {
 function normalizeBool(v) {
   if (v === 'yes' || v === 'true' || v === 'oui') return 'yes';
   if (v === 'no' || v === 'false' || v === 'non') return 'no';
-  return v; // fallback (pour ne pas perdre l’info)
+  return v;
 }
 
-// ⚠️ Ce lien n’est utile que si la bibliothèque est publique.
-// Sinon, tu peux le retirer.
 function buildZoteroUrl(libraryType, libraryId, itemKey) {
   if (!libraryType || !libraryId || !itemKey) return '';
-  // URL “classique” Zotero Web Library (peut varier selon réglages de visibilité)
-  // On fournit un lien générique plutôt que de promettre un accès privé.
   if (libraryType === 'groups') {
     return `https://www.zotero.org/groups/${libraryId}/items/${itemKey}`;
   }
