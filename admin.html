@@ -51,7 +51,7 @@
 
     <div class="card">
       <div class="row">
-        <input id="q" class="hidden" type="search" placeholder="Rechercher (titre, auteur, éditeur…)" style="flex:1;min-width:240px" />
+        <input id="q" class="hidden" type="search" placeholder="Rechercher (titre, auteur, revue, éditeur, ISBN, DOI…)" style="flex:1;min-width:240px" />
         <select id="filterNeed" class="hidden">
           <option value="all">Tout</option>
           <option value="needsAction">À traiter</option>
@@ -62,6 +62,7 @@
           <option value="all">Tous types</option>
           <option value="book">Livres</option>
           <option value="bookSection">Chapitres</option>
+          <option value="journalArticle">Articles</option>
         </select>
       </div>
       <div class="msg" id="msg">🔒 Non connecté.</div>
@@ -101,7 +102,12 @@
         .replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')
         .replaceAll('"','&quot;').replaceAll("'","&#039;");
     }
-    function typeLabel(t){ return t === 'book' ? 'Livre' : (t === 'bookSection' ? 'Chapitre' : (t||'')); }
+    function typeLabel(t){
+      if (t === 'book') return 'Livre';
+      if (t === 'bookSection') return 'Chapitre';
+      if (t === 'journalArticle') return 'Article';
+      return (t || '');
+    }
     function yearFromDate(dateStr){
       const m = String(dateStr || '').match(/\b(19|20)\d{2}\b/);
       return m ? m[0] : '';
@@ -174,7 +180,21 @@
         if (fNeed === 'comms' && flags.comms_publish !== 'yes') return false;
 
         if (!q) return true;
-        const hay = norm([it.title, it.bookTitle, it.publisher, it.place, it.isbn, it.creatorsText].filter(Boolean).join(' | '));
+
+        const hay = norm([
+          it.title,
+          it.bookTitle,
+          it.publicationTitle, // ✅ revue
+          it.publisher,
+          it.place,
+          it.isbn,
+          it.doi,              // ✅ doi
+          it.volume,
+          it.issue,
+          it.pages,
+          it.creatorsText
+        ].filter(Boolean).join(' | '));
+
         return hay.includes(q);
       });
 
@@ -202,14 +222,40 @@
         const halDone = flags.hal_done === 'yes';
         const commDone = flags.comms_done === 'yes';
 
+        // ✅ bloc info selon type
+        let infoTop = '';
+        let infoBottom = '';
+
+        if (it.itemType === 'bookSection' && it.bookTitle) {
+          infoTop = `<div class="mini">Dans : ${escapeHtml(it.bookTitle)}</div>`;
+        } else if (it.itemType === 'journalArticle' && it.publicationTitle) {
+          infoTop = `<div class="mini">Revue : ${escapeHtml(it.publicationTitle)}</div>`;
+        }
+
+        if (it.itemType === 'journalArticle') {
+          const parts = [];
+          if (it.volume) parts.push('vol. ' + escapeHtml(it.volume));
+          if (it.issue) parts.push('n° ' + escapeHtml(it.issue));
+          if (it.pages) parts.push('pp. ' + escapeHtml(it.pages));
+          if (it.doi) parts.push('DOI ' + escapeHtml(it.doi));
+          infoBottom = parts.length ? `<div class="mini">${parts.join(' — ')}</div>` : '';
+        } else {
+          // Livre / Chapitre : on garde l’existant (éditeur/lieu/isbn)
+          const parts = [];
+          if (it.publisher) parts.push(escapeHtml(it.publisher));
+          if (it.place) parts.push(escapeHtml(it.place));
+          if (it.isbn) parts.push('ISBN ' + escapeHtml(it.isbn));
+          infoBottom = parts.length ? `<div class="mini">${parts.join(' — ')}</div>` : '';
+        }
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td class="right">${escapeHtml(it.year || '')}</td>
           <td><span class="tag">${escapeHtml(typeLabel(it.itemType))}</span></td>
           <td>
             <div class="title">${escapeHtml(it.title || '(sans titre)')}</div>
-            ${it.bookTitle ? `<div class="mini">Dans : ${escapeHtml(it.bookTitle)}</div>` : ''}
-            <div class="mini">${escapeHtml(it.publisher || '')}${it.publisher && it.place ? ' — ' : ''}${escapeHtml(it.place || '')}${it.isbn ? ' — ISBN ' + escapeHtml(it.isbn) : ''}</div>
+            ${infoTop}
+            ${infoBottom}
           </td>
           <td>${escapeHtml(it.creatorsText || '')}</td>
 
