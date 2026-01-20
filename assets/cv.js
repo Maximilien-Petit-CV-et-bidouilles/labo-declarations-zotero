@@ -1,10 +1,9 @@
 /* ==========================================================
-   assets/cv.js
-   Générateur de CV connecté au site (Zotero via Netlify)
-   - Chargement publications via /.netlify/functions/public-suivi
-   - Filtres (auteur, années, types)
-   - Edition inline + localStorage
-   - Export HTML / PDF "propre" (html2pdf.js) / DOCX (docx)
+   assets/cv.js — Option 2a (Markdown blocks in-CV)
+   - Publications via /.netlify/functions/public-suivi
+   - Filtres + tri
+   - Blocs texte en Markdown (Edit/Aperçu) sauvegardés en localStorage
+   - Export HTML / PDF (html2pdf) / DOCX
    ========================================================== */
 
 (function () {
@@ -31,8 +30,9 @@
   const elPubCount = $('#pubCount');
   const elCvRoot = $('#cvRoot');
 
-  const TEXT_KEY = 'dlab.cv.textBlocks.v2';
-  const FILTER_KEY = 'dlab.cv.filters.v2';
+  const FILTER_KEY = 'dlab.cv.filters.v3';
+  const MD_KEY = 'dlab.cv.mdblocks.v1';
+  const INLINE_KEY = 'dlab.cv.inline.v1'; // cvName / cvContact
 
   // ---------- Utils
   function setStatus(msg, ok = true) {
@@ -47,9 +47,7 @@
   }
 
   function stripDiacritics(s) {
-    return String(s || '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
+    return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   }
 
   function norm(s) {
@@ -90,33 +88,145 @@
       .replace(/'/g, '&#039;');
   }
 
-  // ---------- Text blocks persistence
-  function loadTextBlocks() {
-    try {
-      const raw = localStorage.getItem(TEXT_KEY);
-      if (!raw) return;
-      const map = JSON.parse(raw);
-      document.querySelectorAll('[data-key]').forEach((node) => {
-        const k = node.getAttribute('data-key');
-        if (!k) return;
-        if (typeof map[k] === 'string' && map[k].trim()) node.innerHTML = map[k];
-      });
-    } catch { /* ignore */ }
+  // ---------- Markdown rendering (safe-ish)
+  function mdToHtml(md) {
+    const src = String(md || '');
+    if (window.marked && typeof window.marked.parse === 'function') {
+      // Prevent raw HTML injection by stripping tags before parsing (simple guard)
+      const noHtml = src.replace(/<[^>]*>/g, '');
+      return window.marked.parse(noHtml, { gfm: true, breaks: true });
+    }
+    // Fallback: plain text with <br>
+    return escapeHtml(src).replace(/\n/g, '<br>');
   }
 
-  function saveTextBlocks() {
+  // ---------- Persist inline (Name / Contact)
+  function loadInline() {
     try {
-      const map = {};
-      document.querySelectorAll('[data-key]').forEach((node) => {
-        const k = node.getAttribute('data-key');
-        if (!k) return;
-        map[k] = node.innerHTML;
-      });
-      localStorage.setItem(TEXT_KEY, JSON.stringify(map));
-      setStatus('✅ Textes sauvegardés localement (' + nowFr() + ').');
-    } catch (e) {
-      setStatus('❌ Impossible de sauvegarder les textes : ' + (e?.message || e), false);
+      const raw = localStorage.getItem(INLINE_KEY);
+      if (!raw) return;
+      const obj = JSON.parse(raw);
+      const n = $('#cvName');
+      const c = $('#cvContact');
+      if (n && typeof obj.name === 'string') n.textContent = obj.name;
+      if (c && typeof obj.contact === 'string') c.textContent = obj.contact;
+    } catch {}
+  }
+
+  function saveInline() {
+    try {
+      const n = $('#cvName')?.textContent || '';
+      const c = $('#cvContact')?.textContent || '';
+      localStorage.setItem(INLINE_KEY, JSON.stringify({ name: n, contact: c }));
+    } catch {}
+  }
+
+  // ---------- Markdown blocks (Option 2a)
+  function loadMdStore() {
+    try {
+      const raw = localStorage.getItem(MD_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
     }
+  }
+
+  function saveMdStore(store) {
+    try {
+      localStorage.setItem(MD_KEY, JSON.stringify(store));
+    } catch {}
+  }
+
+  function getDefaultMd(block) {
+    // defaults are stored as HTML-escaped newlines in attribute
+    const d = block.getAttribute('data-md-default');
+    if (!d) return '';
+    return d
+      .replace(/&#10;/g, '\n')
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>');
+  }
+
+  function initMdBlocks() {
+    const store = loadMdStore();
+
+    document.querySelectorAll('.mdblock[data-md-key]').forEach((block) => {
+      const key = block.getAttribute('data-md-key');
+      const edit = block.querySelector('.mdedit');
+      const preview = block.querySelector('.mdpreview');
+      const tabs = block.querySelectorAll('.mdtabs .tab');
+
+      if (!key || !edit || !preview) return;
+
+      const initial = (typeof store[key] === 'string')
+        ? store[key]
+        : getDefaultMd(block);
+
+      edit.value = initial;
+      preview.innerHTML = mdToHtml(initial);
+
+      function setMode(mode) {
+        // mode: 'edit' or 'preview'
+        tabs.forEach(t => {
+          const isActive = t.getAttribute('data-tab') === mode;
+          t.classList.toggle('active', isActive);
+        });
+
+        if (mode === 'edit') {
+          edit.hidden = false;
+          preview.hidden = true;
+          edit.focus();
+        } else {
+          preview.hidden = false;
+          edit.hidden = true;
+        }
+      }
+
+      // Default mode: preview
+      setMode('preview');
+
+      // Tab click
+      tabs.forEach((t) => {
+        t.addEventListener('click', () => {
+          const mode = t.getAttribute('data-tab');
+          if (mode === 'edit') setMode('edit');
+          else setMode('preview');
+        });
+      });
+
+      // Live render while typing (debounced)
+      let timer = null;
+      edit.addEventListener('input', () => {
+        const md = edit.value;
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          preview.innerHTML = mdToHtml(md);
+          store[key] = md;
+          saveMdStore(store);
+        }, 180);
+      });
+
+      // Save on blur
+      edit.addEventListener('blur', () => {
+        const md = edit.value;
+        preview.innerHTML = mdToHtml(md);
+        store[key] = md;
+        saveMdStore(store);
+      });
+    });
+  }
+
+  function saveAllMdBlocksNow() {
+    const store = loadMdStore();
+    document.querySelectorAll('.mdblock[data-md-key]').forEach((block) => {
+      const key = block.getAttribute('data-md-key');
+      const edit = block.querySelector('.mdedit');
+      if (!key || !edit) return;
+      store[key] = edit.value;
+    });
+    saveMdStore(store);
   }
 
   // ---------- Filters persistence
@@ -130,7 +240,7 @@
       if (typeof f.yearMax === 'string') elYearMax.value = f.yearMax;
       if (typeof f.onlyPubs === 'string') elOnlyPubs.value = f.onlyPubs;
       if (typeof f.sort === 'string') elSort.value = f.sort;
-    } catch { /* ignore */ }
+    } catch {}
   }
 
   function saveFilters() {
@@ -142,7 +252,7 @@
         onlyPubs: elOnlyPubs.value || 'yes',
         sort: elSort.value || 'date_desc'
       }));
-    } catch { /* ignore */ }
+    } catch {}
   }
 
   // ---------- Data fetch
@@ -151,16 +261,11 @@
     const res = await fetch(url, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
     const text = await res.text();
 
-    if (!res.ok) {
-      throw new Error('Function public-suivi: HTTP ' + res.status + ' – ' + text.slice(0, 500));
-    }
+    if (!res.ok) throw new Error('Function public-suivi: HTTP ' + res.status + ' – ' + text.slice(0, 500));
 
     let json;
-    try {
-      json = JSON.parse(text);
-    } catch {
-      throw new Error('Réponse JSON invalide depuis public-suivi : ' + text.slice(0, 200));
-    }
+    try { json = JSON.parse(text); }
+    catch { throw new Error('Réponse JSON invalide depuis public-suivi : ' + text.slice(0, 200)); }
 
     if (Array.isArray(json)) return { items: json, fetchedAt: new Date().toISOString() };
     if (json && Array.isArray(json.items)) return json;
@@ -215,7 +320,7 @@
       .sort((a, b) => compareItems(a, b, sortMode));
   }
 
-  // ---------- Formatting (HTML)
+  // ---------- Publications formatting (HTML)
   function formatOne(item) {
     const authors = String(item.creatorsText || '').trim();
     const year = extractYear(item.date);
@@ -280,12 +385,37 @@
     elPubCount.textContent = n + (n > 1 ? ' références' : ' référence');
   }
 
-  // ---------- Exports
-  function buildStandaloneHtml() {
+  // ---------- Build export clone with Markdown preview applied
+  function buildExportClone() {
+    const clone = elCvRoot.cloneNode(true);
+
+    // Replace mdblocks by their preview content only
+    clone.querySelectorAll('.mdblock').forEach((b) => {
+      const prev = b.querySelector('.mdpreview');
+      const edit = b.querySelector('.mdedit');
+      const tabs = b.querySelector('.mdtabs');
+      if (tabs) tabs.remove();
+      if (edit) edit.remove();
+
+      if (prev) {
+        // Ensure preview visible
+        prev.hidden = false;
+      }
+      // Keep b container but remove its border in exports
+      b.style.border = 'none';
+      b.style.padding = '0';
+    });
+
+    // Remove pills in exports
+    clone.querySelectorAll('.pill').forEach(n => n.remove());
+
+    return clone;
+  }
+
+  // ---------- Export HTML
+  function buildStandaloneHtmlFromClone(clone) {
     const name = ($('#cvName')?.textContent || 'CV').trim();
     const styles = document.querySelector('style')?.textContent || '';
-    const body = elCvRoot?.outerHTML || '';
-
     return `<!doctype html>
 <html lang="fr">
 <head>
@@ -295,101 +425,93 @@
   <style>${styles}</style>
 </head>
 <body>
-  <div class="page">${body}</div>
+  <div class="page">${clone.outerHTML}</div>
 </body>
 </html>`;
   }
 
   function exportHtml() {
     try {
-      const html = buildStandaloneHtml();
+      const clone = buildExportClone();
+      const html = buildStandaloneHtmlFromClone(clone);
       const name = ($('#cvName')?.textContent || 'cv').trim();
       downloadBlob(new Blob([html], { type: 'text/html;charset=utf-8' }), safeFilenameBase(name) + '.html');
       setStatus('✅ Export HTML généré.');
     } catch (e) {
       setStatus('❌ Export HTML impossible : ' + (e?.message || e), false);
+      console.error('[CV] exportHtml error:', e);
     }
   }
 
-  // ✅ PDF "propre" via html2pdf.js — FIX page blanche (ne pas sortir l'élément du viewport)
-async function exportPdf() {
-  let wrap = null;
-  try {
-    if (!window.html2pdf) {
-      setStatus('❌ Export PDF impossible : html2pdf.js ne s’est pas chargé (CDN bloqué ?).', false);
-      return;
+  // ---------- Export PDF (html2pdf) — FIX page blanche
+  async function exportPdf() {
+    let wrap = null;
+    try {
+      if (!window.html2pdf) {
+        setStatus('❌ Export PDF impossible : html2pdf.js ne s’est pas chargé (CDN bloqué ?).', false);
+        return;
+      }
+      if (!elCvRoot) {
+        setStatus('❌ Export PDF impossible : zone CV introuvable (#cvRoot).', false);
+        return;
+      }
+
+      setStatus('⏳ Génération du PDF…');
+
+      const clone = buildExportClone();
+      clone.style.border = 'none';
+      clone.style.borderRadius = '0';
+      clone.style.padding = '0';
+      clone.style.background = '#fff';
+      clone.style.boxShadow = 'none';
+
+      // Avoid breaks inside publication items
+      clone.querySelectorAll('#pubList li').forEach(li => {
+        li.style.breakInside = 'avoid';
+        li.style.pageBreakInside = 'avoid';
+      });
+
+      // Wrapper in viewport but invisible (avoid blank canvas)
+      wrap = document.createElement('div');
+      wrap.style.position = 'absolute';
+      wrap.style.left = '0';
+      wrap.style.top = '0';
+      wrap.style.width = '794px';
+      wrap.style.padding = '24px';
+      wrap.style.background = '#fff';
+      wrap.style.opacity = '0';
+      wrap.style.pointerEvents = 'none';
+      wrap.style.zIndex = '-1';
+      wrap.appendChild(clone);
+      document.body.appendChild(wrap);
+
+      // let browser paint
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+      const name = ($('#cvName')?.textContent || 'CV').trim();
+      const filename = safeFilenameBase(name) + '.pdf';
+
+      const opt = {
+        margin: [10, 10, 12, 10], // mm
+        filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, backgroundColor: '#fff', useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      };
+
+      await window.html2pdf().set(opt).from(clone).save();
+
+      setStatus('✅ PDF généré.');
+    } catch (e) {
+      setStatus('❌ Export PDF impossible : ' + (e?.message || e), false);
+      console.error('[CV] exportPdf error:', e);
+    } finally {
+      try { if (wrap && wrap.remove) wrap.remove(); } catch {}
     }
-    if (!elCvRoot) {
-      setStatus('❌ Export PDF impossible : zone CV introuvable (#cvRoot).', false);
-      return;
-    }
-
-    setStatus('⏳ Génération du PDF…');
-
-    // Clone propre
-    const clone = elCvRoot.cloneNode(true);
-    clone.style.border = 'none';
-    clone.style.borderRadius = '0';
-    clone.style.padding = '0';
-    clone.style.background = '#fff';
-    clone.style.boxShadow = 'none';
-    clone.querySelectorAll('.pill').forEach(n => n.remove());
-
-    // Eviter coupures pubs
-    clone.querySelectorAll('#pubList li').forEach(li => {
-      li.style.breakInside = 'avoid';
-      li.style.pageBreakInside = 'avoid';
-    });
-
-    // Wrapper DANS le viewport mais invisible (sinon html2canvas peut rendre blanc)
-    wrap = document.createElement('div');
-    wrap.id = 'pdf-staging';
-    wrap.style.position = 'absolute';
-    wrap.style.left = '0';
-    wrap.style.top = '0';
-    wrap.style.width = '794px';      // ~A4 @96dpi
-    wrap.style.padding = '24px';
-    wrap.style.background = '#fff';
-    wrap.style.opacity = '0';
-    wrap.style.pointerEvents = 'none';
-    wrap.style.zIndex = '-1';
-
-    wrap.appendChild(clone);
-    document.body.appendChild(wrap);
-
-    // Laisser le navigateur “peindre” le DOM avant capture
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-    const name = ($('#cvName')?.textContent || 'CV').trim();
-    const filename = safeFilenameBase(name) + '.pdf';
-
-    const opt = {
-      margin: [10, 10, 12, 10], // mm
-      filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: {
-        scale: 2,
-        backgroundColor: '#fff',
-        useCORS: true,
-        logging: false
-      },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-    };
-
-    // IMPORTANT : capturer le clone, pas le wrapper
-    await window.html2pdf().set(opt).from(clone).save();
-
-    setStatus('✅ PDF généré.');
-  } catch (e) {
-    setStatus('❌ Export PDF impossible : ' + (e?.message || e), false);
-    console.error('[CV] exportPdf error:', e);
-  } finally {
-    try { if (wrap && wrap.remove) wrap.remove(); } catch {}
   }
-}
 
-  // ✅ DOCX : version “riche” (comme avant)
+  // ---------- Export DOCX (riche)
   async function exportDocx() {
     try {
       if (!window.docx || !window.docx.Document) {
@@ -398,21 +520,53 @@ async function exportPdf() {
       }
 
       const { Document, Packer, Paragraph, TextRun, HeadingLevel } = window.docx;
+
       const name = ($('#cvName')?.textContent || 'Nom Prénom').trim();
       const contact = ($('#cvContact')?.textContent || '').trim();
 
-      const blockText = (id) => {
-        const el = document.getElementById(id);
-        if (!el) return '';
-        return el.innerText.replace(/\n{3,}/g, '\n\n').trim();
-      };
+      // Helper: get markdown source for a mdblock by key
+      const mdStore = loadMdStore();
+      function mdText(key) {
+        if (typeof mdStore[key] === 'string') return mdStore[key].trim();
+        // fallback: read current textarea
+        const b = document.querySelector(`.mdblock[data-md-key="${CSS.escape(key)}"]`);
+        const t = b?.querySelector('.mdedit');
+        return (t?.value || '').trim();
+      }
+
+      // Convert markdown to plain text for DOCX (lightweight)
+      function mdToPlain(md) {
+        // very simple: remove links formatting, emphasis, code fences
+        let t = String(md || '');
+        t = t.replace(/\r/g, '');
+        t = t.replace(/`{3}[\s\S]*?`{3}/g, '');          // fenced code blocks
+        t = t.replace(/`([^`]+)`/g, '$1');              // inline code
+        t = t.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)'); // links
+        t = t.replace(/\*\*([^*]+)\*\*/g, '$1');        // bold
+        t = t.replace(/\*([^*]+)\*/g, '$1');            // italic
+        t = t.replace(/#+\s*/g, '');                    // headings
+        return t.trim();
+      }
+
+      // For lists: lines starting with "- " become separate paragraphs
+      function paragraphsFromMd(md) {
+        const plain = mdToPlain(md);
+        const lines = plain.split('\n').map(x => x.trim());
+        const out = [];
+        for (const line of lines) {
+          if (!line) continue;
+          if (/^[-*]\s+/.test(line)) out.push(line.replace(/^[-*]\s+/, '• '));
+          else out.push(line);
+        }
+        return out;
+      }
 
       const sections = [
-        { title: 'Présentation', text: blockText('cvPresentation') },
-        { title: 'Titres et fonctions', text: blockText('cvTitles') },
-        { title: 'Principaux diplômes', text: blockText('cvDegrees') },
-        { title: 'Productions principales en recherche', text: (elPubList?.innerText || '').trim() },
-        { title: 'Investissement pédagogique et diffusion de la connaissance', text: blockText('cvTeaching') },
+        { title: 'Présentation', lines: paragraphsFromMd(mdText('cv.presentation')) },
+        { title: 'Titres et fonctions', lines: paragraphsFromMd(mdText('cv.titles')) },
+        { title: 'Principaux diplômes', lines: paragraphsFromMd(mdText('cv.degrees')) },
+        { title: 'Productions principales en recherche', lines: (elPubList?.innerText || '').split('\n').map(x => x.trim()).filter(Boolean) },
+        { title: 'Investissement pédagogique et diffusion de la connaissance', lines: paragraphsFromMd(mdText('cv.teaching')) },
       ];
 
       const children = [];
@@ -421,10 +575,11 @@ async function exportPdf() {
       children.push(new Paragraph({ text: ' ' }));
 
       for (const s of sections) {
-        if (!s.text) continue;
+        if (!s.lines || s.lines.length === 0) continue;
         children.push(new Paragraph({ text: s.title, heading: HeadingLevel.HEADING_2 }));
-        const lines = s.text.split('\n').map(x => x.trim()).filter(Boolean);
-        for (const line of lines) children.push(new Paragraph({ children: [new TextRun(line)] }));
+        for (const line of s.lines) {
+          children.push(new Paragraph({ children: [new TextRun(line)] }));
+        }
         children.push(new Paragraph({ text: ' ' }));
       }
 
@@ -438,7 +593,7 @@ async function exportPdf() {
     }
   }
 
-  // ---------- Main render
+  // ---------- Refresh
   async function refresh() {
     saveFilters();
     setStatus('⏳ Récupération des publications…');
@@ -470,14 +625,21 @@ async function exportPdf() {
     }
   }
 
+  // ---------- Save button
+  function saveAllTexts() {
+    saveAllMdBlocksNow();
+    saveInline();
+    setStatus('✅ Textes Markdown sauvegardés (' + nowFr() + ').');
+  }
+
   // ---------- Events
   btnRefresh?.addEventListener('click', refresh);
-  btnSaveText?.addEventListener('click', saveTextBlocks);
+  btnSaveText?.addEventListener('click', saveAllTexts);
   btnExportHtml?.addEventListener('click', exportHtml);
   btnExportPdf?.addEventListener('click', exportPdf);
   btnExportDocx?.addEventListener('click', exportDocx);
 
-  // auto refresh on filter change (debounced)
+  // Auto refresh on filter change (debounced)
   let t = null;
   const schedule = () => {
     saveFilters();
@@ -489,8 +651,13 @@ async function exportPdf() {
     el?.addEventListener('change', schedule);
   });
 
+  // Save inline on blur
+  $('#cvName')?.addEventListener('blur', saveInline);
+  $('#cvContact')?.addEventListener('blur', saveInline);
+
   // ---------- Init
-  loadTextBlocks();
+  loadInline();
   loadFilters();
+  initMdBlocks();
   refresh();
 })();
