@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Back-office — Suivi HAL / Communication</title>
   <style>
-    :root{--bg:#f5f5f8;--card:#fff;--text:#222;--muted:#666;--border:#ddd;--accent:#2c7be5;--ok:#1b7c3a;--warn:#b26a00;--bad:#b32020;}
+    :root{--bg:#f5f5f8;--card:#fff;--text:#222;--muted:#666;--border:#ddd;--accent:#2c7be5;--ok:#1b7c3a;--warn:#b26a00;--bad:#b32020;--chip:#f2f6ff;--chip-border:#cfe0ff;}
     *{box-sizing:border-box}
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--text)}
     .wrap{max-width:1150px;margin:28px auto;padding:0 16px}
@@ -33,6 +33,14 @@
     .chk input{width:18px;height:18px;padding:0}
     .right{white-space:nowrap}
     .hidden{display:none}
+
+    /* ✅ Axes chips */
+    .axes{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+    .chip{
+      display:inline-flex;align-items:center;padding:3px 8px;border-radius:999px;
+      border:1px solid var(--chip-border);background:var(--chip);
+      font-size:.78rem;font-weight:650;color:#1d3c76;white-space:nowrap;
+    }
   </style>
 </head>
 <body>
@@ -51,7 +59,7 @@
 
     <div class="card">
       <div class="row">
-        <input id="q" class="hidden" type="search" placeholder="Rechercher (titre, auteur, revue, éditeur, ISBN, DOI…)" style="flex:1;min-width:240px" />
+        <input id="q" class="hidden" type="search" placeholder="Rechercher (titre, auteur, revue, axes, ISBN, DOI…)" style="flex:1;min-width:240px" />
         <select id="filterNeed" class="hidden">
           <option value="all">Tout</option>
           <option value="needsAction">À traiter</option>
@@ -125,6 +133,12 @@
     }
     function setMsg(t){ $('msg').textContent = t || ''; }
 
+    function parseAxes(flags){
+      const raw = (flags && flags.axes) ? String(flags.axes).trim() : '';
+      if (!raw || raw === 'none') return [];
+      return raw.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
     function showAuthedUI(isAuthed){
       ['logout','refresh','q','filterNeed','filterType'].forEach(id => $(id).classList.toggle('hidden', !isAuthed));
       $('login').classList.toggle('hidden', isAuthed);
@@ -134,7 +148,7 @@
       const user = netlifyIdentity.currentUser();
       if (!user) throw new Error('Not authenticated');
 
-      const token = await user.jwt(); // JWT GoTrue
+      const token = await user.jwt();
       const headers = Object.assign({}, options.headers || {}, {
         'Authorization': 'Bearer ' + token
       });
@@ -181,17 +195,19 @@
 
         if (!q) return true;
 
+        const axesStr = (flags.axes && flags.axes !== 'none') ? flags.axes : '';
         const hay = norm([
           it.title,
           it.bookTitle,
-          it.publicationTitle, // ✅ revue
+          it.publicationTitle,
           it.publisher,
           it.place,
           it.isbn,
-          it.doi,              // ✅ doi
+          it.doi,
           it.volume,
           it.issue,
           it.pages,
+          axesStr,           // ✅ axes dans la recherche
           it.creatorsText
         ].filter(Boolean).join(' | '));
 
@@ -222,7 +238,6 @@
         const halDone = flags.hal_done === 'yes';
         const commDone = flags.comms_done === 'yes';
 
-        // ✅ bloc info selon type
         let infoTop = '';
         let infoBottom = '';
 
@@ -240,13 +255,17 @@
           if (it.doi) parts.push('DOI ' + escapeHtml(it.doi));
           infoBottom = parts.length ? `<div class="mini">${parts.join(' — ')}</div>` : '';
         } else {
-          // Livre / Chapitre : on garde l’existant (éditeur/lieu/isbn)
           const parts = [];
           if (it.publisher) parts.push(escapeHtml(it.publisher));
           if (it.place) parts.push(escapeHtml(it.place));
           if (it.isbn) parts.push('ISBN ' + escapeHtml(it.isbn));
           infoBottom = parts.length ? `<div class="mini">${parts.join(' — ')}</div>` : '';
         }
+
+        const axes = parseAxes(flags);
+        const axesHtml = axes.length
+          ? `<div class="axes">` + axes.map(a => `<span class="chip">${escapeHtml(a)}</span>`).join('') + `</div>`
+          : '';
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
@@ -256,6 +275,7 @@
             <div class="title">${escapeHtml(it.title || '(sans titre)')}</div>
             ${infoTop}
             ${infoBottom}
+            ${axesHtml}
           </td>
           <td>${escapeHtml(it.creatorsText || '')}</td>
 
@@ -327,7 +347,6 @@
       }
     }
 
-    // Identity wiring
     $('login').addEventListener('click', () => netlifyIdentity.open());
     $('logout').addEventListener('click', () => netlifyIdentity.logout());
     $('refresh').addEventListener('click', load);
