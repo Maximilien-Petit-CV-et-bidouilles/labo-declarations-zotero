@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Générateur de CV – Laboratoire</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <style>
+    :root{
+      --bg:#f5f5f8; --card:#fff; --accent:#2c7be5;
+      --accent-soft:#e1ecff; --text:#222; --muted:#666; --border:#ddd;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text)}
+    a{color:inherit}
+    .page{max-width:1000px;margin:32px auto;padding:0 16px}
+    header{margin-bottom:18px}
+    h1{margin:0 0 6px;font-size:1.7rem;font-weight:650}
+    .subtitle{margin:0;color:var(--muted);font-size:.95rem}
+
+    .grid{display:grid;grid-template-columns: 360px 1fr; gap:16px}
+    @media (max-width: 980px){
+      .grid{grid-template-columns:1fr}
+    }
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:14px;
+    }
+    .card h2{margin:0 0 10px;font-size:1.05rem}
+    .row{display:grid;grid-template-columns:1fr 1fr; gap:10px}
+    @media (max-width: 520px){ .row{grid-template-columns:1fr} }
+
+    label{display:block;font-weight:650;font-size:.9rem;margin:0 0 10px}
+    label span{display:block;margin:0 0 4px;color:var(--muted);font-weight:600;font-size:.85rem}
+    input,select,textarea{
+      width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);
+      font:inherit;background:#fff
+    }
+    textarea{resize:vertical; min-height:120px}
+
+    .btnbar{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+    button{
+      border-radius:999px;border:1px solid var(--border);background:#fff;
+      padding:8px 12px;cursor:pointer;font-weight:650
+    }
+    button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+    button:disabled{opacity:.6;cursor:default}
+
+    .hint{color:var(--muted);font-size:.9rem;margin:10px 0 0}
+
+    /* CV preview */
+    .cv{
+      background:#fff;
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:18px;
+    }
+    .cv .cv-title{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+    .cv .cv-title h2{margin:0;font-size:1.35rem}
+    .cv small{color:var(--muted)}
+    .section{margin-top:16px;padding-top:14px;border-top:1px solid var(--border)}
+    .section h3{margin:0 0 8px;font-size:1.05rem}
+    .editable{
+      border:1px dashed transparent;
+      border-radius:10px;
+      padding:8px;
+      min-height:44px;
+    }
+    .editable:focus{
+      outline:none;
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .pubs{margin:0;padding-left:18px}
+    .pubs li{margin:0 0 8px;line-height:1.35}
+    .pill{
+      display:inline-flex;align-items:center;gap:6px;
+      font-size:.8rem;color:var(--muted);
+      border:1px solid var(--border);
+      border-radius:999px;padding:3px 8px;
+      margin-left:8px;
+    }
+
+    .status{margin-top:10px;font-size:.9rem;white-space:pre-wrap}
+    .status.ok{color:#1b7c3a}
+    .status.err{color:#b32020}
+
+    @media print{
+      body{background:#fff}
+      .page{margin:0;max-width:none}
+      .grid{grid-template-columns:1fr}
+      .card{display:none}
+      .cv{border:none}
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>Générateur de CV</h1>
+      <p class="subtitle">Le CV est généré à partir des publications déclarées (Zotero). Les blocs “texte” sont éditables directement.</p>
+      <p style="margin-top:8px;font-size:.9rem">
+        ⬅️ <a href="/" style="color:var(--accent);text-decoration:none;font-weight:650">Retour</a>
+      </p>
+    </header>
+
+    <div class="grid">
+      <!-- LEFT: Controls -->
+      <section class="card">
+        <h2>Paramètres</h2>
+
+        <label>
+          <span>Auteur (filtre)</span>
+          <input id="authorFilter" placeholder="ex : Dupont, Jean / Jean Dupont / DUPONT">
+        </label>
+
+        <div class="row">
+          <label>
+            <span>Année (min)</span>
+            <input id="yearMin" inputmode="numeric" placeholder="2018">
+          </label>
+          <label>
+            <span>Année (max)</span>
+            <input id="yearMax" inputmode="numeric" placeholder="2026">
+          </label>
+        </div>
+
+        <label>
+          <span>Inclure seulement les items “Publication”</span>
+          <select id="onlyPublications">
+            <option value="yes" selected>Oui (book / bookSection / journalArticle)</option>
+            <option value="no">Non (tout ce qui est listé)</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Trier</span>
+          <select id="sortMode">
+            <option value="date_desc" selected>Date décroissante</option>
+            <option value="date_asc">Date croissante</option>
+            <option value="title_asc">Titre A→Z</option>
+          </select>
+        </label>
+
+        <div class="btnbar">
+          <button class="primary" id="refreshBtn">Rafraîchir (Zotero)</button>
+          <button id="saveTextBtn">Sauver les textes</button>
+        </div>
+
+        <div class="btnbar" style="margin-top:8px">
+          <button id="exportHtmlBtn">Exporter HTML</button>
+          <button id="exportPdfBtn">Exporter PDF (impression)</button>
+          <button id="exportDocxBtn">Exporter DOCX</button>
+        </div>
+
+        <p class="hint">
+          💡 Astuce : clique dans les blocs ci-dessous pour éditer. “Sauver les textes” les conserve dans ton navigateur (localStorage).
+        </p>
+
+        <p id="cv-status" class="status"></p>
+      </section>
+
+      <!-- RIGHT: Preview -->
+      <main class="cv" id="cvRoot">
+        <div class="cv-title">
+          <div>
+            <h2 contenteditable="true" class="editable" id="cvName" data-key="cv.name">Nom Prénom</h2>
+            <small contenteditable="true" class="editable" id="cvContact" data-key="cv.contact">Email · Affiliation · Site web</small>
+          </div>
+          <small id="cvMeta"></small>
+        </div>
+
+        <section class="section">
+          <h3>Présentation</h3>
+          <div contenteditable="true" class="editable" id="cvPresentation" data-key="cv.presentation">
+            <p>Bloc libre (présentation courte).</p>
+          </div>
+        </section>
+
+        <section class="section">
+          <h3>Titres et fonctions</h3>
+          <div contenteditable="true" class="editable" id="cvTitles" data-key="cv.titles">
+            <ul>
+              <li>Titre / fonction 1</li>
+              <li>Titre / fonction 2</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="section">
+          <h3>Principaux diplômes</h3>
+          <div contenteditable="true" class="editable" id="cvDegrees" data-key="cv.degrees">
+            <ul>
+              <li>Diplôme 1 (année, établissement)</li>
+              <li>Diplôme 2 (année, établissement)</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="section">
+          <h3>Productions principales en recherche</h3>
+          <div style="margin:4px 0 10px;color:var(--muted);font-size:.9rem">
+            Bibliographie formatée en CSL (Revue française de gestion).
+            <span class="pill" id="pubCount">0 référence</span>
+          </div>
+          <ol class="pubs" id="pubList"></ol>
+        </section>
+
+        <section class="section">
+          <h3>Investissement pédagogique et diffusion de la connaissance</h3>
+          <div contenteditable="true" class="editable" id="cvTeaching" data-key="cv.teaching">
+            <ul>
+              <li>Enseignement / intervention</li>
+              <li>Diffusion / vulgarisation</li>
+            </ul>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- libs (client-side only) -->
+  <script src="https://unpkg.com/citeproc@2.4.63/citeproc.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+
+  <script src="assets/cv.js"></script>
+</body>
+</html>
