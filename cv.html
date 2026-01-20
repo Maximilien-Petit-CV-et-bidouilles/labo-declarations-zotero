@@ -63,6 +63,7 @@
     .cv small{color:var(--muted)}
     .section{margin-top:16px;padding-top:14px;border-top:1px solid var(--border)}
     .section h3{margin:0 0 8px;font-size:1.05rem}
+
     .editable{
       border:1px dashed transparent;
       border-radius:10px;
@@ -89,13 +90,76 @@
     .status.ok{color:#1b7c3a}
     .status.err{color:#b32020}
 
-    /* Garde un print minimal (au cas où), mais le PDF “propre” passe par html2pdf.js */
+    /* -------- Markdown blocks (Option 2a) -------- */
+    .mdblock{
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:10px;
+      background:#fff;
+    }
+    .mdtabs{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin-bottom:8px;
+      flex-wrap:wrap;
+    }
+    .mdtabs .tab{
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:#fff;
+      padding:6px 10px;
+      cursor:pointer;
+      font-weight:650;
+      font-size:.85rem;
+    }
+    .mdtabs .tab.active{
+      border-color:var(--accent);
+      background:var(--accent-soft);
+    }
+    .mdtabs .mdhint{
+      color:var(--muted);
+      font-size:.85rem;
+      margin-left:auto;
+    }
+    .mdedit{
+      width:100%;
+      min-height:120px;
+      padding:10px;
+      border-radius:10px;
+      border:1px solid var(--border);
+      font:inherit;
+      background:#fff;
+      line-height:1.35;
+    }
+    .mdpreview{
+      padding:8px 2px;
+      line-height:1.45;
+    }
+    .mdpreview :is(p, ul, ol){ margin:0 0 8px; }
+    .mdpreview :is(ul, ol){ padding-left:20px; }
+    .mdpreview h1, .mdpreview h2, .mdpreview h3{ margin:10px 0 6px; }
+    .mdpreview a{ color:var(--accent); text-decoration:none; }
+    .mdpreview a:hover{ text-decoration:underline; }
+    .mdpreview code{
+      font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size:.9em;
+      background:#f2f4f7;
+      padding:1px 6px;
+      border-radius:999px;
+      border:1px solid var(--border);
+    }
+
+    /* Print fallback minimal (PDF “propre” via html2pdf.js) */
     @media print{
       body{background:#fff}
       .page{margin:0;max-width:none}
       .grid{grid-template-columns:1fr}
       .card{display:none}
       .cv{border:none}
+      .mdtabs{display:none}
+      .mdedit{display:none}
+      .mdpreview{display:block !important}
     }
   </style>
 </head>
@@ -103,7 +167,7 @@
   <div class="page">
     <header>
       <h1>Générateur de CV</h1>
-      <p class="subtitle">Le CV est généré à partir des publications déclarées (Zotero). Les blocs “texte” sont éditables directement.</p>
+      <p class="subtitle">Le CV est généré à partir des publications déclarées (Zotero). Les sections texte sont en Markdown (mode Éditer/Aperçu).</p>
       <p style="margin-top:8px;font-size:.9rem">
         ⬅️ <a href="/" style="color:var(--accent);text-decoration:none;font-weight:650">Retour</a>
       </p>
@@ -159,13 +223,14 @@
         </div>
 
         <p class="hint">
-          💡 Astuce : clique dans les blocs ci-dessous pour éditer. “Sauver les textes” les conserve dans ton navigateur (localStorage).
+          ✍️ Les blocs texte utilisent du Markdown : <code>**gras**</code>, <code>*italique*</code>, listes (<code>- item</code>), liens (<code>[texte](url)</code>).
+          Clique “Aperçu” pour voir le rendu, “Sauver les textes” pour conserver dans le navigateur.
         </p>
 
         <p id="cv-status" class="status"></p>
       </section>
 
-      <!-- RIGHT: Preview -->
+      <!-- RIGHT: CV -->
       <main class="cv" id="cvRoot">
         <div class="cv-title">
           <div>
@@ -175,33 +240,49 @@
           <small id="cvMeta"></small>
         </div>
 
+        <!-- Markdown block: Présentation -->
         <section class="section">
           <h3>Présentation</h3>
-          <div contenteditable="true" class="editable" id="cvPresentation" data-key="cv.presentation">
-            <p>Bloc libre (présentation courte).</p>
+          <div class="mdblock" data-md-key="cv.presentation" data-md-default="Je suis…&#10;&#10;- Thématique 1&#10;- Thématique 2&#10;&#10;[Mon site](https://exemple.fr)">
+            <div class="mdtabs">
+              <button class="tab active" type="button" data-tab="preview">Aperçu</button>
+              <button class="tab" type="button" data-tab="edit">Éditer</button>
+              <span class="mdhint">Markdown</span>
+            </div>
+            <textarea class="mdedit" hidden></textarea>
+            <div class="mdpreview"></div>
           </div>
         </section>
 
+        <!-- Markdown block: Titres -->
         <section class="section">
           <h3>Titres et fonctions</h3>
-          <div contenteditable="true" class="editable" id="cvTitles" data-key="cv.titles">
-            <ul>
-              <li>Titre / fonction 1</li>
-              <li>Titre / fonction 2</li>
-            </ul>
+          <div class="mdblock" data-md-key="cv.titles" data-md-default="- Ingénieur d’études (IGE)&#10;- Appui aux projets de recherche">
+            <div class="mdtabs">
+              <button class="tab active" type="button" data-tab="preview">Aperçu</button>
+              <button class="tab" type="button" data-tab="edit">Éditer</button>
+              <span class="mdhint">Markdown</span>
+            </div>
+            <textarea class="mdedit" hidden></textarea>
+            <div class="mdpreview"></div>
           </div>
         </section>
 
+        <!-- Markdown block: Diplômes -->
         <section class="section">
           <h3>Principaux diplômes</h3>
-          <div contenteditable="true" class="editable" id="cvDegrees" data-key="cv.degrees">
-            <ul>
-              <li>Diplôme 1 (année, établissement)</li>
-              <li>Diplôme 2 (année, établissement)</li>
-            </ul>
+          <div class="mdblock" data-md-key="cv.degrees" data-md-default="- Master … (année, établissement)&#10;- Licence … (année, établissement)">
+            <div class="mdtabs">
+              <button class="tab active" type="button" data-tab="preview">Aperçu</button>
+              <button class="tab" type="button" data-tab="edit">Éditer</button>
+              <span class="mdhint">Markdown</span>
+            </div>
+            <textarea class="mdedit" hidden></textarea>
+            <div class="mdpreview"></div>
           </div>
         </section>
 
+        <!-- Publications (Zotero) -->
         <section class="section">
           <h3>Productions principales en recherche</h3>
           <div style="margin:4px 0 10px;color:var(--muted);font-size:.9rem">
@@ -211,13 +292,17 @@
           <ol class="pubs" id="pubList"></ol>
         </section>
 
+        <!-- Markdown block: Teaching -->
         <section class="section">
           <h3>Investissement pédagogique et diffusion de la connaissance</h3>
-          <div contenteditable="true" class="editable" id="cvTeaching" data-key="cv.teaching">
-            <ul>
-              <li>Enseignement / intervention</li>
-              <li>Diffusion / vulgarisation</li>
-            </ul>
+          <div class="mdblock" data-md-key="cv.teaching" data-md-default="- Cours / interventions…&#10;- Vulgarisation / diffusion…">
+            <div class="mdtabs">
+              <button class="tab active" type="button" data-tab="preview">Aperçu</button>
+              <button class="tab" type="button" data-tab="edit">Éditer</button>
+              <span class="mdhint">Markdown</span>
+            </div>
+            <textarea class="mdedit" hidden></textarea>
+            <div class="mdpreview"></div>
           </div>
         </section>
       </main>
@@ -227,6 +312,9 @@
   <!-- libs (client-side only) -->
   <script src="https://unpkg.com/citeproc@2.4.63/citeproc.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+
+  <!-- Markdown renderer -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
 
   <!-- PDF "propre" (html2canvas + jsPDF) -->
   <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
