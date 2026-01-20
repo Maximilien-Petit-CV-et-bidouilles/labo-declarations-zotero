@@ -30,7 +30,7 @@ exports.handler = async (event) => {
     const filtered = items
       .map(z => z?.data)
       .filter(Boolean)
-      .filter(d => d.itemType === 'book' || d.itemType === 'bookSection')
+      .filter(d => d.itemType === 'book' || d.itemType === 'bookSection' || d.itemType === 'journalArticle')
       .map(d => ({
         key: d.key,
         itemType: d.itemType,
@@ -43,9 +43,14 @@ exports.handler = async (event) => {
           .filter(Boolean)
           .join(', '),
         bookTitle: d.bookTitle || '',
+        publicationTitle: d.publicationTitle || d.journalAbbreviation || '',
         publisher: d.publisher || '',
         place: d.place || '',
         isbn: d.ISBN || d.isbn || '',
+        doi: d.DOI || d.doi || '',
+        volume: d.volume || '',
+        issue: d.issue || '',
+        pages: d.pages || '',
         flags: parseDLABFlags(d.extra || '')
       }));
 
@@ -109,7 +114,6 @@ async function verifyIdentityUser(event) {
   const token = m[1].trim();
   if (!token) return null;
 
-  // URL du site (Netlify fournit process.env.URL). Fallback sur l’origin de la requête.
   const siteUrl =
     process.env.URL ||
     (event.headers?.origin || event.headers?.Origin || '').trim();
@@ -123,6 +127,5 @@ async function verifyIdentityUser(event) {
   });
 
   if (!res.ok) return null;
-
   return await res.json();
 }
