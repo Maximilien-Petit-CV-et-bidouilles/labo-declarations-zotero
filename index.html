@@ -93,7 +93,7 @@
       <button type="button" class="active">Nouvelle publication</button>
     </div>
 
-    <p class="hint">Choisissez le type (Livre / Chapitre), puis remplissez les champs requis.</p>
+    <p class="hint">Choisissez le type (Livre / Chapitre / Article), puis remplissez les champs requis.</p>
 
     <form id="pub-form">
       <label>
@@ -101,6 +101,7 @@
         <select name="pubType" id="pubType">
           <option value="book">Livre</option>
           <option value="bookSection">Chapitre d’ouvrage</option>
+          <option value="journalArticle">Article (revue)</option>
         </select>
       </label>
 
@@ -157,6 +158,35 @@
         </div>
 
         <label><span>ISBN</span><input name="sectionIsbn" placeholder="978-..."></label>
+      </div>
+
+      <!-- ====== CHAMPS ARTICLE ====== -->
+      <div id="article-fields" style="display:none">
+        <div class="two-cols">
+          <label><span>Publication (revue) *</span><input name="articlePublication" placeholder="Nom de la revue"></label>
+          <label><span>Date *</span><input name="articleDate" placeholder="2024 ou 2024-06-15"></label>
+        </div>
+
+        <div class="two-cols">
+          <label><span>Volume</span><input name="articleVolume"></label>
+          <label><span>Issue</span><input name="articleIssue"></label>
+        </div>
+
+        <div class="two-cols">
+          <label><span>Pages</span><input name="articlePages" placeholder="123-145"></label>
+          <label><span>DOI</span>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input name="articleDoi" id="articleDoi" placeholder="10.xxxx/xxxxx" style="flex:1">
+              <button type="button" id="doi-prefill" class="btn-secondary" title="Préremplir à partir du DOI">⚡ DOI</button>
+            </div>
+            <span class="small-muted">Collez un DOI (ou une URL doi.org), puis cliquez sur ⚡</span>
+          </label>
+        </div>
+
+        <div class="two-cols">
+          <label><span>Publisher</span><input name="articlePublisher"></label>
+          <label><span>Place</span><input name="articlePlace"></label>
+        </div>
       </div>
 
       <!-- ====== OPTIONS (HAL / COMMS) ====== -->
