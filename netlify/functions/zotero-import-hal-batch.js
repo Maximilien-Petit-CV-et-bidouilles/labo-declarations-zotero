@@ -1,11 +1,19 @@
 // netlify/functions/zotero-import-hal-batch.js
 //
 // Import CSV HAL (halId) -> HAL API -> Zotero batch
-// + dédoublonnage par HALID, OPTIMISÉ (préchargement des tags HALID:* en une passe)
+// FINAL: dédoublonnage HALID robuste + compatible gros volumes (chunking côté front)
+//
+// Dédoublonnage:
+// - on taggue chaque item créé avec `HALID:<halId>`
+// - avant import, on cherche dans Zotero les items qui ont ces tags (requête unique par paquet)
+//
+// Optimisations:
+// - HAL fetch en parallèle (concurrency limitée)
+// - Zotero POST par batch de 25
 //
 // Vars d'env attendues :
 // - ZOTERO_API_KEY
-// - ZOTERO_LIBRARY_TYPE   (ex: "users" ou "groups")
+// - ZOTERO_LIBRARY_TYPE   ("users" ou "groups")
 // - ZOTERO_LIBRARY_ID
 
 const HAL_SEARCH = "https://api.archives-ouvertes.fr/search/";
@@ -17,7 +25,7 @@ const HAL_TO_ZOTERO = {
   COUV: "bookSection",
 };
 
-// Champs HAL (best-effort)
+// Champs HAL (best-effort, HAL varie selon les dépôts)
 const HAL_FL = [
   "halId_s",
   "docid",
@@ -293,7 +301,7 @@ async function fetchHALById(halId) {
 
 function zoteroEnv() {
   const apiKey = process.env.ZOTERO_API_KEY;
-  const libType = process.env.ZOTERO_LIBRARY_TYPE;
+  const libType = process.env.ZOTERO_LIBRARY_TYPE; // "users" ou "groups"
   const libId = process.env.ZOTERO_LIBRARY_ID;
 
   if (!apiKey || !libType || !libId) {
@@ -302,35 +310,55 @@ function zoteroEnv() {
   return { apiKey, libType, libId };
 }
 
-// ✅ OPTIMISATION : on récupère en une passe tous les tags HALID:* existants
-async function fetchExistingHalIdsFromZotero() {
+// Concurrency helper
+async function mapWithConcurrency(items, concurrency, fn) {
+  const results = new Array(items.length);
+  let idx = 0;
+
+  async function worker() {
+    while (true) {
+      const i = idx++;
+      if (i >= items.length) break;
+      results[i] = await fn(items[i], i);
+    }
+  }
+
+  const workers = Array.from({ length: Math.max(1, concurrency) }, () => worker());
+  await Promise.all(workers);
+  return results;
+}
+
+// ✅ Dédoublonnage: requête unique Zotero pour le paquet
+// Stratégie: qmode=everything avec requête OR sur "tag:HALID:xxx"
+// Ex: tag:"HALID:hal-xxx" OR tag:"HALID:hal-yyy"
+async function fetchExistingHalIdsForChunk(halIds) {
   const { apiKey, libType, libId } = zoteroEnv();
+
+  // Protéger la longueur d'URL: cette méthode est prévue pour un chunk (40–60)
+  // On quote pour les tags avec caractères spéciaux.
+  const clauses = halIds.map((id) => `tag:"HALID:${id}"`);
+  const q = clauses.join(" OR ");
+
+  const url =
+    `${ZOTERO_API}/${libType}/${libId}/items?` +
+    `q=${encodeURIComponent(q)}&qmode=everything&limit=100`;
+
+  const r = await fetch(url, {
+    headers: {
+      "Zotero-API-Key": apiKey,
+      "Zotero-API-Version": "3",
+      Accept: "application/json",
+    },
+  });
+
+  if (!r.ok) {
+    throw new Error(`Zotero chunk-dedupe lookup failed (HTTP ${r.status})`);
+  }
+
+  const items = await r.json();
   const existing = new Set();
 
-  // Zotero pagination: start + limit
-  let start = 0;
-  const limit = 100; // Zotero accepte jusqu'à 100
-
-  while (true) {
-    const url =
-      `${ZOTERO_API}/${libType}/${libId}/items?tag=${encodeURIComponent("HALID:*")}` +
-      `&limit=${limit}&start=${start}`;
-
-    const r = await fetch(url, {
-      headers: {
-        "Zotero-API-Key": apiKey,
-        "Zotero-API-Version": "3",
-        Accept: "application/json",
-      },
-    });
-
-    if (!r.ok) {
-      throw new Error(`Zotero HALID preload failed (HTTP ${r.status})`);
-    }
-
-    const items = await r.json();
-    if (!Array.isArray(items) || items.length === 0) break;
-
+  if (Array.isArray(items)) {
     for (const it of items) {
       const tags = it?.data?.tags || [];
       for (const t of tags) {
@@ -341,13 +369,6 @@ async function fetchExistingHalIdsFromZotero() {
         }
       }
     }
-
-    if (items.length < limit) break;
-    start += limit;
-
-    // Sécurité: si énorme bibliothèque, on ne boucle pas à l'infini.
-    // (on garde très large)
-    if (start > 5000) break;
   }
 
   return existing;
@@ -395,52 +416,65 @@ exports.handler = async (event) => {
     const errors = [];
     const skipped = [];
 
-    // ✅ Préchargement des HALID existants (1 passe)
-    let existingHalIds = new Set();
+    // ✅ 1) Dédoublonnage du paquet en 1 requête Zotero
+    let existing = new Set();
     try {
-      existingHalIds = await fetchExistingHalIdsFromZotero();
+      existing = await fetchExistingHalIdsForChunk(uniqueHalIds);
     } catch (e) {
-      // si le preload échoue, on préfère continuer (sans dédoublonnage) plutôt que bloquer
-      errors.push({ step: "ZoteroPreload", message: e.message || String(e) });
-      existingHalIds = new Set();
+      // On n'empêche pas l'import si la recherche échoue, mais on log.
+      errors.push({ step: "ZoteroChunkDedupe", message: e.message || String(e) });
+      existing = new Set();
     }
 
-    let fetched = 0;
+    const skippedDuplicatesHalIds = [];
     let skippedDuplicates = 0;
 
-    // 1) Fetch HAL + map payloads + dedupe
-    const payloads = [];
-
+    const toProcess = [];
     for (const halId of uniqueHalIds) {
-      try {
-        if (existingHalIds.has(halId)) {
-          skippedDuplicates++;
-          skipped.push({ halId, reason: "doublon (HALID déjà présent dans Zotero)" });
-          continue;
-        }
-
-        const doc = await fetchHALById(halId);
-        if (!doc) {
-          skipped.push({ halId, reason: "introuvable via API HAL" });
-          continue;
-        }
-        fetched++;
-
-        const res = halDocToPayload(doc);
-        if (!res.ok) {
-          skipped.push({ halId, reason: res.reason });
-          continue;
-        }
-
-        payloads.push(res.payload);
-      } catch (e) {
-        errors.push({ halId, step: "HAL", message: e.message || String(e) });
+      if (existing.has(halId)) {
+        skippedDuplicates++;
+        skippedDuplicatesHalIds.push(halId);
+        skipped.push({ halId, reason: "doublon (HALID déjà présent dans Zotero)" });
+      } else {
+        toProcess.push(halId);
       }
     }
 
+    // ✅ 2) Fetch HAL en parallèle (concurrency)
+    const CONCURRENCY = 8; // 6–10 recommandé
+    const results = await mapWithConcurrency(toProcess, CONCURRENCY, async (halId) => {
+      try {
+        const doc = await fetchHALById(halId);
+        if (!doc) return { type: "skip", halId, reason: "introuvable via API HAL" };
+
+        const res = halDocToPayload(doc);
+        if (!res.ok) return { type: "skip", halId, reason: res.reason };
+
+        return { type: "ok", payload: res.payload };
+      } catch (e) {
+        return { type: "err", halId, step: "HAL", message: e.message || String(e) };
+      }
+    });
+
+    let fetched = 0;
+    const payloads = [];
+
+    for (const r of results) {
+      if (!r) continue;
+      if (r.type === "ok") {
+        payloads.push(r.payload);
+        fetched++;
+      } else if (r.type === "skip") {
+        skipped.push({ halId: r.halId, reason: r.reason });
+      } else if (r.type === "err") {
+        errors.push({ halId: r.halId, step: r.step, message: r.message });
+      }
+    }
+
+    // ✅ 3) Map to Zotero items
     const zoteroItems = payloads.map(payloadToZoteroItem).filter(Boolean);
 
-    // 3) Post to Zotero in batches of 25
+    // ✅ 4) Post to Zotero in batches of 25
     const BATCH = 25;
     let imported = 0;
     let zoteroFailures = 0;
@@ -458,15 +492,18 @@ exports.handler = async (event) => {
 
     return jsonResponse(200, {
       requested: uniqueHalIds.length,
+      // fetched = nombre de payloads OK (HAL trouvés + mappables)
       fetched,
       importable: zoteroItems.length,
       imported,
       zoteroFailures,
       skippedCount: skipped.length,
       skippedDuplicates,
+      skippedDuplicatesHalIds,
       skipped,
       errors,
-      note: "Optimisation active: préchargement des tags HALID:* en une seule passe.",
+      note:
+        "Final: dédoublonnage HALID via requête Zotero unique par paquet + HAL fetch parallèle. Utiliser chunking côté front (40–60).",
     });
   } catch (e) {
     return jsonResponse(500, { error: e.message || String(e) });
