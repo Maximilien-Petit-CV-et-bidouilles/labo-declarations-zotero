@@ -1,8 +1,7 @@
 // netlify/functions/zotero-import-hal-batch.js
 //
 // Import CSV HAL (halId) -> HAL API -> Zotero batch
-// On importe UNIQUEMENT book / bookSection / journalArticle
-// et UNIQUEMENT les champs déjà utilisés par zotero-create-item.js
+// + dédoublonnage par HALID (tag Zotero "HALID:<halId>").
 //
 // Vars d'env attendues :
 // - ZOTERO_API_KEY
@@ -171,6 +170,9 @@ function halDocToPayload(doc) {
   const extra = extraLines.join("\n");
 
   const payload = {
+    // ✅ on garde halId séparé pour tag + dédoublonnage
+    halId,
+
     pubType,              // book | bookSection | journalArticle
     title,
     authors,
@@ -198,8 +200,8 @@ function halDocToPayload(doc) {
     extra,
   };
 
-  // ✅ Validation RELÂCHÉE : on n'impose plus publisher/place/bookTitle/publication
-  // On impose juste le minimum commun pour créer une notice exploitable.
+  // Validation minimale (relâchée)
+  if (!payload.halId) return { ok: false, reason: "halId manquant" };
   if (!payload.title) return { ok: false, reason: "titre manquant" };
   if (!payload.date) return { ok: false, reason: "date manquante" };
   if (!payload.authors || payload.authors.length === 0) return { ok: false, reason: "auteurs manquants" };
@@ -213,6 +215,9 @@ function payloadToZoteroItem(p) {
     firstName: a.firstName || "",
     lastName: a.lastName || "",
   }));
+
+  // ✅ Tag HALID pour dédoublonnage
+  const tags = [{ tag: `HALID:${p.halId}` }];
 
   if (p.pubType === "book") {
     return {
@@ -231,6 +236,7 @@ function payloadToZoteroItem(p) {
       abstractNote: p.abstract || "",
       language: p.language || "",
       extra: p.extra || "",
+      tags,
     };
   }
 
@@ -252,6 +258,7 @@ function payloadToZoteroItem(p) {
       abstractNote: p.abstract || "",
       language: p.language || "",
       extra: p.extra || "",
+      tags,
     };
   }
 
@@ -271,6 +278,7 @@ function payloadToZoteroItem(p) {
       abstractNote: p.abstract || "",
       language: p.language || "",
       extra: p.extra || "",
+      tags,
     };
   }
 
@@ -289,7 +297,7 @@ async function fetchHALById(halId) {
   return j?.response?.docs?.[0] || null;
 }
 
-async function postZoteroItems(items) {
+function zoteroEnv() {
   const apiKey = process.env.ZOTERO_API_KEY;
   const libType = process.env.ZOTERO_LIBRARY_TYPE; // "users" ou "groups"
   const libId = process.env.ZOTERO_LIBRARY_ID;
@@ -297,6 +305,55 @@ async function postZoteroItems(items) {
   if (!apiKey || !libType || !libId) {
     throw new Error("Missing Zotero env vars (ZOTERO_API_KEY / ZOTERO_LIBRARY_TYPE / ZOTERO_LIBRARY_ID).");
   }
+  return { apiKey, libType, libId };
+}
+
+async function zoteroHasHalIdTag(halId) {
+  const { apiKey, libType, libId } = zoteroEnv();
+  const tag = `HALID:${halId}`;
+  const url = `${ZOTERO_API}/${libType}/${libId}/items?tag=${encodeURIComponent(tag)}&limit=1`;
+
+  const r = await fetch(url, {
+    headers: {
+      "Zotero-API-Key": apiKey,
+      "Zotero-API-Version": "3",
+      Accept: "application/json",
+    },
+  });
+
+  if (!r.ok) {
+    throw new Error(`Zotero tag lookup failed (HTTP ${r.status}) for ${tag}`);
+  }
+
+  const items = await r.json();
+  return Array.isArray(items) && items.length > 0;
+}
+
+// Fallback pour éviter de dupliquer des imports anciens (sans tag),
+// mais qui contiennent déjà "HAL: <halId>" dans extra.
+async function zoteroHasHalInExtra(halId) {
+  const { apiKey, libType, libId } = zoteroEnv();
+  const q = `HAL: ${halId}`;
+  const url = `${ZOTERO_API}/${libType}/${libId}/items?q=${encodeURIComponent(q)}&qmode=everything&limit=1`;
+
+  const r = await fetch(url, {
+    headers: {
+      "Zotero-API-Key": apiKey,
+      "Zotero-API-Version": "3",
+      Accept: "application/json",
+    },
+  });
+
+  if (!r.ok) {
+    throw new Error(`Zotero extra lookup failed (HTTP ${r.status}) for ${q}`);
+  }
+
+  const items = await r.json();
+  return Array.isArray(items) && items.length > 0;
+}
+
+async function postZoteroItems(items) {
+  const { apiKey, libType, libId } = zoteroEnv();
 
   const r = await fetch(`${ZOTERO_API}/${libType}/${libId}/items`, {
     method: "POST",
@@ -324,9 +381,7 @@ async function postZoteroItems(items) {
 
 exports.handler = async (event) => {
   try {
-    if (event.httpMethod !== "POST") {
-      return jsonResponse(405, { error: "Method not allowed" });
-    }
+    if (event.httpMethod !== "POST") return jsonResponse(405, { error: "Method not allowed" });
 
     const body = JSON.parse(event.body || "{}");
     const halIds = Array.isArray(body.halIds)
@@ -340,10 +395,29 @@ exports.handler = async (event) => {
     const skipped = [];
 
     let fetched = 0;
+
+    // 1) Fetch HAL, map payloads, dedupe by HALID in Zotero
     const payloads = [];
+    let skippedDuplicates = 0;
 
     for (const halId of uniqueHalIds) {
       try {
+        // ✅ Dédoublonnage par HALID AVANT même d'appeler HAL (rapide)
+        const alreadyTagged = await zoteroHasHalIdTag(halId);
+        if (alreadyTagged) {
+          skippedDuplicates++;
+          skipped.push({ halId, reason: "doublon (tag HALID déjà présent)" });
+          continue;
+        }
+
+        // ✅ Fallback: anciens imports qui ont "HAL: halId" dans extra
+        const alreadyInExtra = await zoteroHasHalInExtra(halId);
+        if (alreadyInExtra) {
+          skippedDuplicates++;
+          skipped.push({ halId, reason: "doublon (HAL déjà trouvé dans extra)" });
+          continue;
+        }
+
         const doc = await fetchHALById(halId);
         if (!doc) {
           skipped.push({ halId, reason: "introuvable via API HAL" });
@@ -356,15 +430,17 @@ exports.handler = async (event) => {
           skipped.push({ halId, reason: res.reason });
           continue;
         }
+
         payloads.push(res.payload);
       } catch (e) {
-        errors.push({ halId, step: "HAL", message: e.message || String(e) });
+        errors.push({ halId, step: "HAL/ZoteroLookup", message: e.message || String(e) });
       }
     }
 
+    // 2) Map to Zotero items
     const zoteroItems = payloads.map(payloadToZoteroItem).filter(Boolean);
 
-    // Batch Zotero
+    // 3) Post to Zotero in batches of 25
     const BATCH = 25;
     let imported = 0;
     let zoteroFailures = 0;
@@ -387,7 +463,8 @@ exports.handler = async (event) => {
       imported,
       zoteroFailures,
       skippedCount: skipped.length,
-      skipped,   // ✅ donne les raisons (ça va t’aider à comprendre les notices manquantes)
+      skippedDuplicates,
+      skipped,
       errors,
     });
   } catch (e) {
