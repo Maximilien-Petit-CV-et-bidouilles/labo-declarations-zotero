@@ -1,76 +1,93 @@
 // netlify/functions/public-suivi.js
-// Renvoie un JSON public "sanitisé" à partir de Zotero (sans exposer la clé API côté navigateur)
+// Renvoie un JSON public à partir de Zotero (sans exposer la clé API côté navigateur)
+//
+// FIX IMPORTANT : Zotero limite "limit" à 100 -> pagination avec start=0,100,200...
+// Sinon la page suivi plafonne à 100 items même si la bibliothèque en contient plus.
 
 exports.handler = async () => {
   try {
-    const apiKey = process.env.ZOTERO_API_KEY;             // clé avec droit de lecture (ou lecture+écriture)
-    const libraryType = process.env.ZOTERO_LIBRARY_TYPE;   // 'users' ou 'groups'
+    const apiKey = process.env.ZOTERO_API_KEY;
+    const libraryType = process.env.ZOTERO_LIBRARY_TYPE; // 'users' ou 'groups'
     const libraryId = process.env.ZOTERO_LIBRARY_ID;
 
     if (!apiKey || !libraryType || !libraryId) {
-      return json(500, { error: 'Missing Zotero env vars' });
+      return json(500, { error: "Missing Zotero env vars" });
     }
 
-    // Récupère les items triés par date de modification (desc), limite raisonnable.
-    const url = `https://api.zotero.org/${libraryType}/${libraryId}/items?limit=200&sort=dateModified&direction=desc`;
+    const limit = 100; // Zotero max
+    let start = 0;
+    const MAX_ITEMS = 10000; // sécurité large
 
-    const res = await fetch(url, {
-      headers: {
-        'Zotero-API-Key': apiKey,
-        'Zotero-API-Version': '3'
-      }
-    });
+    const all = [];
 
-    const raw = await res.text();
-    if (!res.ok) {
-      return json(res.status, { error: 'Zotero error', details: raw });
-    }
+    while (true) {
+      const url =
+        `https://api.zotero.org/${libraryType}/${libraryId}/items` +
+        `?limit=${limit}&start=${start}&sort=dateModified&direction=desc`;
 
-    const items = JSON.parse(raw);
-
-    // On ne garde que livres + chapitres + articles
-    const filtered = items
-      .map(z => z?.data)
-      .filter(Boolean)
-      .filter(d => d.itemType === 'book' || d.itemType === 'bookSection' || d.itemType === 'journalArticle')
-      .map(d => {
-        const flags = parseDLABFlags(d.extra || '');
-
-        return {
-          itemType: d.itemType,
-          title: d.title || '',
-          date: d.date || '',
-          year: extractYear(d.date || ''),
-          creators: Array.isArray(d.creators) ? d.creators : [],
-          creatorsText: (d.creators || [])
-            .filter(c => c && (c.creatorType === 'author' || c.creatorType === 'editor'))
-            .map(c => `${(c.lastName||'').trim()} ${(c.firstName||'').trim()}`.trim())
-            .filter(Boolean)
-            .join(', '),
-
-          // Champs utiles au tableau
-          bookTitle: d.bookTitle || '',
-          publicationTitle: d.publicationTitle || d.journalAbbreviation || '',
-          publisher: d.publisher || '',
-          place: d.place || '',
-          isbn: d.ISBN || d.isbn || '',
-          doi: d.DOI || d.doi || '',
-          volume: d.volume || '',
-          issue: d.issue || '',
-          pages: d.pages || '',
-          flags,
-
-          // Lien public (si bibliothèque publique). Sinon, on renvoie rien.
-          zoteroUrl: buildZoteroUrl(libraryType, libraryId, d.key)
-        };
+      const res = await fetch(url, {
+        headers: {
+          "Zotero-API-Key": apiKey,
+          "Zotero-API-Version": "3",
+          "Accept": "application/json",
+        },
       });
+
+      const txt = await res.text();
+      if (!res.ok) {
+        return json(res.status, { error: `Zotero error HTTP ${res.status}`, details: txt });
+      }
+
+      const items = JSON.parse(txt);
+      if (!Array.isArray(items) || items.length === 0) break;
+
+      all.push(...items);
+
+      // dernière page
+      if (items.length < limit) break;
+
+      start += limit;
+      if (all.length >= MAX_ITEMS) break;
+    }
+
+    // On renvoie au front un format compatible avec ton suivi.html
+    // Ton suivi.html utilise: data.items[], data.fetchedAt
+    const out = all
+      .map((z) => z && z.data ? z.data : null)
+      .filter(Boolean)
+      .filter((d) => d.itemType === "book" || d.itemType === "bookSection" || d.itemType === "journalArticle")
+      .map((d) => ({
+        // champs attendus par ton suivi.html
+        itemType: d.itemType || "",
+        title: d.title || "",
+        date: d.date || "",
+
+        // champs optionnels utilisés dans la recherche/affichage
+        bookTitle: d.bookTitle || "",
+        publicationTitle: d.publicationTitle || "",
+        publisher: d.publisher || "",
+        place: d.place || "",
+        isbn: d.ISBN || "",
+        doi: d.DOI || "",
+        volume: d.volume || "",
+        issue: d.issue || "",
+        pages: d.pages || "",
+
+        // creators et flags (DLAB dans extra)
+        creators: Array.isArray(d.creators) ? d.creators : [],
+        flags: parseDLABFlags(d.extra || ""),
+
+        // lien zotero (si tu l’utilises)
+        zoteroUrl: buildZoteroUrl(libraryType, libraryId, d.key),
+      }));
 
     return json(200, {
       fetchedAt: new Date().toISOString(),
-      items: filtered
+      count: out.length,
+      items: out,
     });
-  } catch (err) {
-    return json(500, { error: 'Server error', message: err.message });
+  } catch (e) {
+    return json(500, { error: e.message || String(e) });
   }
 };
 
@@ -78,61 +95,59 @@ function json(statusCode, obj) {
   return {
     statusCode,
     headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': 'public, max-age=60'
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
     },
-    body: JSON.stringify(obj)
+    body: JSON.stringify(obj),
   };
 }
 
-function extractYear(dateStr) {
-  const m = String(dateStr || '').match(/\b(19|20)\d{2}\b/);
-  return m ? m[0] : '';
-}
-
-// Parse le bloc:
+// Parse le bloc DLAB dans extra:
 // [DLAB]
 // hal_create: yes
 // comms_publish: no
 // hal_done: yes
 // comms_done: no
+// axes: PICMAP, MOPTIS
 // [/DLAB]
 function parseDLABFlags(extra) {
-  const s = String(extra || '');
-  const start = s.indexOf('[DLAB]');
-  const end = s.indexOf('[/DLAB]');
+  const s = String(extra || "");
+  const start = s.indexOf("[DLAB]");
+  const end = s.indexOf("[/DLAB]");
   if (start === -1 || end === -1 || end <= start) return {};
 
   const block = s.slice(start + 6, end).trim();
   const flags = {};
 
-  block.split('\n').forEach(line => {
+  block.split("\n").forEach((line) => {
     const l = line.trim();
-    if (!l || l.startsWith('#')) return;
-    const idx = l.indexOf(':');
+    if (!l || l.startsWith("#")) return;
+    const idx = l.indexOf(":");
     if (idx === -1) return;
-    const k = l.slice(0, idx).trim();
-    const v = l.slice(idx + 1).trim().toLowerCase();
-    if (!k) return;
-    flags[k] = normalizeBool(v);
+
+    const key = l.slice(0, idx).trim();
+    let val = l.slice(idx + 1).trim();
+
+    if (!key) return;
+
+    // normalisation yes/no
+    const low = val.toLowerCase();
+    if (low === "yes" || low === "true" || low === "oui") val = "yes";
+    else if (low === "no" || low === "false" || low === "non") val = "no";
+
+    flags[key] = val;
   });
 
   return flags;
 }
 
-function normalizeBool(v) {
-  if (v === 'yes' || v === 'true' || v === 'oui') return 'yes';
-  if (v === 'no' || v === 'false' || v === 'non') return 'no';
-  return v;
-}
-
 function buildZoteroUrl(libraryType, libraryId, itemKey) {
-  if (!libraryType || !libraryId || !itemKey) return '';
-  if (libraryType === 'groups') {
+  if (!libraryType || !libraryId || !itemKey) return "";
+  if (libraryType === "groups") {
     return `https://www.zotero.org/groups/${libraryId}/items/${itemKey}`;
   }
-  if (libraryType === 'users') {
+  if (libraryType === "users") {
     return `https://www.zotero.org/users/${libraryId}/items/${itemKey}`;
   }
-  return '';
+  return "";
 }
