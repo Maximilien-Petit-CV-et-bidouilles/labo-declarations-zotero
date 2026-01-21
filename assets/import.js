@@ -1,6 +1,6 @@
 // assets/import.js
 // Page: import.html
-// Objectif : importer un CSV HAL (colonnes halId_s + docType_s) -> Netlify Function -> Zotero
+// CSV HAL -> envoi en paquets à la Netlify Function pour éviter les timeouts
 
 (function () {
   const $ = (id) => document.getElementById(id);
@@ -17,15 +17,16 @@
 
   const previewBody = $("previewBody");
 
-  // Données en mémoire
   let rowsAll = [];
   let rowsUsable = [];
-  let rowsImportable = []; // seulement ART/OUV/COUV
+  let rowsImportable = [];
   let busy = false;
 
-  // Mapping docType HAL -> importable ?
-  // On filtre au plus tôt côté front pour éviter des appels HAL inutiles.
   const HAL_IMPORTABLE = new Set(["ART", "OUV", "COUV"]);
+
+  // ✅ IMPORTANT : taille des paquets pour éviter les 504
+  const CHUNK_SIZE = 50;     // recommandé 40–60
+  const PAUSE_MS = 150;      // petite pause entre chunks (évite surcharge)
 
   function setBusy(v) {
     busy = v;
@@ -53,9 +54,7 @@
     kpiUsable.textContent = "0";
     kpiImportable.textContent = "0";
     dotTotal.className = "dot";
-    previewBody.innerHTML = `
-      <tr><td colspan="3" class="small">Aucun fichier chargé.</td></tr>
-    `;
+    previewBody.innerHTML = `<tr><td colspan="3" class="small">Aucun fichier chargé.</td></tr>`;
     btnImport.disabled = true;
     fileInput.value = "";
     clearStatus();
@@ -69,32 +68,6 @@
     return [...new Set(arr)];
   }
 
-  function renderPreview() {
-    const max = 50;
-    const slice = rowsUsable.slice(0, max);
-
-    if (!slice.length) {
-      previewBody.innerHTML = `<tr><td colspan="3" class="small">Aucune ligne exploitable (halId_s manquant ?).</td></tr>`;
-      return;
-    }
-
-    previewBody.innerHTML = slice
-      .map((r) => {
-        const docType = r.docType_s || "";
-        const halId = r.halId_s || "";
-        const importable = HAL_IMPORTABLE.has(docType);
-        const status = importable ? "importable" : "ignoré";
-        return `
-          <tr>
-            <td class="mono">${escapeHtml(docType)}</td>
-            <td class="mono">${escapeHtml(halId)}</td>
-            <td>${importable ? "✅ Importable" : "— Ignoré"}</td>
-          </tr>
-        `;
-      })
-      .join("");
-  }
-
   function escapeHtml(s) {
     return String(s ?? "").replace(/[&<>"']/g, (c) => ({
       "&": "&amp;",
@@ -105,11 +78,33 @@
     }[c]));
   }
 
+  function renderPreview() {
+    const max = 50;
+    const slice = rowsUsable.slice(0, max);
+
+    if (!slice.length) {
+      previewBody.innerHTML = `<tr><td colspan="3" class="small">Aucune ligne exploitable (halId_s manquant ?).</td></tr>`;
+      return;
+    }
+
+    previewBody.innerHTML = slice.map((r) => {
+      const docType = r.docType_s || "";
+      const halId = r.halId_s || "";
+      const importable = HAL_IMPORTABLE.has(docType);
+      return `
+        <tr>
+          <td class="mono">${escapeHtml(docType)}</td>
+          <td class="mono">${escapeHtml(halId)}</td>
+          <td>${importable ? "✅ Importable" : "— Ignoré"}</td>
+        </tr>
+      `;
+    }).join("");
+  }
+
   function computeKpis() {
     kpiTotal.textContent = String(rowsAll.length);
     kpiUsable.textContent = String(rowsUsable.length);
     kpiImportable.textContent = String(rowsImportable.length);
-
     dotTotal.className = "dot" + (rowsAll.length ? " ok" : "");
     btnImport.disabled = rowsImportable.length === 0 || busy;
   }
@@ -128,15 +123,11 @@
             const data = Array.isArray(res.data) ? res.data : [];
             rowsAll = data;
 
-            // Exploitables si halId_s présent
-            rowsUsable = data
-              .map((r) => ({
-                halId_s: normalize(r.halId_s),
-                docType_s: normalize(r.docType_s),
-              }))
-              .filter((r) => r.halId_s);
+            rowsUsable = data.map((r) => ({
+              halId_s: normalize(r.halId_s),
+              docType_s: normalize(r.docType_s),
+            })).filter((r) => r.halId_s);
 
-            // Importables si docType dans {ART, OUV, COUV}
             rowsImportable = rowsUsable.filter((r) => HAL_IMPORTABLE.has(r.docType_s));
 
             computeKpis();
@@ -147,20 +138,18 @@
             } else if (!rowsUsable.length) {
               setStatus("Aucune ligne exploitable : la colonne halId_s est absente ou vide.", "bad");
             } else if (!rowsImportable.length) {
-              setStatus(
-                "Aucune ligne importable (types attendus : ART, OUV, COUV). Les autres types HAL sont ignorés.",
-                "warn"
-              );
+              setStatus("Aucune ligne importable (types attendus : ART, OUV, COUV).", "warn");
             } else {
               const uniqueIds = unique(rowsImportable.map((r) => r.halId_s));
-              const msg =
-                `CSV chargé.\n` +
-                `- Lignes totales : ${rowsAll.length}\n` +
-                `- Exploitables (halId_s) : ${rowsUsable.length}\n` +
+              setStatus(
+                `CSV chargé ✅\n` +
+                `- Total : ${rowsAll.length}\n` +
+                `- Exploitables : ${rowsUsable.length}\n` +
                 `- Importables (ART/OUV/COUV) : ${rowsImportable.length}\n` +
-                `- halId uniques à importer : ${uniqueIds.length}\n\n` +
-                `Clique sur “Importer dans Zotero”.`;
-              setStatus(msg, "ok");
+                `- halId uniques : ${uniqueIds.length}\n\n` +
+                `L’import sera envoyé par paquets de ${CHUNK_SIZE} pour éviter les timeouts.`,
+                "ok"
+              );
             }
 
             resolve(true);
@@ -178,6 +167,16 @@
     });
   }
 
+  function chunkArray(arr, size) {
+    const out = [];
+    for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+    return out;
+  }
+
+  function sleep(ms) {
+    return new Promise((r) => setTimeout(r, ms));
+  }
+
   async function doImport() {
     if (busy) return;
     if (!rowsImportable.length) {
@@ -186,44 +185,79 @@
     }
 
     const halIds = unique(rowsImportable.map((r) => r.halId_s));
+    const chunks = chunkArray(halIds, CHUNK_SIZE);
 
     setBusy(true);
-    setStatus(
-      `Import en cours…\n- ${halIds.length} halId uniques envoyés\n\nNe ferme pas l’onglet.`,
-      "info"
-    );
+
+    let agg = {
+      requested: halIds.length,
+      fetched: 0,
+      importable: 0,
+      imported: 0,
+      skippedCount: 0,
+      skippedDuplicates: 0,
+      zoteroFailures: 0,
+      errors: 0,
+    };
 
     try {
-      const r = await fetch("/.netlify/functions/zotero-import-hal-batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ halIds }),
-      });
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
 
-      const text = await r.text();
-      let payload;
-      try { payload = JSON.parse(text); } catch { payload = { raw: text }; }
+        setStatus(
+          `Import en cours…\n` +
+          `Paquet ${i + 1}/${chunks.length}\n` +
+          `- IDs dans ce paquet : ${chunk.length}\n` +
+          `- Progression : ${Math.min(((i) * CHUNK_SIZE), halIds.length)}/${halIds.length}\n\n` +
+          `Cumul : importés=${agg.imported} | doublons=${agg.skippedDuplicates} | ignorés=${agg.skippedCount} | erreurs=${agg.errors}`,
+          "info"
+        );
 
-      if (!r.ok) {
-        const msg =
-          `Erreur serveur (${r.status}).\n` +
-          (payload?.error ? `\n${payload.error}` : "") +
-          (payload?.raw ? `\n\n${payload.raw}` : "");
-        setStatus(msg, "bad");
-        return;
+        const r = await fetch("/.netlify/functions/zotero-import-hal-batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ halIds: chunk }),
+        });
+
+        const text = await r.text();
+        let payload;
+        try { payload = JSON.parse(text); } catch { payload = { raw: text }; }
+
+        if (!r.ok) {
+          // on stoppe au premier paquet en erreur (plus clair), avec contexte
+          setStatus(
+            `Erreur serveur sur le paquet ${i + 1}/${chunks.length} (HTTP ${r.status}).\n\n` +
+            (payload?.error || payload?.raw || "Erreur inconnue"),
+            "bad"
+          );
+          return;
+        }
+
+        agg.fetched += payload.fetched || 0;
+        agg.importable += payload.importable || 0;
+        agg.imported += payload.imported || 0;
+        agg.skippedCount += payload.skippedCount || 0;
+        agg.skippedDuplicates += payload.skippedDuplicates || 0;
+        agg.zoteroFailures += payload.zoteroFailures || 0;
+        agg.errors += (payload.errors && payload.errors.length) ? payload.errors.length : 0;
+
+        // petite pause pour éviter surcharge/ratelimit
+        await sleep(PAUSE_MS);
       }
 
-      // payload attendu : { requested, fetched, importable, imported, skipped, errors }
-      const msg =
+      setStatus(
         `Import terminé ✅\n\n` +
-        `Demandés : ${payload.requested ?? halIds.length}\n` +
-        `Trouvés HAL : ${payload.fetched ?? "?"}\n` +
-        `Importables (book/bookSection/journalArticle) : ${payload.importable ?? "?"}\n` +
-        `Créés Zotero : ${payload.imported ?? "?"}\n` +
-        `Ignorés (doublons ou non importables) : ${payload.skipped ?? 0}\n` +
-        (payload.errors?.length ? `\nErreurs : ${payload.errors.length} (voir détails dans la réponse serveur)` : "");
+        `Demandés : ${agg.requested}\n` +
+        `Trouvés HAL : ${agg.fetched}\n` +
+        `Importables : ${agg.importable}\n` +
+        `Créés Zotero : ${agg.imported}\n` +
+        `Doublons : ${agg.skippedDuplicates}\n` +
+        `Ignorés : ${agg.skippedCount}\n` +
+        `Échecs Zotero : ${agg.zoteroFailures}\n` +
+        `Erreurs : ${agg.errors}\n`,
+        (agg.errors || agg.zoteroFailures) ? "warn" : "ok"
+      );
 
-      setStatus(msg, payload.errors?.length ? "warn" : "ok");
     } catch (e) {
       setStatus(`Erreur réseau : ${e.message || e}`, "bad");
     } finally {
@@ -231,7 +265,6 @@
     }
   }
 
-  // Events
   fileInput.addEventListener("change", async () => {
     const f = fileInput.files && fileInput.files[0];
     if (!f) return;
@@ -246,6 +279,5 @@
   btnImport.addEventListener("click", doImport);
   btnReset.addEventListener("click", resetUI);
 
-  // Init
   resetUI();
 })();
