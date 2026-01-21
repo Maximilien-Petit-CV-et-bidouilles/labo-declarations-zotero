@@ -1,12 +1,10 @@
 // netlify/functions/zotero-import-hal-batch.js
 //
-// Reçoit: { halIds: ["hal-xxxx", ...] }
-// Pour chaque halId : récupère des métadonnées structurées via l'API HAL,
-// filtre uniquement livres/chapitres/articles, mappe vers le "modèle" déjà utilisé
-// par le projet (book / bookSection / journalArticle), puis crée les items dans Zotero
-// en batch.
+// Import CSV HAL (halId) -> HAL API -> Zotero batch
+// On importe UNIQUEMENT book / bookSection / journalArticle
+// et UNIQUEMENT les champs déjà utilisés par zotero-create-item.js
 //
-// Vars d'env attendues (déjà présentes dans ton projet):
+// Vars d'env attendues :
 // - ZOTERO_API_KEY
 // - ZOTERO_LIBRARY_TYPE   (ex: "users" ou "groups")
 // - ZOTERO_LIBRARY_ID
@@ -14,43 +12,46 @@
 const HAL_SEARCH = "https://api.archives-ouvertes.fr/search/";
 const ZOTERO_API = "https://api.zotero.org";
 
-// Mapping docType HAL -> itemType Zotero autorisé
 const HAL_TO_ZOTERO = {
   ART: "journalArticle",
   OUV: "book",
   COUV: "bookSection",
 };
 
-// Champs qu'on demande à HAL (best-effort : HAL varie selon les dépôts/types)
+// On demande large (HAL varie selon les dépôts)
 const HAL_FL = [
   "halId_s",
   "docid",
   "docType_s",
 
-  // Titre / date
   "title_s",
   "title_t",
+
   "year_i",
   "producedDate_s",
   "publicationDate_s",
 
-  // Auteurs
   "authFullName_s",
   "authLastName_s",
   "authFirstName_s",
 
   // Article
   "journalTitle_s",
+  "journalTitle_t",
   "volume_s",
   "issue_s",
   "page_s",
 
   // Livre / chapitre
   "publisher_s",
+  "publisher_t",
   "place_s",
+  "city_s",
   "bookTitle_s",
+  "bookTitle_t",
   "isbn_s",
   "series_s",
+  "series_t",
   "seriesNumber_s",
   "edition_s",
 
@@ -59,6 +60,7 @@ const HAL_FL = [
 
   // Divers
   "abstract_s",
+  "abstract_t",
   "language_s",
 ].join(",");
 
@@ -72,14 +74,13 @@ function jsonResponse(statusCode, obj) {
 
 function asString(v) {
   if (v === null || v === undefined) return "";
-  if (Array.isArray(v)) return v.filter(Boolean).join(" ").trim();
+  if (Array.isArray(v)) return v.map((x) => String(x ?? "").trim()).filter(Boolean).join(" ").trim();
   return String(v).trim();
 }
 
 function pickFirstNonEmpty(doc, keys) {
   for (const k of keys) {
-    const v = doc?.[k];
-    const s = asString(v);
+    const s = asString(doc?.[k]);
     if (s) return s;
   }
   return "";
@@ -93,7 +94,7 @@ function normalizeDoi(raw) {
 }
 
 function parseCreatorsFromHAL(doc) {
-  // Priorité: authLastName_s + authFirstName_s (si fournis)
+  // 1) authLastName_s + authFirstName_s si dispo
   const ln = doc?.authLastName_s;
   const fn = doc?.authFirstName_s;
 
@@ -108,7 +109,7 @@ function parseCreatorsFromHAL(doc) {
     if (out.length) return out;
   }
 
-  // Fallback: authFullName_s (souvent "NOM, Prénom" ou "Prénom NOM")
+  // 2) Fallback authFullName_s (souvent "NOM, Prénom" ou "Prénom NOM")
   const full = doc?.authFullName_s;
   const names = Array.isArray(full) ? full : (full ? [full] : []);
   const creators = [];
@@ -121,7 +122,6 @@ function parseCreatorsFromHAL(doc) {
       const [last, first] = s.split(",", 2);
       creators.push({ lastName: asString(last), firstName: asString(first) });
     } else {
-      // Heuristique simple: dernier mot = nom, reste = prénom
       const parts = s.split(/\s+/).filter(Boolean);
       if (parts.length === 1) creators.push({ lastName: parts[0], firstName: "" });
       else creators.push({ lastName: parts[parts.length - 1], firstName: parts.slice(0, -1).join(" ") });
@@ -133,45 +133,45 @@ function parseCreatorsFromHAL(doc) {
 
 function halDocToPayload(doc) {
   const docType = asString(doc?.docType_s);
-  const zotItemType = HAL_TO_ZOTERO[docType];
-  if (!zotItemType) return null;
+  const pubType = HAL_TO_ZOTERO[docType];
+  if (!pubType) return { ok: false, reason: `docType non importable: ${docType}` };
 
   const halId = pickFirstNonEmpty(doc, ["halId_s"]);
+  const docid = pickFirstNonEmpty(doc, ["docid"]);
+
   const title = pickFirstNonEmpty(doc, ["title_s", "title_t"]);
   const year = pickFirstNonEmpty(doc, ["year_i"]);
   const produced = pickFirstNonEmpty(doc, ["producedDate_s", "publicationDate_s"]);
   const date = year || (produced ? produced.slice(0, 10) : "");
 
   const authors = parseCreatorsFromHAL(doc);
-  const publisher = pickFirstNonEmpty(doc, ["publisher_s"]);
-  const place = pickFirstNonEmpty(doc, ["place_s"]);
+
+  const publisher = pickFirstNonEmpty(doc, ["publisher_s", "publisher_t"]);
+  const place = pickFirstNonEmpty(doc, ["place_s", "city_s"]);
   const pages = pickFirstNonEmpty(doc, ["page_s"]);
   const isbn = pickFirstNonEmpty(doc, ["isbn_s"]);
   const language = pickFirstNonEmpty(doc, ["language_s"]);
-  const abstract = pickFirstNonEmpty(doc, ["abstract_s"]);
+  const abstract = pickFirstNonEmpty(doc, ["abstract_s", "abstract_t"]);
   const doi = normalizeDoi(pickFirstNonEmpty(doc, ["doiId_s"]));
 
-  // Champs spécifiques
-  const publication = pickFirstNonEmpty(doc, ["journalTitle_s"]);
+  const publication = pickFirstNonEmpty(doc, ["journalTitle_s", "journalTitle_t"]);
   const articleVolume = pickFirstNonEmpty(doc, ["volume_s"]);
   const articleIssue = pickFirstNonEmpty(doc, ["issue_s"]);
 
-  const bookTitle = pickFirstNonEmpty(doc, ["bookTitle_s"]);
-  const series = pickFirstNonEmpty(doc, ["series_s"]);
+  const bookTitle = pickFirstNonEmpty(doc, ["bookTitle_s", "bookTitle_t"]);
+  const series = pickFirstNonEmpty(doc, ["series_s", "series_t"]);
   const seriesNumber = pickFirstNonEmpty(doc, ["seriesNumber_s"]);
   const edition = pickFirstNonEmpty(doc, ["edition_s"]);
-  const volume = pickFirstNonEmpty(doc, ["volume_s"]); // peut aussi servir au livre
+  const volume = pickFirstNonEmpty(doc, ["volume_s"]);
 
-  // Extra: on conserve une trace HAL (utile pour retrouver / dédoublonner ensuite)
-  const docid = pickFirstNonEmpty(doc, ["docid"]);
+  // Trace HAL (utile)
   const extraLines = [];
   if (halId) extraLines.push(`HAL: ${halId}`);
   if (docid) extraLines.push(`HAL_DOCID: ${docid}`);
   const extra = extraLines.join("\n");
 
-  // On ne sort QUE les champs définis dans le projet (mêmes noms que la function existante)
   const payload = {
-    pubType: zotItemType, // book | bookSection | journalArticle
+    pubType,              // book | bookSection | journalArticle
     title,
     authors,
     date,
@@ -190,7 +190,7 @@ function halDocToPayload(doc) {
     publication,
     articleVolume,
     articleIssue,
-    articlePages: pages, // pour un article, HAL met souvent "page_s"
+    articlePages: pages,
     doi,
 
     abstract,
@@ -198,20 +198,13 @@ function halDocToPayload(doc) {
     extra,
   };
 
-  // Validation minimale (cohérente avec votre schéma)
-  if (!payload.title || !payload.authors?.length || !payload.date) return null;
+  // ✅ Validation RELÂCHÉE : on n'impose plus publisher/place/bookTitle/publication
+  // On impose juste le minimum commun pour créer une notice exploitable.
+  if (!payload.title) return { ok: false, reason: "titre manquant" };
+  if (!payload.date) return { ok: false, reason: "date manquante" };
+  if (!payload.authors || payload.authors.length === 0) return { ok: false, reason: "auteurs manquants" };
 
-  if (payload.pubType === "book") {
-    if (!payload.publisher || !payload.place) return null;
-  }
-  if (payload.pubType === "bookSection") {
-    if (!payload.bookTitle || !payload.publisher || !payload.place) return null;
-  }
-  if (payload.pubType === "journalArticle") {
-    if (!payload.publication) return null;
-  }
-
-  return payload;
+  return { ok: true, payload };
 }
 
 function payloadToZoteroItem(p) {
@@ -293,8 +286,7 @@ async function fetchHALById(halId) {
   const r = await fetch(url, { headers: { Accept: "application/json" } });
   if (!r.ok) throw new Error(`HAL ${halId}: HTTP ${r.status}`);
   const j = await r.json();
-  const doc = j?.response?.docs?.[0] || null;
-  return doc;
+  return j?.response?.docs?.[0] || null;
 }
 
 async function postZoteroItems(items) {
@@ -325,11 +317,9 @@ async function postZoteroItems(items) {
     throw new Error(`Zotero HTTP ${r.status}: ${err}`);
   }
 
-  // Zotero renvoie souvent: { successful: {...}, unsuccessful: {...} }
   const successful = payload?.successful ? Object.keys(payload.successful).length : items.length;
   const unsuccessful = payload?.unsuccessful ? Object.keys(payload.unsuccessful).length : 0;
-
-  return { successful, unsuccessful, raw: payload || text };
+  return { successful, unsuccessful };
 }
 
 exports.handler = async (event) => {
@@ -339,39 +329,42 @@ exports.handler = async (event) => {
     }
 
     const body = JSON.parse(event.body || "{}");
-    const halIds = Array.isArray(body.halIds) ? body.halIds.map(String).map((s) => s.trim()).filter(Boolean) : [];
+    const halIds = Array.isArray(body.halIds)
+      ? body.halIds.map(String).map((s) => s.trim()).filter(Boolean)
+      : [];
 
-    if (!halIds.length) {
-      return jsonResponse(400, { error: "Missing 'halIds' array" });
-    }
+    if (!halIds.length) return jsonResponse(400, { error: "Missing 'halIds' array" });
 
     const uniqueHalIds = [...new Set(halIds)];
     const errors = [];
+    const skipped = [];
 
-    // 1) Fetch HAL + OUV/COUV/ART filter + map payload
     let fetched = 0;
     const payloads = [];
 
     for (const halId of uniqueHalIds) {
       try {
         const doc = await fetchHALById(halId);
-        if (!doc) continue;
+        if (!doc) {
+          skipped.push({ halId, reason: "introuvable via API HAL" });
+          continue;
+        }
         fetched++;
 
-        const payload = halDocToPayload(doc);
-        if (!payload) continue; // non importable ou incomplet selon règles
-        payloads.push(payload);
+        const res = halDocToPayload(doc);
+        if (!res.ok) {
+          skipped.push({ halId, reason: res.reason });
+          continue;
+        }
+        payloads.push(res.payload);
       } catch (e) {
         errors.push({ halId, step: "HAL", message: e.message || String(e) });
       }
     }
 
-    // 2) Map to Zotero items
-    const zoteroItems = payloads
-      .map(payloadToZoteroItem)
-      .filter(Boolean);
+    const zoteroItems = payloads.map(payloadToZoteroItem).filter(Boolean);
 
-    // 3) Post to Zotero in batches of 25
+    // Batch Zotero
     const BATCH = 25;
     let imported = 0;
     let zoteroFailures = 0;
@@ -383,20 +376,18 @@ exports.handler = async (event) => {
         imported += res.successful;
         zoteroFailures += res.unsuccessful;
       } catch (e) {
-        // En cas d’échec batch : on log et continue (pour ne pas bloquer tout)
         errors.push({ batchStart: i, step: "Zotero", message: e.message || String(e) });
       }
     }
-
-    const skipped = Math.max(0, uniqueHalIds.length - payloads.length);
 
     return jsonResponse(200, {
       requested: uniqueHalIds.length,
       fetched,
       importable: zoteroItems.length,
       imported,
-      skipped,
       zoteroFailures,
+      skippedCount: skipped.length,
+      skipped,   // ✅ donne les raisons (ça va t’aider à comprendre les notices manquantes)
       errors,
     });
   } catch (e) {
