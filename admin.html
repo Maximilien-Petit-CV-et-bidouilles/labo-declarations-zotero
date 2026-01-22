@@ -165,6 +165,13 @@
     let PAGE_INDEX = 0;
     let PAGE_SIZE = 25;
 
+    // ✅ Debounce recherche (perf)
+    let __tSearch = null;
+    function debouncedRender(ms=200){
+      clearTimeout(__tSearch);
+      __tSearch = setTimeout(() => render(), ms);
+    }
+
     const $ = (id) => document.getElementById(id);
 
     function norm(s){
@@ -270,12 +277,11 @@
       PAGE_INDEX = 0;
       PAGE_SIZE = parseInt($('pageSize').value, 10) || 25;
 
-      // Au tout début, la recherche porte sur ce qui est chargé (100).
-      // Dès que le reste arrive, on re-render => recherche sur tout.
-      setMsg(`✅ ${ALL.length} item(s) chargés (chargement partiel).`);
+      // Au début: recherche sur 100 (chargé). Puis re-render quand le reste arrive.
+      setMsg(`✅ ${ALL.length} item(s) chargés (partiel).`);
       render();
 
-      // 2) Charger le reste en arrière-plan si nécessaire
+      // 2) Charger le reste en arrière-plan
       if (data1.hasMore && data1.nextStart !== null) {
         let nextStart = data1.nextStart;
         const limit = 100;
@@ -298,10 +304,10 @@
           nextStart = d.hasMore ? d.nextStart : null;
         }
 
-        setMsg(`✅ ${ALL.length} item(s) chargés. (sync: ${new Date(data1.fetchedAt).toLocaleString('fr-FR')})`);
+        setMsg(`✅ ${ALL.length} item(s) chargés.`);
         render();
       } else {
-        setMsg(`✅ ${ALL.length} item(s) chargés. (sync: ${new Date(data1.fetchedAt).toLocaleString('fr-FR')})`);
+        setMsg(`✅ ${ALL.length} item(s) chargés.`);
         render();
       }
     }
@@ -310,7 +316,7 @@
       const q = norm($('q').value);
       const fNeed = $('filterNeed').value;
       const fType = $('filterType').value;
-      const fAxis = $('filterAxis').value; // ✅
+      const fAxis = $('filterAxis').value;
 
       const rows = ALL.filter(it => {
         if (fType !== 'all' && it.itemType !== fType) return false;
@@ -322,7 +328,7 @@
         if (fNeed === 'hal' && flags.hal_create !== 'yes') return false;
         if (fNeed === 'comms' && flags.comms_publish !== 'yes') return false;
 
-        // ✅ Filtre Axe
+        // Filtre Axe
         const axes = parseAxes(flags);
         const axisSel = String(fAxis || 'all').toUpperCase();
         if (axisSel !== 'ALL') {
@@ -411,6 +417,8 @@
           ? `<div class="axes">` + axes.map(a => `<span class="chip">${escapeHtml(a)}</span>`).join('') + `</div>`
           : '';
 
+        const authorsFull = it.creatorsText || '';
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td class="right">${escapeHtml(it.year || '')}</td>
@@ -422,7 +430,7 @@
             ${axesHtml}
           </td>
           <td class="authorsCol">
-            <div class="clamp" title="${escapeHtml(it.creatorsText || '')}">${escapeHtml(it.creatorsText || '')}</div>
+            <div class="clamp" title="${escapeHtml(authorsFull)}">${escapeHtml(authorsFull)}</div>
           </td>
 
           <td>
@@ -506,9 +514,11 @@
     $('logout').addEventListener('click', () => netlifyIdentity.logout());
     $('refresh').addEventListener('click', load);
 
-    // ✅ listeners robustes : reset page + render
-    $('q').addEventListener('input', () => { PAGE_INDEX = 0; render(); });
-    ['filterNeed','filterType','filterAxis'].forEach(id => $(id).addEventListener('change', () => { PAGE_INDEX = 0; render(); }));
+    // ✅ listeners : debounce sur recherche + reset page
+    $('q').addEventListener('input', () => { PAGE_INDEX = 0; debouncedRender(200); });
+    ['filterNeed','filterType','filterAxis'].forEach(id =>
+      $(id).addEventListener('change', () => { PAGE_INDEX = 0; render(); })
+    );
 
     // Pagination tableau
     $('pageSize').addEventListener('change', () => {
@@ -516,14 +526,8 @@
       PAGE_INDEX = 0;
       render();
     });
-    $('prevPage').addEventListener('click', () => {
-      PAGE_INDEX--;
-      render();
-    });
-    $('nextPage').addEventListener('click', () => {
-      PAGE_INDEX++;
-      render();
-    });
+    $('prevPage').addEventListener('click', () => { PAGE_INDEX--; render(); });
+    $('nextPage').addEventListener('click', () => { PAGE_INDEX++; render(); });
 
     netlifyIdentity.on('init', user => {
       showAuthedUI(!!user);
