@@ -1,12 +1,44 @@
 // netlify/functions/admin-items.js
+//
+// Endpoint admin (auth Netlify Identity)
+// - Pagination Zotero (100 max / page)
+// - Chargement progressif côté front
+// - Cache mémoire "warm function" (≈25s) pour éviter de re-puller 1500 items en boucle
+//
+// ⚠️ Pas de cache navigateur/proxy (endpoint admin)
 
+
+// =======================
+// Cache mémoire (warm)
+// =======================
+let __CACHE = {
+  at: 0,
+  key: '',
+  data: null
+};
+
+function getCache(key, ttlMs){
+  if (__CACHE.data && __CACHE.key === key && (Date.now() - __CACHE.at) < ttlMs) {
+    return __CACHE.data;
+  }
+  return null;
+}
+
+function setCache(key, data){
+  __CACHE = { at: Date.now(), key, data };
+}
+
+
+// =======================
+// Handler
+// =======================
 exports.handler = async (event) => {
   try {
     const user = await verifyIdentityUser(event);
     if (!user) return json(401, { error: 'Unauthorized (not logged in)' });
 
     const apiKey = process.env.ZOTERO_API_KEY;
-    const libraryType = process.env.ZOTERO_LIBRARY_TYPE; // 'users' ou 'groups'
+    const libraryType = process.env.ZOTERO_LIBRARY_TYPE; // 'users' | 'groups'
     const libraryId = process.env.ZOTERO_LIBRARY_ID;
 
     if (!apiKey || !libraryType || !libraryId) {
@@ -17,13 +49,16 @@ exports.handler = async (event) => {
     const start = qs.start !== undefined ? Math.max(0, parseInt(qs.start, 10) || 0) : null;
     const limitReq = qs.limit !== undefined ? (parseInt(qs.limit, 10) || 100) : null;
 
-    // Zotero max limit = 100
-    const limit = limitReq !== null ? Math.min(100, Math.max(1, limitReq)) : 100;
+    const limit = limitReq !== null
+      ? Math.min(100, Math.max(1, limitReq))
+      : 100;
 
-    // ✅ Mode "page" si start/limit fournis (un seul appel Zotero)
+    // =======================
+    // Mode PAGE (rapide)
+    // =======================
     if (start !== null || limitReq !== null) {
       const page = await fetchZoteroPage({ apiKey, libraryType, libraryId, start: start || 0, limit });
-      const filtered = mapItems(page.items);
+      const items = mapItems(page.items);
 
       return json(200, {
         fetchedAt: new Date().toISOString(),
@@ -33,32 +68,60 @@ exports.handler = async (event) => {
         totalResults: page.totalResults,
         hasMore: page.hasMore,
         nextStart: page.hasMore ? (page.start + page.items.length) : null,
-        items: filtered
+        items
       });
     }
 
-    // ✅ Mode "all" par défaut (compat: si ton admin.html appelle sans params)
-    const all = await fetchAllZoteroItems({ apiKey, libraryType, libraryId });
-    const filtered = mapItems(all);
+    // =======================
+    // Mode ALL (rare, compat)
+    // =======================
+    const CACHE_TTL = 25000; // 25s
+    const cacheKey = 'admin-items-all';
 
-    return json(200, { fetchedAt: new Date().toISOString(), mode: 'all', items: filtered });
+    const cached = getCache(cacheKey, CACHE_TTL);
+    if (cached) {
+      return json(200, { ...cached, cached: true });
+    }
+
+    const all = await fetchAllZoteroItems({ apiKey, libraryType, libraryId });
+    const items = mapItems(all);
+
+    const payload = {
+      fetchedAt: new Date().toISOString(),
+      mode: 'all',
+      items
+    };
+
+    setCache(cacheKey, payload);
+    return json(200, payload);
+
   } catch (err) {
+    console.error(err);
     return json(500, { error: 'Server error', message: err.message });
   }
 };
 
-function json(statusCode, obj) {
+
+// =======================
+// Helpers HTTP
+// =======================
+function json(statusCode, obj){
   return {
     statusCode,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
+      // ❌ pas de cache navigateur/proxy
       'Cache-Control': 'no-store'
     },
     body: JSON.stringify(obj)
   };
 }
 
-async function fetchZoteroPage({ apiKey, libraryType, libraryId, start, limit }) {
+
+// =======================
+// Zotero fetch helpers
+// =======================
+async function fetchZoteroPage({ apiKey, libraryType, libraryId, start, limit }){
   const url =
     `https://api.zotero.org/${libraryType}/${libraryId}/items` +
     `?limit=${limit}&start=${start}&sort=dateModified&direction=desc`;
@@ -72,7 +135,9 @@ async function fetchZoteroPage({ apiKey, libraryType, libraryId, start, limit })
   });
 
   const raw = await res.text();
-  if (!res.ok) throw new Error(`Zotero error HTTP ${res.status}: ${raw}`);
+  if (!res.ok) {
+    throw new Error(`Zotero error HTTP ${res.status}: ${raw}`);
+  }
 
   const items = JSON.parse(raw);
   const totalResults = parseInt(res.headers.get('Total-Results') || '', 10);
@@ -91,7 +156,7 @@ async function fetchZoteroPage({ apiKey, libraryType, libraryId, start, limit })
   };
 }
 
-async function fetchAllZoteroItems({ apiKey, libraryType, libraryId }) {
+async function fetchAllZoteroItems({ apiKey, libraryType, libraryId }){
   const limit = 100;
   let start = 0;
   const MAX_ITEMS = 10000;
@@ -111,22 +176,32 @@ async function fetchAllZoteroItems({ apiKey, libraryType, libraryId }) {
   return all;
 }
 
-function mapItems(zoteroWrappedItems) {
+
+// =======================
+// Mapping Zotero → Admin
+// =======================
+function mapItems(zoteroWrappedItems){
   return (zoteroWrappedItems || [])
     .map(z => z?.data)
     .filter(Boolean)
-    .filter(d => d.itemType === 'book' || d.itemType === 'bookSection' || d.itemType === 'journalArticle')
+    .filter(d =>
+      d.itemType === 'book' ||
+      d.itemType === 'bookSection' ||
+      d.itemType === 'journalArticle'
+    )
     .map(d => ({
       key: d.key,
       itemType: d.itemType,
       title: d.title || '',
       date: d.date || '',
       year: extractYear(d.date || ''),
+
       creatorsText: (d.creators || [])
         .filter(c => c && (c.creatorType === 'author' || c.creatorType === 'editor'))
         .map(c => `${(c.lastName || '').trim()} ${(c.firstName || '').trim()}`.trim())
         .filter(Boolean)
         .join(', '),
+
       bookTitle: d.bookTitle || '',
       publicationTitle: d.publicationTitle || d.journalAbbreviation || '',
       publisher: d.publisher || '',
@@ -136,16 +211,21 @@ function mapItems(zoteroWrappedItems) {
       volume: d.volume || '',
       issue: d.issue || '',
       pages: d.pages || '',
+
       flags: parseDLABFlags(d.extra || '')
     }));
 }
 
-function extractYear(dateStr) {
+function extractYear(dateStr){
   const m = String(dateStr || '').match(/\b(19|20)\d{2}\b/);
   return m ? m[0] : '';
 }
 
-function parseDLABFlags(extra) {
+
+// =======================
+// DLAB flags
+// =======================
+function parseDLABFlags(extra){
   const s = String(extra || '');
   const start = s.indexOf('[DLAB]');
   const end = s.indexOf('[/DLAB]');
@@ -153,33 +233,38 @@ function parseDLABFlags(extra) {
 
   const block = s.slice(start + 6, end).trim();
   const flags = {};
+
   block.split('\n').forEach(line => {
     const l = line.trim();
     if (!l || l.startsWith('#')) return;
     const idx = l.indexOf(':');
     if (idx === -1) return;
+
     const k = l.slice(0, idx).trim();
     const v = l.slice(idx + 1).trim().toLowerCase();
     if (!k) return;
+
     flags[k] = normalizeBool(v);
   });
+
   return flags;
 }
 
-function normalizeBool(v) {
+function normalizeBool(v){
   if (v === 'yes' || v === 'true' || v === 'oui') return 'yes';
   if (v === 'no' || v === 'false' || v === 'non') return 'no';
   return v;
 }
 
-/**
- * Vérifie le JWT Identity via GoTrue:
- * GET /.netlify/identity/user avec Authorization: Bearer <token>
- */
-async function verifyIdentityUser(event) {
+
+// =======================
+// Netlify Identity verify
+// =======================
+async function verifyIdentityUser(event){
   const auth = event.headers?.authorization || event.headers?.Authorization || '';
   const m = String(auth).match(/^Bearer\s+(.+)$/i);
   if (!m) return null;
+
   const token = m[1].trim();
   if (!token) return null;
 
