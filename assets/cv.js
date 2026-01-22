@@ -34,6 +34,10 @@
   const MD_KEY = 'dlab.cv.mdblocks.v1';
   const INLINE_KEY = 'dlab.cv.inline.v1'; // cvName / cvContact
 
+  // Publications cache (évite de recharger si on retouche uniquement les filtres)
+  let PUBS_CACHE = null;
+  let PUBS_FETCHED_AT = null;
+
   // ---------- Utils
   function setStatus(msg, ok = true) {
     if (!elStatus) return;
@@ -61,6 +65,28 @@
   function extractYear(dateStr) {
     const m = String(dateStr || '').match(/\b(19|20)\d{2}\b/);
     return m ? Number(m[0]) : null;
+  }
+
+  // ---------- Creators helpers (authors string)
+  function creatorsToText(creators) {
+    if (!Array.isArray(creators)) return '';
+    const names = creators
+      .filter(c => c && (c.creatorType === 'author' || c.creatorType === 'editor' || c.creatorType === 'presenter'))
+      .map(c => {
+        const fn = String(c.firstName || '').trim();
+        const ln = String(c.lastName || '').trim();
+        return (ln && fn) ? (ln + ' ' + fn) : (ln || fn);
+      })
+      .filter(Boolean);
+    return names.join(', ');
+  }
+
+  function hasFullNameQuery(q) {
+    const tokens = norm(q).split(' ').filter(Boolean);
+    if (tokens.length < 2) return false;
+    // évite de déclencher sur "a b" : au moins 2 caractères par token
+    if (tokens.some(t => t.length < 2)) return false;
+    return true;
   }
 
   function safeFilenameBase(name) {
@@ -120,120 +146,17 @@
     } catch {}
   }
 
-  // ---------- Markdown blocks (Option 2a)
-  function loadMdStore() {
-    try {
-      const raw = localStorage.getItem(MD_KEY);
-      return raw ? JSON.parse(raw) : {};
-    } catch {
-      return {};
-    }
-  }
-
-  function saveMdStore(store) {
-    try {
-      localStorage.setItem(MD_KEY, JSON.stringify(store));
-    } catch {}
-  }
-
-  function getDefaultMd(block) {
-    const d = block.getAttribute('data-md-default');
-    if (!d) return '';
-    return d
-      .replace(/&#10;/g, '\n')
-      .replace(/&quot;/g, '"')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>');
-  }
-
-  function initMdBlocks() {
-    const store = loadMdStore();
-
-    document.querySelectorAll('.mdblock[data-md-key]').forEach((block) => {
-      const key = block.getAttribute('data-md-key');
-      const edit = block.querySelector('.mdedit');
-      const preview = block.querySelector('.mdpreview');
-      const tabs = block.querySelectorAll('.mdtabs .tab');
-
-      if (!key || !edit || !preview) return;
-
-      const initial = (typeof store[key] === 'string') ? store[key] : getDefaultMd(block);
-
-      edit.value = initial;
-      preview.innerHTML = mdToHtml(initial);
-
-      function setMode(mode) {
-        tabs.forEach(t => {
-          const isActive = t.getAttribute('data-tab') === mode;
-          t.classList.toggle('active', isActive);
-        });
-
-        if (mode === 'edit') {
-          edit.hidden = false;
-          preview.hidden = true;
-          edit.focus();
-        } else {
-          preview.hidden = false;
-          edit.hidden = true;
-        }
-      }
-
-      // Default: preview
-      setMode('preview');
-
-      tabs.forEach((t) => {
-        t.addEventListener('click', () => {
-          const mode = t.getAttribute('data-tab');
-          if (mode === 'edit') setMode('edit');
-          else setMode('preview');
-        });
-      });
-
-      // Live render while typing (debounced)
-      let timer = null;
-      edit.addEventListener('input', () => {
-        const md = edit.value;
-        clearTimeout(timer);
-        timer = setTimeout(() => {
-          preview.innerHTML = mdToHtml(md);
-          store[key] = md;
-          saveMdStore(store);
-        }, 180);
-      });
-
-      // Save on blur
-      edit.addEventListener('blur', () => {
-        const md = edit.value;
-        preview.innerHTML = mdToHtml(md);
-        store[key] = md;
-        saveMdStore(store);
-      });
-    });
-  }
-
-  function saveAllMdBlocksNow() {
-    const store = loadMdStore();
-    document.querySelectorAll('.mdblock[data-md-key]').forEach((block) => {
-      const key = block.getAttribute('data-md-key');
-      const edit = block.querySelector('.mdedit');
-      if (!key || !edit) return;
-      store[key] = edit.value;
-    });
-    saveMdStore(store);
-  }
-
-  // ---------- Filters persistence
+  // ---------- Persist filters
   function loadFilters() {
     try {
       const raw = localStorage.getItem(FILTER_KEY);
       if (!raw) return;
-      const f = JSON.parse(raw);
-      if (typeof f.author === 'string') elAuthor.value = f.author;
-      if (typeof f.yearMin === 'string') elYearMin.value = f.yearMin;
-      if (typeof f.yearMax === 'string') elYearMax.value = f.yearMax;
-      if (typeof f.onlyPubs === 'string') elOnlyPubs.value = f.onlyPubs;
-      if (typeof f.sort === 'string') elSort.value = f.sort;
+      const obj = JSON.parse(raw);
+      if (elAuthor && typeof obj.author === 'string') elAuthor.value = obj.author;
+      if (elYearMin && typeof obj.yearMin === 'string') elYearMin.value = obj.yearMin;
+      if (elYearMax && typeof obj.yearMax === 'string') elYearMax.value = obj.yearMax;
+      if (elOnlyPubs && typeof obj.onlyPubs === 'string') elOnlyPubs.value = obj.onlyPubs;
+      if (elSort && typeof obj.sort === 'string') elSort.value = obj.sort;
     } catch {}
   }
 
@@ -251,20 +174,51 @@
 
   // ---------- Data fetch
   async function fetchPublicItems() {
-    const url = '/.netlify/functions/public-suivi';
-    const res = await fetch(url, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
-    const text = await res.text();
+    // ⚠️ On utilise la pagination (100/page) pour éviter un gros JSON d'un coup.
+    // Cette fonction est appelée uniquement quand l'utilisateur a saisi "Nom Prénom".
+    const limit = 100;
+    let start = 0;
+    const MAX_ITEMS = 10000;
 
-    if (!res.ok) throw new Error('Function public-suivi: HTTP ' + res.status + ' – ' + text.slice(0, 500));
+    const all = [];
+    let fetchedAt = new Date().toISOString();
+    let totalResults = null;
 
-    let json;
-    try { json = JSON.parse(text); }
-    catch { throw new Error('Réponse JSON invalide depuis public-suivi : ' + text.slice(0, 200)); }
+    while (true) {
+      const url = `/.netlify/functions/public-suivi?start=${start}&limit=${limit}`;
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
+      const text = await res.text();
 
-    if (Array.isArray(json)) return { items: json, fetchedAt: new Date().toISOString() };
-    if (json && Array.isArray(json.items)) return json;
+      if (!res.ok) throw new Error('Function public-suivi: HTTP ' + res.status + ' – ' + text.slice(0, 500));
 
-    throw new Error('Format inattendu depuis public-suivi (pas de items[]).');
+      let json;
+      try { json = JSON.parse(text); }
+      catch { throw new Error('Réponse JSON invalide depuis public-suivi : ' + text.slice(0, 200)); }
+
+      // compat ancien format
+      if (Array.isArray(json)) {
+        return { items: json, fetchedAt: new Date().toISOString() };
+      }
+
+      if (!json || !Array.isArray(json.items)) {
+        throw new Error('Format inattendu depuis public-suivi (pas de items[]).');
+      }
+
+      fetchedAt = json.fetchedAt || fetchedAt;
+      if (typeof json.totalResults === 'number') totalResults = json.totalResults;
+
+      all.push(...json.items);
+
+      const hasMore = !!json.hasMore;
+      const nextStart = (json.nextStart !== undefined && json.nextStart !== null) ? Number(json.nextStart) : null;
+
+      if (!hasMore || nextStart === null) break;
+
+      start = nextStart;
+      if (all.length >= MAX_ITEMS) break;
+    }
+
+    return { items: all, fetchedAt, totalResults };
   }
 
   // ---------- Filtering + sorting
@@ -298,9 +252,10 @@
     const hasMin = Number.isFinite(yMin);
     const hasMax = Number.isFinite(yMax);
     const onlyPubs = (elOnlyPubs.value || 'yes') === 'yes';
-    const sortMode = elSort.value || 'date_desc';
 
-    return (items || [])
+    const sort = elSort.value || 'date_desc';
+
+    const out = (items || [])
       .filter(it => it && typeof it === 'object')
       .filter(it => !onlyPubs || isPublicationType(it.itemType))
       .filter(it => matchAuthor(it.creatorsText || '', author))
@@ -310,8 +265,9 @@
         if (hasMax && (y === null || y > yMax)) return false;
         return true;
       })
-      .slice()
-      .sort((a, b) => compareItems(a, b, sortMode));
+      .sort((a, b) => compareItems(a, b, sort));
+
+    return out;
   }
 
   // ---------- Publications formatting (HTML)
@@ -330,102 +286,140 @@
     if (it === 'journalArticle') {
       const j = String(item.publicationTitle || '').trim();
       const vol = String(item.volume || '').trim();
-      const iss = String(item.issue || '').trim();
+      const issue = String(item.issue || '').trim();
       const pages = String(item.pages || '').trim();
-
-      let jPart = '';
-      if (j) jPart += '<em>' + escapeHtml(j) + '</em>';
-      const vPart = [vol, iss ? '(' + iss + ')' : ''].filter(Boolean).join('');
-      if (vPart) jPart += (jPart ? ', ' : '') + escapeHtml(vPart);
-      if (pages) jPart += (jPart ? ', ' : '') + 'p. ' + escapeHtml(pages);
-      if (jPart) parts.push(jPart + '.');
-
       const doi = String(item.doi || '').trim();
-      if (doi) parts.push('DOI: ' + escapeHtml(doi) + '.');
-    } else if (it === 'bookSection') {
-      const bt = String(item.bookTitle || '').trim();
-      const pages = String(item.pages || '').trim();
-      if (bt) {
-        let s = 'In <em>' + escapeHtml(bt) + '</em>';
-        if (pages) s += ', p. ' + escapeHtml(pages);
-        s += '.';
-        parts.push(s);
-      }
-      const pub = String(item.publisher || '').trim();
-      const place = String(item.place || '').trim();
-      const pp = [place, pub].filter(Boolean).join(' : ');
-      if (pp) parts.push(escapeHtml(pp) + '.');
+
+      const tail = [];
+      if (j) tail.push('<i>' + escapeHtml(j) + '</i>');
+      if (vol) tail.push('vol. ' + escapeHtml(vol));
+      if (issue) tail.push('n° ' + escapeHtml(issue));
+      if (pages) tail.push('pp. ' + escapeHtml(pages));
+      if (doi) tail.push('DOI: ' + escapeHtml(doi));
+
+      if (tail.length) parts.push(tail.join(', ') + '.');
     } else if (it === 'book') {
-      const pub = String(item.publisher || '').trim();
+      const publisher = String(item.publisher || '').trim();
       const place = String(item.place || '').trim();
-      const pp = [place, pub].filter(Boolean).join(' : ');
-      if (pp) parts.push(escapeHtml(pp) + '.');
+      const isbn = String(item.isbn || '').trim();
+      const tail = [];
+      if (place) tail.push(escapeHtml(place));
+      if (publisher) tail.push(escapeHtml(publisher));
+      if (isbn) tail.push('ISBN: ' + escapeHtml(isbn));
+      if (tail.length) parts.push(tail.join(', ') + '.');
+    } else if (it === 'bookSection') {
+      const bookTitle = String(item.bookTitle || '').trim();
+      const publisher = String(item.publisher || '').trim();
+      const place = String(item.place || '').trim();
+      const pages = String(item.pages || '').trim();
+      const isbn = String(item.isbn || '').trim();
+
+      const tail = [];
+      if (bookTitle) tail.push('Dans : <i>' + escapeHtml(bookTitle) + '</i>');
+      const ed = [];
+      if (place) ed.push(escapeHtml(place));
+      if (publisher) ed.push(escapeHtml(publisher));
+      if (ed.length) tail.push(ed.join(', '));
+      if (pages) tail.push('pp. ' + escapeHtml(pages));
+      if (isbn) tail.push('ISBN: ' + escapeHtml(isbn));
+
+      if (tail.length) parts.push(tail.join(', ') + '.');
     }
 
     return parts.join(' ');
   }
 
   function renderList(items) {
-    elPubList.innerHTML = '';
-    const frag = document.createDocumentFragment();
-    for (const it of items) {
-      const li = document.createElement('li');
-      li.innerHTML = formatOne(it);
-      frag.appendChild(li);
-    }
-    elPubList.appendChild(frag);
+    const list = elPubList;
+    if (!list) return;
 
-    const n = items.length;
-    elPubCount.textContent = n + (n > 1 ? ' références' : ' référence');
+    const arr = Array.isArray(items) ? items : [];
+    list.innerHTML = arr.map(it => `<li>${formatOne(it)}</li>`).join('');
+
+    if (elPubCount) {
+      const n = arr.length;
+      elPubCount.textContent = n + (n <= 1 ? ' référence' : ' références');
+    }
   }
 
-  // ---------- Build export clone with Markdown preview applied
-  function buildExportClone() {
-    const clone = elCvRoot.cloneNode(true);
+  // ---------- Markdown blocks (edit/preview)
+  function readMdState() {
+    try {
+      const raw = localStorage.getItem(MD_KEY);
+      if (!raw) return {};
+      const obj = JSON.parse(raw);
+      return (obj && typeof obj === 'object') ? obj : {};
+    } catch {
+      return {};
+    }
+  }
 
-    // Replace mdblocks by preview content only (remove tabs + textarea)
-    clone.querySelectorAll('.mdblock').forEach((b) => {
-      const prev = b.querySelector('.mdpreview');
-      const edit = b.querySelector('.mdedit');
-      const tabs = b.querySelector('.mdtabs');
-      if (tabs) tabs.remove();
-      if (edit) edit.remove();
-      if (prev) prev.hidden = false;
+  function writeMdState(state) {
+    try {
+      localStorage.setItem(MD_KEY, JSON.stringify(state || {}));
+    } catch {}
+  }
 
-      b.style.border = 'none';
-      b.style.padding = '0';
+  function initMdBlocks() {
+    const blocks = document.querySelectorAll('[data-mdblock]');
+    const state = readMdState();
+
+    blocks.forEach((wrap) => {
+      const key = wrap.getAttribute('data-mdblock');
+      const textarea = wrap.querySelector('textarea.mdedit');
+      const preview = wrap.querySelector('.mdpreview');
+      const toggle = wrap.querySelector('button.mdtoggle');
+
+      if (!key || !textarea || !preview) return;
+
+      if (typeof state[key] === 'string') textarea.value = state[key];
+
+      const renderPreview = () => { preview.innerHTML = mdToHtml(textarea.value || ''); };
+      renderPreview();
+
+      // Toggle edit/preview
+      toggle?.addEventListener('click', () => {
+        const isHidden = textarea.hasAttribute('hidden');
+        if (isHidden) {
+          textarea.removeAttribute('hidden');
+          toggle.textContent = 'Aperçu';
+        } else {
+          textarea.setAttribute('hidden', '');
+          toggle.textContent = 'Éditer';
+          renderPreview();
+        }
+      });
+
+      textarea.addEventListener('input', () => { renderPreview(); });
+    });
+  }
+
+  function saveAllMdBlocksNow() {
+    const blocks = document.querySelectorAll('[data-mdblock]');
+    const state = readMdState();
+
+    blocks.forEach((wrap) => {
+      const key = wrap.getAttribute('data-mdblock');
+      const textarea = wrap.querySelector('textarea.mdedit');
+      if (!key || !textarea) return;
+      state[key] = textarea.value || '';
     });
 
-    // Remove pills in exports
-    clone.querySelectorAll('.pill').forEach(n => n.remove());
-
-    return clone;
+    writeMdState(state);
   }
 
   // ---------- Export HTML
-  function buildStandaloneHtmlFromClone(clone) {
-    const name = ($('#cvName')?.textContent || 'CV').trim();
-    const styles = document.querySelector('style')?.textContent || '';
-    return `<!doctype html>
-<html lang="fr">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${escapeHtml(name)} – CV</title>
-  <style>${styles}</style>
-</head>
-<body>
-  <div class="page">${clone.outerHTML}</div>
-</body>
-</html>`;
-  }
-
   function exportHtml() {
     try {
-      const clone = buildExportClone();
-      const html = buildStandaloneHtmlFromClone(clone);
-      const name = ($('#cvName')?.textContent || 'cv').trim();
-      downloadBlob(new Blob([html], { type: 'text/html;charset=utf-8' }), safeFilenameBase(name) + '.html');
+      saveAllMdBlocksNow();
+      saveInline();
+      setStatus('⏳ Génération HTML…');
+
+      const html = '<!doctype html>\n' + document.documentElement.outerHTML;
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const name = $('#cvName')?.textContent || 'cv';
+      downloadBlob(blob, safeFilenameBase(name) + '.html');
+
       setStatus('✅ Export HTML généré.');
     } catch (e) {
       setStatus('❌ Export HTML impossible : ' + (e?.message || e), false);
@@ -433,241 +427,177 @@
     }
   }
 
-  // ---------- Export PDF (html2pdf) — FIX page blanche
+  // ---------- Export PDF
   async function exportPdf() {
-    let wrap = null;
     try {
-      if (!window.html2pdf) {
-        setStatus('❌ Export PDF impossible : html2pdf.js ne s’est pas chargé (CDN bloqué ?).', false);
-        return;
-      }
-      if (!elCvRoot) {
-        setStatus('❌ Export PDF impossible : zone CV introuvable (#cvRoot).', false);
-        return;
-      }
+      saveAllMdBlocksNow();
+      saveInline();
+      setStatus('⏳ Génération PDF…');
 
-      setStatus('⏳ Génération du PDF…');
+      if (!window.html2pdf) throw new Error('html2pdf.js introuvable (CDN).');
 
-      const clone = buildExportClone();
-      clone.style.border = 'none';
-      clone.style.borderRadius = '0';
-      clone.style.padding = '0';
-      clone.style.background = '#fff';
-      clone.style.boxShadow = 'none';
-
-      // Avoid breaks inside publication items
-      clone.querySelectorAll('#pubList li').forEach(li => {
-        li.style.breakInside = 'avoid';
-        li.style.pageBreakInside = 'avoid';
-      });
-
-      // Wrapper in viewport but invisible (avoid blank canvas)
-      wrap = document.createElement('div');
-      wrap.style.position = 'absolute';
-      wrap.style.left = '0';
-      wrap.style.top = '0';
-      wrap.style.width = '794px';
-      wrap.style.padding = '24px';
-      wrap.style.background = '#fff';
-      wrap.style.opacity = '0';
-      wrap.style.pointerEvents = 'none';
-      wrap.style.zIndex = '-1';
-      wrap.appendChild(clone);
-      document.body.appendChild(wrap);
-
-      // let browser paint
-      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-      const name = ($('#cvName')?.textContent || 'CV').trim();
-      const filename = safeFilenameBase(name) + '.pdf';
-
+      const name = $('#cvName')?.textContent || 'cv';
       const opt = {
-        margin: [10, 10, 12, 10], // mm
-        filename,
+        margin: [8, 8, 8, 8],
+        filename: safeFilenameBase(name) + '.pdf',
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, backgroundColor: '#fff', useCORS: true, logging: false },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
+
+      // Clone to avoid UI buttons etc.
+      const clone = elCvRoot ? elCvRoot.cloneNode(true) : document.body.cloneNode(true);
+
+      // Remove controls in clone
+      clone.querySelectorAll('.controls, .adminbar, button, .mdtoggle').forEach(n => n.remove());
+      // Ensure textareas replaced by preview
+      clone.querySelectorAll('textarea.mdedit').forEach(n => n.remove());
 
       await window.html2pdf().set(opt).from(clone).save();
 
-      setStatus('✅ PDF généré.');
+      setStatus('✅ Export PDF généré.');
     } catch (e) {
       setStatus('❌ Export PDF impossible : ' + (e?.message || e), false);
       console.error('[CV] exportPdf error:', e);
-    } finally {
-      try { if (wrap && wrap.remove) wrap.remove(); } catch {}
     }
   }
 
-  // ---------- Export DOCX (docx) — Preserve Markdown formatting for text blocks
+  // ---------- DOCX helpers: inline markdown -> docx runs
+  function splitMarkdownBlocks(md) {
+    const lines = String(md || '').split('\n');
+    const blocks = [];
+    let buf = [];
+
+    const flushPara = () => {
+      if (!buf.length) return;
+      blocks.push({ type: 'para', text: buf.join('\n') });
+      buf = [];
+    };
+
+    for (const line of lines) {
+      const l = line.trim();
+
+      // headings
+      const h = l.match(/^(#{1,3})\s+(.*)$/);
+      if (h) {
+        flushPara();
+        blocks.push({ type: 'heading', level: h[1].length, text: h[2] });
+        continue;
+      }
+
+      // bullets
+      const b = l.match(/^[-*]\s+(.*)$/);
+      if (b) {
+        flushPara();
+        blocks.push({ type: 'bullet', text: b[1] });
+        continue;
+      }
+
+      buf.push(line);
+    }
+
+    flushPara();
+    return blocks;
+  }
+
+  function runsFromInlineMarkdown(text) {
+    // Supports **bold**, *italic*, and [link](url) (very small subset)
+    const { TextRun, ExternalHyperlink } = window.docx || {};
+    if (!TextRun) return [];
+
+    const s = String(text || '');
+
+    // Tokenize links first
+    const linkRe = /\[([^\]]+)\]\(([^)]+)\)/g;
+    let last = 0;
+    const parts = [];
+    for (let m; (m = linkRe.exec(s)); ) {
+      if (m.index > last) parts.push({ type: 'text', value: s.slice(last, m.index) });
+      parts.push({ type: 'link', label: m[1], url: m[2] });
+      last = m.index + m[0].length;
+    }
+    if (last < s.length) parts.push({ type: 'text', value: s.slice(last) });
+
+    const out = [];
+
+    const pushInline = (chunk) => {
+      // parse **bold** and *italic* in plain text chunk
+      const re = /(\*\*[^*]+\*\*|\*[^*]+\*)/g;
+      let i = 0;
+      let m;
+      while ((m = re.exec(chunk))) {
+        if (m.index > i) out.push(new TextRun({ text: chunk.slice(i, m.index) }));
+        const token = m[0];
+        if (token.startsWith('**')) {
+          out.push(new TextRun({ text: token.slice(2, -2), bold: true }));
+        } else if (token.startsWith('*')) {
+          out.push(new TextRun({ text: token.slice(1, -1), italics: true }));
+        }
+        i = m.index + token.length;
+      }
+      if (i < chunk.length) out.push(new TextRun({ text: chunk.slice(i) }));
+    };
+
+    for (const p of parts) {
+      if (p.type === 'text') {
+        pushInline(p.value);
+      } else if (p.type === 'link' && ExternalHyperlink) {
+        out.push(new ExternalHyperlink({
+          link: p.url,
+          children: [new TextRun({ text: p.label, style: 'Hyperlink' })]
+        }));
+      } else if (p.type === 'link') {
+        pushInline(p.label + ' (' + p.url + ')');
+      }
+    }
+
+    return out;
+  }
+
   async function exportDocx() {
     try {
-      if (!window.docx || !window.docx.Document) {
-        setStatus('❌ La bibliothèque DOCX ne s’est pas chargée (CDN bloqué ?).', false);
-        return;
-      }
+      saveAllMdBlocksNow();
+      saveInline();
+      setStatus('⏳ Génération DOCX…');
 
-      const { Document, Packer, Paragraph, TextRun, HeadingLevel } = window.docx;
+      const docx = window.docx;
+      if (!docx) throw new Error('docx (CDN) introuvable.');
 
-      const name = ($('#cvName')?.textContent || 'Nom Prénom').trim();
-      const contact = ($('#cvContact')?.textContent || '').trim();
+      const { Document, Packer, Paragraph, TextRun, HeadingLevel } = docx;
 
-      const mdStore = loadMdStore();
-      function mdText(key) {
-        if (typeof mdStore[key] === 'string') return mdStore[key].trim();
-        const b = document.querySelector(`.mdblock[data-md-key="${CSS.escape(key)}"]`);
-        const t = b?.querySelector('.mdedit');
-        return (t?.value || '').trim();
-      }
-
-      function mdToLinesPreserveMarkdown(md) {
-        // Remove fenced code blocks; keep inline markdown
-        let t = String(md || '').replace(/\r/g, '');
-        t = t.replace(/`{3}[\s\S]*?`{3}/g, '');
-        return t.split('\n');
-      }
-
-      function paragraphsFromMd(md) {
-        const lines = mdToLinesPreserveMarkdown(md).map(x => x.trim());
-        const paras = [];
-
-        for (const line of lines) {
-          if (!line) continue;
-
-          // Bullet "- item" or "* item"
-          const m = line.match(/^[-*]\s+(.*)$/);
-          if (m) {
-            paras.push({ type: 'bullet', text: m[1] });
-            continue;
-          }
-
-          // Headings "#", "##", "###"
-          const h = line.match(/^(#{1,3})\s+(.*)$/);
-          if (h) {
-            paras.push({ type: 'heading', level: h[1].length, text: h[2] });
-            continue;
-          }
-
-          paras.push({ type: 'p', text: line });
-        }
-
-        return paras;
-      }
-
-      function runsFromInlineMarkdown(text) {
-        // Parse simple inline markdown: **bold**, *italic*, `code`, [label](url)
-        const src = String(text || '');
-        const runs = [];
-
-        const push = (t, opts = {}) => {
-          if (!t) return;
-          runs.push(new TextRun({ text: t, ...opts }));
-        };
-
-        let i = 0;
-        while (i < src.length) {
-          // Link [label](url)
-          if (src[i] === '[') {
-            const close = src.indexOf(']', i + 1);
-            const openPar = src.indexOf('(', close + 1);
-            const closePar = src.indexOf(')', openPar + 1);
-            if (close !== -1 && openPar === close + 1 && closePar !== -1) {
-              const label = src.slice(i + 1, close);
-              const url = src.slice(openPar + 1, closePar);
-              push(label, { underline: {} });
-              push(` (${url})`);
-              i = closePar + 1;
-              continue;
-            }
-          }
-
-          // Bold **text**
-          if (src[i] === '*' && src[i + 1] === '*') {
-            const end = src.indexOf('**', i + 2);
-            if (end !== -1) {
-              const inner = src.slice(i + 2, end);
-              push(inner, { bold: true });
-              i = end + 2;
-              continue;
-            }
-          }
-
-          // Italic *text*
-          if (src[i] === '*') {
-            const end = src.indexOf('*', i + 1);
-            if (end !== -1) {
-              const inner = src.slice(i + 1, end);
-              push(inner, { italics: true });
-              i = end + 1;
-              continue;
-            }
-          }
-
-          // Inline code `code`
-          if (src[i] === '`') {
-            const end = src.indexOf('`', i + 1);
-            if (end !== -1) {
-              const inner = src.slice(i + 1, end);
-              push(inner, { font: 'Courier New' });
-              i = end + 1;
-              continue;
-            }
-          }
-
-          // Default: consume until next special token
-          const nextCandidates = [];
-          const n1 = src.indexOf('[', i);
-          if (n1 !== -1) nextCandidates.push(n1);
-          const n2 = src.indexOf('**', i);
-          if (n2 !== -1) nextCandidates.push(n2);
-          const n3 = src.indexOf('*', i);
-          if (n3 !== -1) nextCandidates.push(n3);
-          const n4 = src.indexOf('`', i);
-          if (n4 !== -1) nextCandidates.push(n4);
-
-          const next = nextCandidates.length ? Math.min(...nextCandidates) : -1;
-
-          if (next === -1) {
-            push(src.slice(i));
-            break;
-          } else if (next === i) {
-            push(src[i]);
-            i += 1;
-          } else {
-            push(src.slice(i, next));
-            i = next;
-          }
-        }
-
-        return runs;
-      }
-
-      const sections = [
-        { title: 'Présentation', parts: paragraphsFromMd(mdText('cv.presentation')) },
-        { title: 'Titres et fonctions', parts: paragraphsFromMd(mdText('cv.titles')) },
-        { title: 'Principaux diplômes', parts: paragraphsFromMd(mdText('cv.degrees')) },
-        {
-          title: 'Productions principales en recherche',
-          parts: (elPubList?.innerText || '').split('\n').map(x => x.trim()).filter(Boolean).map(t => ({ type: 'p', text: t }))
-        },
-        { title: 'Investissement pédagogique et diffusion de la connaissance', parts: paragraphsFromMd(mdText('cv.teaching')) },
-      ];
+      const name = $('#cvName')?.textContent || 'CV';
+      const contact = $('#cvContact')?.textContent || '';
 
       const children = [];
-      children.push(new Paragraph({ text: name, heading: HeadingLevel.TITLE }));
-      if (contact) children.push(new Paragraph({ children: [new TextRun({ text: contact })] }));
+
+      // Header
+      children.push(new Paragraph({
+        text: name,
+        heading: HeadingLevel.HEADING_1
+      }));
+      if (contact) {
+        children.push(new Paragraph({
+          children: [new TextRun({ text: contact })]
+        }));
+      }
       children.push(new Paragraph({ text: ' ' }));
 
-      for (const s of sections) {
-        if (!s.parts || s.parts.length === 0) continue;
+      // Markdown blocks (in order)
+      const blocks = document.querySelectorAll('[data-mdblock]');
+      const state = readMdState();
 
-        children.push(new Paragraph({ text: s.title, heading: HeadingLevel.HEADING_2 }));
+      for (const wrap of blocks) {
+        const key = wrap.getAttribute('data-mdblock');
+        const title = wrap.querySelector('h3')?.textContent || '';
+        const md = (key && typeof state[key] === 'string') ? state[key] : (wrap.querySelector('textarea.mdedit')?.value || '');
 
-        for (const part of s.parts) {
-          if (!part) continue;
+        if (title) {
+          children.push(new Paragraph({ text: title, heading: HeadingLevel.HEADING_2 }));
+        }
 
+        const parts = splitMarkdownBlocks(md);
+
+        for (const part of parts) {
           if (part.type === 'bullet') {
             children.push(new Paragraph({
               children: runsFromInlineMarkdown(part.text),
@@ -690,6 +620,15 @@
         children.push(new Paragraph({ text: ' ' }));
       }
 
+      // Publications as list
+      const pubs = Array.from(elPubList?.querySelectorAll('li') || []).map(li => li.textContent || '').filter(Boolean);
+      if (pubs.length) {
+        children.push(new Paragraph({ text: 'Productions principales en recherche', heading: HeadingLevel.HEADING_2 }));
+        for (const p of pubs) {
+          children.push(new Paragraph({ text: p, bullet: { level: 0 } }));
+        }
+      }
+
       const doc = new Document({ sections: [{ properties: {}, children }] });
       const blob = await Packer.toBlob(doc);
       downloadBlob(blob, safeFilenameBase(name) + '.docx');
@@ -701,17 +640,44 @@
   }
 
   // ---------- Refresh
-  async function refresh() {
+  async function refresh(force = false) {
     saveFilters();
-    setStatus('⏳ Récupération des publications…');
+
+    const authorQuery = elAuthor?.value || '';
+    if (!hasFullNameQuery(authorQuery)) {
+      // ✅ Pas de chargement tant qu'on n'a pas "Nom Prénom"
+      if (elPubList) {
+        elPubList.innerHTML = '<li style="color:var(--muted)">' +
+          'Tapez <b>Nom Prénom</b> dans le filtre <b>Auteur</b> pour charger les publications.' +
+          '</li>';
+      }
+      if (elPubCount) elPubCount.textContent = '—';
+      if (elMeta) elMeta.textContent = '';
+      setStatus('ℹ️ Publications non chargées (saisir Nom + Prénom dans Auteur).');
+      return;
+    }
+
+    setStatus('⏳ Chargement des publications…');
 
     try {
       if (btnRefresh) btnRefresh.disabled = true;
 
-      const payload = await fetchPublicItems();
-      const items = Array.isArray(payload.items) ? payload.items : [];
-      const filtered = applyFilters(items);
+      // ✅ charge Zotero une seule fois (ou si force=true)
+      if (force || !PUBS_CACHE) {
+        const payload = await fetchPublicItems();
+        const items = Array.isArray(payload.items) ? payload.items : [];
 
+        // ✅ réinjecte creatorsText si l’API ne le fournit pas
+        PUBS_CACHE = items.map(it => ({
+          ...it,
+          creatorsText: (it && typeof it === 'object')
+            ? (it.creatorsText || creatorsToText(it.creators || []))
+            : ''
+        }));
+        PUBS_FETCHED_AT = payload.fetchedAt || new Date().toISOString();
+      }
+
+      const filtered = applyFilters(PUBS_CACHE);
       renderList(filtered);
 
       if (elMeta) elMeta.textContent = 'MAJ: ' + nowFr() + ' · source: Zotero';
@@ -740,7 +706,7 @@
   }
 
   // ---------- Events
-  btnRefresh?.addEventListener('click', refresh);
+  btnRefresh?.addEventListener('click', () => refresh(true));
   btnSaveText?.addEventListener('click', saveAllTexts);
   btnExportHtml?.addEventListener('click', exportHtml);
   btnExportPdf?.addEventListener('click', exportPdf);
@@ -751,7 +717,23 @@
   const schedule = () => {
     saveFilters();
     clearTimeout(t);
-    t = setTimeout(() => refresh(), 250);
+    t = setTimeout(() => {
+      const authorQuery = elAuthor?.value || '';
+      if (!hasFullNameQuery(authorQuery)) {
+        // Pas de fetch : on affiche juste un hint + vide
+        if (elPubList) {
+          elPubList.innerHTML = '<li style="color:var(--muted)">' +
+            'Tapez <b>Nom Prénom</b> dans le filtre <b>Auteur</b> pour charger les publications.' +
+            '</li>';
+        }
+        if (elPubCount) elPubCount.textContent = '—';
+        if (elMeta) elMeta.textContent = '';
+        setStatus('ℹ️ Publications non chargées (saisir Nom + Prénom dans Auteur).');
+        return;
+      }
+      // Auteur OK : on applique filtres (et charge si besoin)
+      refresh(false);
+    }, 250);
   };
   [elAuthor, elYearMin, elYearMax, elOnlyPubs, elSort].forEach((el) => {
     el?.addEventListener('input', schedule);
