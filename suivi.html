@@ -90,6 +90,17 @@
     .dot:nth-child(2){animation-delay:.15s}
     .dot:nth-child(3){animation-delay:.3s}
     @keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
+
+    /* ✅ Auteurs : clamp pour éviter que la colonne explose */
+    td.authorsCol{max-width:220px;}
+    td.authorsCol .clamp{
+      display:-webkit-box;
+      -webkit-line-clamp:2; /* 2 lignes max */
+      -webkit-box-orient:vertical;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      word-break:break-word;
+    }
   </style>
 </head>
 <body>
@@ -191,6 +202,25 @@
           </td></tr>
         </tbody>
       </table>
+
+      <!-- ✅ Pagination tableau (après filtrage) -->
+      <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:10px">
+        <div class="pill" id="pagerInfo">Page —</div>
+
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <label class="pill" style="gap:6px">
+            Lignes/page
+            <select id="pageSize" style="padding:6px 8px;border-radius:10px">
+              <option value="25" selected>25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </label>
+
+          <button class="ghost" id="prevPage">◀ Précédent</button>
+          <button class="ghost" id="nextPage">Suivant ▶</button>
+        </div>
+      </div>
     </div>
 
     <p class="sub" style="margin-top:12px">
@@ -204,6 +234,10 @@
     let ALL = [];
     let VIEW = [];
     let CHARTS = { year:null, split:null, status:null };
+
+    // ✅ Pagination du tableau
+    let PAGE_INDEX = 0;
+    let PAGE_SIZE = 25;
 
     const $ = (id) => document.getElementById(id);
 
@@ -333,6 +367,23 @@
       });
     }
 
+    function clampPageIndex(){
+      const totalPages = Math.max(1, Math.ceil(VIEW.length / PAGE_SIZE));
+      if (PAGE_INDEX >= totalPages) PAGE_INDEX = totalPages - 1;
+      if (PAGE_INDEX < 0) PAGE_INDEX = 0;
+      return totalPages;
+    }
+
+    function updatePagerUI(){
+      const totalPages = clampPageIndex();
+      const from = VIEW.length ? (PAGE_INDEX * PAGE_SIZE + 1) : 0;
+      const to = Math.min(VIEW.length, (PAGE_INDEX + 1) * PAGE_SIZE);
+
+      $('pagerInfo').textContent = `Page ${PAGE_INDEX + 1}/${totalPages} — ${from}-${to} / ${VIEW.length}`;
+      $('prevPage').disabled = PAGE_INDEX <= 0;
+      $('nextPage').disabled = PAGE_INDEX >= (totalPages - 1);
+    }
+
     function render(){
       const q = norm($('q').value);
       const fType = $('filterType').value;
@@ -393,6 +444,7 @@
       tbody.innerHTML = '';
 
       if (!VIEW.length){
+        updatePagerUI();
         tbody.innerHTML = `<tr><td colspan="7" class="muted">Aucun résultat avec ces filtres.</td></tr>`;
         return;
       }
@@ -404,7 +456,13 @@
         return (b.date || '').localeCompare(a.date || '');
       });
 
-      for (const it of VIEW){
+      // ✅ Pagination table (après tri)
+      updatePagerUI();
+      const startIdx = PAGE_INDEX * PAGE_SIZE;
+      const endIdx = startIdx + PAGE_SIZE;
+      const pageItems = VIEW.slice(startIdx, endIdx);
+
+      for (const it of pageItems){
         const st = statusFor(it);
         const hal = tagYesNo(it.flags?.hal_create);
         const comms = tagYesNo(it.flags?.comms_publish);
@@ -433,12 +491,16 @@
           ? `<div class="axes">` + axes.map(a => `<span class="chip">${escapeHtml(a)}</span>`).join('') + `</div>`
           : '';
 
+        const authorsFull = it.creatorsText || '';
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td class="right">${escapeHtml(it.year || '')}</td>
           <td><span class="tag">${escapeHtml(typeLabel(it.itemType))}</span></td>
           <td class="title">${titleHtml}${extraMini}${axesHtml}</td>
-          <td>${escapeHtml(it.creatorsText || '')}</td>
+          <td class="authorsCol">
+            <div class="clamp" title="${escapeHtml(authorsFull)}">${escapeHtml(authorsFull)}</div>
+          </td>
           <td><span class="tag ${hal.cls}">${escapeHtml(halTxt)}</span></td>
           <td><span class="tag ${comms.cls}">${escapeHtml(commTxt)}</span></td>
           <td><span class="tag ${st.cls}">${escapeHtml(st.txt)}</span></td>
@@ -464,21 +526,22 @@
       sel.value = years.includes(cur) ? cur : 'all';
     }
 
+    // ✅ Chargement progressif: affiche vite 100 items puis charge le reste en arrière-plan
     async function load(){
       $('msg').textContent = '';
       $('rows').innerHTML = `<tr><td colspan="7"><span class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span> Chargement des données…</span></td></tr>`;
 
       try{
-        const r = await fetch('/.netlify/functions/public-suivi', { cache: 'no-store' });
-        const data = await r.json();
+        const first = await fetch('/.netlify/functions/public-suivi?start=0&limit=100', { cache: 'no-store' });
+        const data1 = await first.json();
 
-        if (!r.ok) {
+        if (!first.ok) {
           $('msg').textContent = 'Erreur de chargement.';
           $('rows').innerHTML = `<tr><td colspan="7" class="muted">Erreur côté serveur.</td></tr>`;
           return;
         }
 
-        ALL = (data.items || []).map(it => {
+        ALL = (data1.items || []).map(it => {
           const y = it.year || yearFromDate(it.date);
           return {
             ...it,
@@ -489,10 +552,45 @@
 
         fillYears(ALL);
 
-        const ts = data.fetchedAt ? new Date(data.fetchedAt) : new Date();
+        const ts = data1.fetchedAt ? new Date(data1.fetchedAt) : new Date();
         $('lastUpdate').textContent = `Dernière mise à jour : ${ts.toLocaleString('fr-FR')}`;
 
+        PAGE_INDEX = 0;
+        PAGE_SIZE = parseInt($('pageSize').value, 10) || 25;
         render();
+
+        // arrière-plan : charger toutes les pages restantes
+        if (data1.hasMore && data1.nextStart !== null) {
+          $('msg').textContent = `Chargement du reste… (${ALL.length}/${data1.totalResults || '…'})`;
+
+          let nextStart = data1.nextStart;
+          const limit = 100;
+
+          while (nextStart !== null) {
+            const r = await fetch(`/.netlify/functions/public-suivi?start=${nextStart}&limit=${limit}`, { cache: 'no-store' });
+            const d = await r.json();
+            if (!r.ok) break;
+
+            const more = (d.items || []).map(it => {
+              const y = it.year || yearFromDate(it.date);
+              return {
+                ...it,
+                year: y || '',
+                creatorsText: it.creatorsText || joinCreators(it.creators || []),
+              };
+            });
+
+            ALL.push(...more);
+            $('msg').textContent = `Chargement du reste… (${ALL.length}/${d.totalResults || '…'})`;
+
+            nextStart = d.hasMore ? d.nextStart : null;
+          }
+
+          fillYears(ALL);
+          $('msg').textContent = '';
+          render();
+        }
+
       } catch(err){
         console.error(err);
         $('msg').textContent = 'Erreur réseau.';
@@ -500,9 +598,11 @@
       }
     }
 
-    // ✅ listeners robustes : input pour champ texte, change pour selects
-    $('q').addEventListener('input', render);
-    ['filterType','filterNeeds','filterAxis','filterYear'].forEach(id => $(id).addEventListener('change', render));
+    // ✅ listeners robustes + reset page
+    $('q').addEventListener('input', () => { PAGE_INDEX = 0; render(); });
+    ['filterType','filterNeeds','filterAxis','filterYear'].forEach(id =>
+      $(id).addEventListener('change', () => { PAGE_INDEX = 0; render(); })
+    );
 
     $('reset').addEventListener('click', () => {
       $('q').value = '';
@@ -510,10 +610,28 @@
       $('filterNeeds').value = 'all';
       $('filterAxis').value = 'all';
       $('filterYear').value = 'all';
+      PAGE_INDEX = 0;
       render();
     });
 
     $('refresh').addEventListener('click', load);
+
+    // Pagination UI
+    $('pageSize').addEventListener('change', () => {
+      PAGE_SIZE = parseInt($('pageSize').value, 10) || 25;
+      PAGE_INDEX = 0;
+      render();
+    });
+
+    $('prevPage').addEventListener('click', () => {
+      PAGE_INDEX--;
+      render();
+    });
+
+    $('nextPage').addEventListener('click', () => {
+      PAGE_INDEX++;
+      render();
+    });
 
     load();
   </script>
