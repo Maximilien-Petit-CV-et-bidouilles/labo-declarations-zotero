@@ -3,6 +3,8 @@
 //
 // - Mode "page" si start/limit sont fournis (plus rapide)
 // - Mode "all" (par défaut) : récupère tout (pagination interne)
+//
+// ✅ Optimisation perf : cache HTTP court (60s) pour éviter de re-puller 1500 items à chaque visite
 
 exports.handler = async (event) => {
   try {
@@ -21,7 +23,7 @@ exports.handler = async (event) => {
     // Zotero max=100
     const limit = limitReq !== null ? Math.min(100, Math.max(1, limitReq)) : 100;
 
-    // Si start/limit fournis => mode "page" (1 seul appel Zotero)
+    // ✅ Mode "page" si start/limit fournis => un seul appel Zotero
     if (start !== null || limitReq !== null) {
       const page = await fetchZoteroPage({ apiKey, libraryType, libraryId, start: start || 0, limit });
       const items = mapItems(page.items, libraryType, libraryId);
@@ -39,7 +41,7 @@ exports.handler = async (event) => {
       });
     }
 
-    // Sinon => mode "all" (comme avant)
+    // ✅ Mode "all" (compat)
     const all = await fetchAllZoteroItems({ apiKey, libraryType, libraryId });
     const items = mapItems(all, libraryType, libraryId);
 
@@ -59,7 +61,10 @@ function json(statusCode, obj) {
     statusCode,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      "Cache-Control": "no-store",
+      // ✅ cache court (page publique interne)
+      // stale-while-revalidate : Netlify/CDN peut servir une version encore fraîche
+      // pendant qu'il récupère la nouvelle (meilleure UX sur gros volumes)
+      "Cache-Control": "public, max-age=60, stale-while-revalidate=60",
     },
     body: JSON.stringify(obj),
   };
@@ -83,7 +88,7 @@ async function fetchZoteroPage({ apiKey, libraryType, libraryId, start, limit })
 
   const items = JSON.parse(raw);
 
-  // Zotero renvoie souvent Total-Results
+  // Total-Results (souvent présent)
   const totalResults = parseInt(res.headers.get("Total-Results") || "", 10);
   const total = Number.isFinite(totalResults) ? totalResults : null;
 
@@ -109,11 +114,12 @@ async function fetchAllZoteroItems({ apiKey, libraryType, libraryId }) {
   while (true) {
     const page = await fetchZoteroPage({ apiKey, libraryType, libraryId, start, limit });
     if (!page.items.length) break;
+
     all.push(...page.items);
 
     if (!page.hasMore) break;
-    start += page.items.length;
 
+    start += page.items.length;
     if (all.length >= MAX_ITEMS) break;
   }
 
@@ -172,6 +178,7 @@ function parseDLABFlags(extra) {
 
     const key = l.slice(0, idx).trim();
     let val = l.slice(idx + 1).trim();
+
     if (!key) return;
 
     const low = val.toLowerCase();
