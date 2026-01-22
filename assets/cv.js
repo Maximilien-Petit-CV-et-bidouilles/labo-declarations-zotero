@@ -4,7 +4,9 @@
    - Ne charge les publications que si Auteur contient "Nom Prénom"
    - Blocs texte en Markdown (Edit/Aperçu) sauvegardés en localStorage
    - Export HTML / PDF "propres" : exporte UNIQUEMENT le CV avec CSS "pandoc-like"
-   - Export DOCX (baseline)
+   - HTML: OK, on ne touche plus (pas de MAJ/source)
+   - DOCX: OK, on ne touche plus
+   - PDF: suppression explicite de tout cadre (border/radius/shadow) + réglages html2canvas
    ========================================================== */
 
 (function () {
@@ -26,7 +28,7 @@
   const btnExportDocx = $('#exportDocxBtn');
 
   const elStatus = $('#cv-status');
-  const elMeta = $('#cvMeta');
+  const elMeta = $('#cvMeta'); // affichage page (pas export)
   const elPubList = $('#pubList');
   const elPubCount = $('#pubCount');
   const elCvRoot = $('#cvRoot');
@@ -393,7 +395,7 @@
   }
 
   // ==========================================================
-  // ✅ EXPORTS PROPRES — CSS “pandoc-like”
+  // ✅ EXPORTS PROPRES — CSS “pandoc-like” + anti-cadre
   // ==========================================================
   function exportCssPandocLike() {
     return `
@@ -404,14 +406,29 @@
         --link:#2c7be5;
       }
       *{ box-sizing:border-box; }
-      html, body { height:auto; }
+
+      html, body {
+        height:auto;
+        background:#fff !important;
+      }
+
       body{
         margin:0;
-        background:#fff;
         color:var(--text);
-        font-family: Georgia, "Times New Roman", Times, serif; /* pandoc-ish */
+        font-family: Georgia, "Times New Roman", Times, serif;
         font-size: 11.3pt;
         line-height: 1.35;
+      }
+
+      /* ⛔️ Anti-cadre : on écrase border/radius/shadow (artefacts html2canvas) */
+      .page, .cv, .cv *{
+        box-shadow: none !important;
+        outline: none !important;
+      }
+      .page, .cv{
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: #fff !important;
       }
 
       /* page width like pandoc */
@@ -422,9 +439,8 @@
       }
 
       /* title block */
-      .cv{
-        padding: 0;
-      }
+      .cv{ padding: 0; }
+
       .cv-title{
         display:flex;
         justify-content:space-between;
@@ -432,10 +448,7 @@
         gap: 16px;
         margin-bottom: 10px;
       }
-      .cv-title .title-left{
-        flex: 1 1 auto;
-        min-width: 240px;
-      }
+      .cv-title .title-left{ flex: 1 1 auto; min-width: 240px; }
       .cv-title .title-right{
         flex: 0 0 auto;
         text-align:right;
@@ -469,7 +482,7 @@
       .section{
         margin-top: 14px;
         padding-top: 0;
-        border-top: 0;
+        border-top: 0 !important;
       }
       .section h3{
         margin: 0 0 8px;
@@ -490,7 +503,7 @@
       a{ color: var(--link); text-decoration: none; }
       a:hover{ text-decoration: underline; }
 
-      /* publications: hanging indent (pandoc bibliography feel) */
+      /* publications: hanging indent */
       .pubs{
         margin: 0;
         padding-left: 0;
@@ -498,7 +511,7 @@
       }
       .pubs li{
         margin: 0 0 7px;
-        padding-left: 1.35em;     /* hanging indent */
+        padding-left: 1.35em;
         text-indent: -1.35em;
         break-inside: avoid;
         page-break-inside: avoid;
@@ -508,7 +521,7 @@
       /* hide UI */
       .pill, .controls, button, textarea, .mdtabs, #cv-status, #cvMeta { display:none !important; }
 
-      /* better PDF breaks */
+      /* breaks */
       .section{ break-inside: avoid; page-break-inside: avoid; }
       .mdpreview p, .mdpreview li{ orphans: 2; widows: 2; }
 
@@ -529,22 +542,18 @@
     // Remove markdown UI (keep mdpreview only)
     clone.querySelectorAll('.mdtabs, button, textarea.mdedit').forEach(n => n.remove());
 
-    // Make title block nicer:
-    // - Keep name + contact as text
-    // - Build a right-aligned contact block from #cvContact
+    // Title block rebuild
     const nameEl = clone.querySelector('#cvName');
     const contactEl = clone.querySelector('#cvContact');
 
     const nameTxt = (nameEl?.textContent || '').trim() || 'Nom Prénom';
     const contactTxt = (contactEl?.textContent || '').trim();
 
-    // Remove original nodes to rebuild cleanly
     if (nameEl) nameEl.remove();
     if (contactEl) contactEl.remove();
 
     const cvTitle = clone.querySelector('.cv-title') || clone.firstElementChild;
     if (cvTitle) {
-      // wipe existing content of cv-title
       cvTitle.innerHTML = `
         <div class="title-left">
           <div class="name">${escapeHtml(nameTxt)}</div>
@@ -552,13 +561,12 @@
         </div>
         <div class="title-right">${escapeHtml(contactTxt)}</div>
       `;
-      // Add rule after title block if not present
       const hr = document.createElement('hr');
       hr.className = 'rule';
       cvTitle.insertAdjacentElement('afterend', hr);
     }
 
-    // Also remove any remaining contenteditable attributes if present
+    // Remove contenteditable attrs
     clone.querySelectorAll('[contenteditable]').forEach(n => n.removeAttribute('contenteditable'));
 
     const css = exportCssPandocLike();
@@ -622,7 +630,11 @@
         margin: [8, 8, 8, 8],
         filename: safeFilenameBase(title) + '.pdf',
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        html2canvas: {
+          scale: 1.6,              // ↓ réduit certains artefacts de bord (cadres fantômes)
+          useCORS: true,
+          backgroundColor: '#ffffff'
+        },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
       };
