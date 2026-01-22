@@ -1,10 +1,10 @@
 // netlify/functions/public-suivi.js
-// Renvoie un JSON public à partir de Zotero (sans exposer la clé API côté navigateur)
+// JSON public depuis Zotero (sans exposer la clé API côté navigateur)
 //
-// FIX IMPORTANT : Zotero limite "limit" à 100 -> pagination avec start=0,100,200...
-// Sinon la page suivi plafonne à 100 items même si la bibliothèque en contient plus.
+// - Mode "page" si start/limit sont fournis (plus rapide)
+// - Mode "all" (par défaut) : récupère tout (pagination interne)
 
-exports.handler = async () => {
+exports.handler = async (event) => {
   try {
     const apiKey = process.env.ZOTERO_API_KEY;
     const libraryType = process.env.ZOTERO_LIBRARY_TYPE; // 'users' ou 'groups'
@@ -14,77 +14,40 @@ exports.handler = async () => {
       return json(500, { error: "Missing Zotero env vars" });
     }
 
-    const limit = 100; // Zotero max
-    let start = 0;
-    const MAX_ITEMS = 10000; // sécurité large
+    const qs = event.queryStringParameters || {};
+    const start = qs.start !== undefined ? Math.max(0, parseInt(qs.start, 10) || 0) : null;
+    const limitReq = qs.limit !== undefined ? (parseInt(qs.limit, 10) || 100) : null;
 
-    const all = [];
+    // Zotero max=100
+    const limit = limitReq !== null ? Math.min(100, Math.max(1, limitReq)) : 100;
 
-    while (true) {
-      const url =
-        `https://api.zotero.org/${libraryType}/${libraryId}/items` +
-        `?limit=${limit}&start=${start}&sort=dateModified&direction=desc`;
+    // Si start/limit fournis => mode "page" (1 seul appel Zotero)
+    if (start !== null || limitReq !== null) {
+      const page = await fetchZoteroPage({ apiKey, libraryType, libraryId, start: start || 0, limit });
+      const items = mapItems(page.items, libraryType, libraryId);
 
-      const res = await fetch(url, {
-        headers: {
-          "Zotero-API-Key": apiKey,
-          "Zotero-API-Version": "3",
-          "Accept": "application/json",
-        },
+      return json(200, {
+        fetchedAt: new Date().toISOString(),
+        mode: "page",
+        start: page.start,
+        limit: page.limit,
+        totalResults: page.totalResults,
+        hasMore: page.hasMore,
+        nextStart: page.hasMore ? (page.start + page.items.length) : null,
+        count: items.length,
+        items,
       });
-
-      const txt = await res.text();
-      if (!res.ok) {
-        return json(res.status, { error: `Zotero error HTTP ${res.status}`, details: txt });
-      }
-
-      const items = JSON.parse(txt);
-      if (!Array.isArray(items) || items.length === 0) break;
-
-      all.push(...items);
-
-      // dernière page
-      if (items.length < limit) break;
-
-      start += limit;
-      if (all.length >= MAX_ITEMS) break;
     }
 
-    // On renvoie au front un format compatible avec ton suivi.html
-    // Ton suivi.html utilise: data.items[], data.fetchedAt
-    const out = all
-      .map((z) => z && z.data ? z.data : null)
-      .filter(Boolean)
-      .filter((d) => d.itemType === "book" || d.itemType === "bookSection" || d.itemType === "journalArticle")
-      .map((d) => ({
-        // champs attendus par ton suivi.html
-        itemType: d.itemType || "",
-        title: d.title || "",
-        date: d.date || "",
-
-        // champs optionnels utilisés dans la recherche/affichage
-        bookTitle: d.bookTitle || "",
-        publicationTitle: d.publicationTitle || "",
-        publisher: d.publisher || "",
-        place: d.place || "",
-        isbn: d.ISBN || "",
-        doi: d.DOI || "",
-        volume: d.volume || "",
-        issue: d.issue || "",
-        pages: d.pages || "",
-
-        // creators et flags (DLAB dans extra)
-        creators: Array.isArray(d.creators) ? d.creators : [],
-        flags: parseDLABFlags(d.extra || ""),
-
-        // lien zotero (si tu l’utilises)
-        zoteroUrl: buildZoteroUrl(libraryType, libraryId, d.key),
-      }));
+    // Sinon => mode "all" (comme avant)
+    const all = await fetchAllZoteroItems({ apiKey, libraryType, libraryId });
+    const items = mapItems(all, libraryType, libraryId);
 
     return json(200, {
       fetchedAt: new Date().toISOString(),
-      count: out.length,
-      items: out,
+      mode: "all",
+      count: items.length,
+      items,
     });
   } catch (e) {
     return json(500, { error: e.message || String(e) });
@@ -100,6 +63,88 @@ function json(statusCode, obj) {
     },
     body: JSON.stringify(obj),
   };
+}
+
+async function fetchZoteroPage({ apiKey, libraryType, libraryId, start, limit }) {
+  const url =
+    `https://api.zotero.org/${libraryType}/${libraryId}/items` +
+    `?limit=${limit}&start=${start}&sort=dateModified&direction=desc`;
+
+  const res = await fetch(url, {
+    headers: {
+      "Zotero-API-Key": apiKey,
+      "Zotero-API-Version": "3",
+      "Accept": "application/json",
+    },
+  });
+
+  const raw = await res.text();
+  if (!res.ok) throw new Error(`Zotero error HTTP ${res.status}: ${raw}`);
+
+  const items = JSON.parse(raw);
+
+  // Zotero renvoie souvent Total-Results
+  const totalResults = parseInt(res.headers.get("Total-Results") || "", 10);
+  const total = Number.isFinite(totalResults) ? totalResults : null;
+
+  const hasMore = total !== null
+    ? (start + items.length) < total
+    : (Array.isArray(items) && items.length === limit);
+
+  return {
+    start,
+    limit,
+    totalResults: total,
+    hasMore,
+    items: Array.isArray(items) ? items : [],
+  };
+}
+
+async function fetchAllZoteroItems({ apiKey, libraryType, libraryId }) {
+  const limit = 100;
+  let start = 0;
+  const MAX_ITEMS = 10000;
+
+  const all = [];
+  while (true) {
+    const page = await fetchZoteroPage({ apiKey, libraryType, libraryId, start, limit });
+    if (!page.items.length) break;
+    all.push(...page.items);
+
+    if (!page.hasMore) break;
+    start += page.items.length;
+
+    if (all.length >= MAX_ITEMS) break;
+  }
+
+  return all;
+}
+
+function mapItems(zoteroWrappedItems, libraryType, libraryId) {
+  return (zoteroWrappedItems || [])
+    .map((z) => (z && z.data) ? z.data : null)
+    .filter(Boolean)
+    .filter((d) => d.itemType === "book" || d.itemType === "bookSection" || d.itemType === "journalArticle")
+    .map((d) => ({
+      itemType: d.itemType || "",
+      title: d.title || "",
+      date: d.date || "",
+
+      bookTitle: d.bookTitle || "",
+      publicationTitle: d.publicationTitle || "",
+      publisher: d.publisher || "",
+      place: d.place || "",
+      isbn: d.ISBN || "",
+      doi: d.DOI || "",
+      volume: d.volume || "",
+      issue: d.issue || "",
+      pages: d.pages || "",
+
+      creators: Array.isArray(d.creators) ? d.creators : [],
+      flags: parseDLABFlags(d.extra || ""),
+
+      zoteroUrl: buildZoteroUrl(libraryType, libraryId, d.key),
+    }));
 }
 
 // Parse le bloc DLAB dans extra:
@@ -127,10 +172,8 @@ function parseDLABFlags(extra) {
 
     const key = l.slice(0, idx).trim();
     let val = l.slice(idx + 1).trim();
-
     if (!key) return;
 
-    // normalisation yes/no
     const low = val.toLowerCase();
     if (low === "yes" || low === "true" || low === "oui") val = "yes";
     else if (low === "no" || low === "false" || low === "non") val = "no";
