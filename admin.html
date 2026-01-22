@@ -180,26 +180,55 @@
     }
 
     async function load(){
-      setMsg('⏳ Chargement…');
-      $('rows').innerHTML = `<tr><td colspan="7" class="mini">Chargement…</td></tr>`;
+  setMsg('⏳ Chargement…');
+  $('rows').innerHTML = `<tr><td colspan="7" class="mini">Chargement…</td></tr>`;
 
-      const r = await authedFetch('/.netlify/functions/admin-items');
-      const data = await r.json().catch(()=>({}));
+  // 1) Première page rapide (100 max)
+  const first = await authedFetch('/.netlify/functions/admin-items?start=0&limit=100');
+  const data1 = await first.json().catch(()=>({}));
 
-      if (!r.ok){
-        setMsg('❌ Erreur: ' + (data?.error || 'accès refusé'));
-        $('rows').innerHTML = `<tr><td colspan="7" class="mini">Erreur serveur.</td></tr>`;
-        return;
-      }
+  if (!first.ok){
+    setMsg('❌ Erreur: ' + (data1?.error || 'accès refusé'));
+    $('rows').innerHTML = `<tr><td colspan="7" class="mini">Erreur serveur.</td></tr>`;
+    return;
+  }
 
-      ALL = (data.items || []).map(it => ({
+  ALL = (data1.items || []).map(it => ({
+    ...it,
+    year: it.year || yearFromDate(it.date),
+  }));
+
+  setMsg(`✅ ${ALL.length} item(s) chargés. (sync: ${new Date(data1.fetchedAt).toLocaleString('fr-FR')})`);
+  render();
+
+  // 2) Charger le reste en arrière-plan si nécessaire
+  if (data1.hasMore && data1.nextStart !== null) {
+    let nextStart = data1.nextStart;
+    const limit = 100;
+
+    setMsg(`⏳ Chargement du reste… (${ALL.length}/${data1.totalResults || '…'})`);
+
+    while (nextStart !== null) {
+      const r = await authedFetch(`/.netlify/functions/admin-items?start=${nextStart}&limit=${limit}`);
+      const d = await r.json().catch(()=>({}));
+      if (!r.ok) break;
+
+      const more = (d.items || []).map(it => ({
         ...it,
         year: it.year || yearFromDate(it.date),
       }));
 
-      setMsg(`✅ ${ALL.length} item(s) chargés. (sync: ${new Date(data.fetchedAt).toLocaleString('fr-FR')})`);
-      render();
+      ALL.push(...more);
+
+      setMsg(`⏳ Chargement du reste… (${ALL.length}/${d.totalResults || '…'})`);
+      nextStart = d.hasMore ? d.nextStart : null;
     }
+
+    setMsg(`✅ ${ALL.length} item(s) chargés. (sync: ${new Date(data1.fetchedAt).toLocaleString('fr-FR')})`);
+    render();
+  }
+}
+
 
     function render(){
       const q = norm($('q').value);
