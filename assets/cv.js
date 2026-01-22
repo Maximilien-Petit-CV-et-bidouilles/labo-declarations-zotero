@@ -3,7 +3,7 @@
    - Publications via /.netlify/functions/public-suivi (pagination)
    - Ne charge les publications que si Auteur contient "Nom Prénom"
    - Blocs texte en Markdown (Edit/Aperçu) sauvegardés en localStorage
-   - Export HTML / PDF "propres" : exporte UNIQUEMENT le CV avec CSS d'export
+   - Export HTML / PDF "propres" : exporte UNIQUEMENT le CV avec CSS "pandoc-like"
    - Export DOCX (baseline)
    ========================================================== */
 
@@ -35,7 +35,7 @@
   const MD_KEY = 'dlab.cv.mdblocks.v1';
   const INLINE_KEY = 'dlab.cv.inline.v1'; // cvName / cvContact
 
-  // Publications cache (évite de recharger si on retouche uniquement les filtres)
+  // Publications cache
   let PUBS_CACHE = null;
   let PUBS_FETCHED_AT = null;
 
@@ -68,7 +68,7 @@
     return m ? Number(m[0]) : null;
   }
 
-  // ---------- Creators helpers (authors string)
+  // ---------- Creators helpers
   function creatorsToText(creators) {
     if (!Array.isArray(creators)) return '';
     const names = creators
@@ -114,7 +114,7 @@
       .replace(/'/g, '&#039;');
   }
 
-  // ---------- Markdown rendering (safe-ish)
+  // ---------- Markdown rendering
   function mdToHtml(md) {
     const src = String(md || '');
     if (window.marked && typeof window.marked.parse === 'function') {
@@ -393,63 +393,176 @@
   }
 
   // ==========================================================
-  // ✅ EXPORTS PROPRES (CV seul + CSS export)
+  // ✅ EXPORTS PROPRES — CSS “pandoc-like”
   // ==========================================================
-  function exportCss() {
-    // CSS minimal “propre” pour HTML/PDF (A4-friendly)
-    // -> pas de colonne paramètres, pas de UI, typographie lisible
+  function exportCssPandocLike() {
     return `
-      :root{ --text:#111; --muted:#555; --border:#ddd; --accent:#2c7be5; }
+      :root{
+        --text:#111;
+        --muted:#555;
+        --rule:#d9d9df;
+        --link:#2c7be5;
+      }
       *{ box-sizing:border-box; }
-      body{ margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial; color:var(--text); background:#fff; }
-      .page{ max-width: 820px; margin: 0 auto; padding: 28px 34px; }
-      .cv{ border:1px solid var(--border); border-radius:12px; padding:18px; }
-      .cv-title{ display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
-      .cv-title h2{ margin:0; font-size:1.6rem; font-weight:750; }
-      .cv-title small{ color:var(--muted); }
-      .section{ margin-top:16px; padding-top:14px; border-top:1px solid var(--border); }
-      .section h3{ margin:0 0 8px; font-size:1.1rem; }
-      .mdpreview{ line-height:1.45; }
-      .mdpreview p{ margin:0 0 8px; }
-      .mdpreview ul, .mdpreview ol{ margin:0 0 8px; padding-left:20px; }
-      .pubs{ margin:0; padding-left:18px; }
-      .pubs li{ margin:0 0 8px; line-height:1.35; }
-      .pill, .controls, button, textarea, .mdtabs, #cv-status { display:none !important; }
+      html, body { height:auto; }
+      body{
+        margin:0;
+        background:#fff;
+        color:var(--text);
+        font-family: Georgia, "Times New Roman", Times, serif; /* pandoc-ish */
+        font-size: 11.3pt;
+        line-height: 1.35;
+      }
 
-      /* Meilleure coupure de page PDF */
+      /* page width like pandoc */
+      .page{
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 26px 36px;
+      }
+
+      /* title block */
+      .cv{
+        padding: 0;
+      }
+      .cv-title{
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-start;
+        gap: 16px;
+        margin-bottom: 10px;
+      }
+      .cv-title .title-left{
+        flex: 1 1 auto;
+        min-width: 240px;
+      }
+      .cv-title .title-right{
+        flex: 0 0 auto;
+        text-align:right;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+        font-size: 10.5pt;
+        color: var(--muted);
+        line-height: 1.25;
+        white-space: pre-wrap;
+      }
+      .cv-title .name{
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+        font-weight: 750;
+        font-size: 24pt;
+        letter-spacing: .2px;
+        margin: 0;
+        line-height: 1.1;
+      }
+      .cv-title .subtitle{
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 10.8pt;
+      }
+
+      hr.rule{
+        border:0;
+        border-top: 1px solid var(--rule);
+        margin: 10px 0 14px;
+      }
+
+      /* sections */
+      .section{
+        margin-top: 14px;
+        padding-top: 0;
+        border-top: 0;
+      }
+      .section h3{
+        margin: 0 0 8px;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+        font-variant: small-caps;
+        letter-spacing: .6px;
+        font-weight: 800;
+        font-size: 11.2pt;
+        color: #111;
+      }
+
+      /* markdown preview */
+      .mdpreview{ line-height:1.45; }
+      .mdpreview p{ margin: 0 0 8px; }
+      .mdpreview ul, .mdpreview ol{ margin: 0 0 8px; padding-left: 18px; }
+      .mdpreview li{ margin: 0 0 3px; }
+
+      a{ color: var(--link); text-decoration: none; }
+      a:hover{ text-decoration: underline; }
+
+      /* publications: hanging indent (pandoc bibliography feel) */
+      .pubs{
+        margin: 0;
+        padding-left: 0;
+        list-style: none;
+      }
+      .pubs li{
+        margin: 0 0 7px;
+        padding-left: 1.35em;     /* hanging indent */
+        text-indent: -1.35em;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .pubs li .t{ font-weight: 650; }
+
+      /* hide UI */
+      .pill, .controls, button, textarea, .mdtabs, #cv-status, #cvMeta { display:none !important; }
+
+      /* better PDF breaks */
       .section{ break-inside: avoid; page-break-inside: avoid; }
-      .pubs li{ break-inside: avoid; page-break-inside: avoid; }
+      .mdpreview p, .mdpreview li{ orphans: 2; widows: 2; }
 
       @page { margin: 14mm; }
     `;
   }
 
   function buildExportDocumentHtml() {
-    // Rend sûr : on force les previews Markdown à être à jour
+    // Sync state
     saveAllMdBlocksNow();
     saveInline();
 
-    // Clone du CV uniquement
     const clone = elCvRoot.cloneNode(true);
 
-    // Supprime UI markdown (boutons/textarea) et garde uniquement .mdpreview
+    // Remove meta “MAJ … source Zotero” in export
+    clone.querySelectorAll('#cvMeta').forEach(n => n.remove());
+
+    // Remove markdown UI (keep mdpreview only)
     clone.querySelectorAll('.mdtabs, button, textarea.mdedit').forEach(n => n.remove());
 
-    // Remplace les zones contenteditable par du texte “figé”
-    clone.querySelectorAll('[contenteditable="true"]').forEach(n => {
-      const span = document.createElement(n.tagName.toLowerCase() === 'small' ? 'div' : 'div');
-      span.textContent = n.textContent || '';
-      span.style.font = 'inherit';
-      span.style.whiteSpace = 'pre-wrap';
-      n.replaceWith(span);
-    });
+    // Make title block nicer:
+    // - Keep name + contact as text
+    // - Build a right-aligned contact block from #cvContact
+    const nameEl = clone.querySelector('#cvName');
+    const contactEl = clone.querySelector('#cvContact');
 
-    // Petite amélioration : si meta vide, on enlève
-    const meta = clone.querySelector('#cvMeta');
-    if (meta && !String(meta.textContent || '').trim()) meta.remove();
+    const nameTxt = (nameEl?.textContent || '').trim() || 'Nom Prénom';
+    const contactTxt = (contactEl?.textContent || '').trim();
 
-    const css = exportCss();
-    const title = ($('#cvName')?.textContent || 'CV').trim();
+    // Remove original nodes to rebuild cleanly
+    if (nameEl) nameEl.remove();
+    if (contactEl) contactEl.remove();
+
+    const cvTitle = clone.querySelector('.cv-title') || clone.firstElementChild;
+    if (cvTitle) {
+      // wipe existing content of cv-title
+      cvTitle.innerHTML = `
+        <div class="title-left">
+          <div class="name">${escapeHtml(nameTxt)}</div>
+          <div class="subtitle"></div>
+        </div>
+        <div class="title-right">${escapeHtml(contactTxt)}</div>
+      `;
+      // Add rule after title block if not present
+      const hr = document.createElement('hr');
+      hr.className = 'rule';
+      cvTitle.insertAdjacentElement('afterend', hr);
+    }
+
+    // Also remove any remaining contenteditable attributes if present
+    clone.querySelectorAll('[contenteditable]').forEach(n => n.removeAttribute('contenteditable'));
+
+    const css = exportCssPandocLike();
+    const title = nameTxt;
 
     const html = `<!doctype html>
 <html lang="fr">
@@ -492,15 +605,14 @@
       const { html, title } = buildExportDocumentHtml();
       setStatus('⏳ Génération PDF…');
 
-      // Injecte le doc d’export dans un conteneur caché (styles stables)
+      // Hidden host with stable layout
       const host = document.createElement('div');
       host.style.position = 'fixed';
       host.style.left = '-99999px';
       host.style.top = '0';
-      host.style.width = '900px';
+      host.style.width = '980px';
       host.style.background = '#fff';
       host.innerHTML = html;
-
       document.body.appendChild(host);
 
       const exportRoot = host.querySelector('.page');
@@ -518,16 +630,14 @@
       await window.html2pdf().set(opt).from(exportRoot).save();
 
       host.remove();
-      setStatus('✅ Export PDF (propre) généré.');
+      setStatus('✅ Export PDF (pandoc-like) généré.');
     } catch (e) {
       setStatus('❌ Export PDF impossible : ' + (e?.message || e), false);
       console.error('[CV] exportPdf error:', e);
-      // cleanup safe
-      document.querySelectorAll('div[data-cv-export-host]').forEach(n => n.remove());
     }
   }
 
-  // ---------- DOCX helpers: inline markdown -> docx runs
+  // ---------- DOCX helpers (baseline)
   function splitMarkdownBlocks(md) {
     const lines = String(md || '').split('\n');
     const blocks = [];
