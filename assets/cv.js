@@ -1,9 +1,10 @@
 /* ==========================================================
-   assets/cv.js — Option 2a (Markdown blocks in-CV) + DOCX Markdown
-   - Publications via /.netlify/functions/public-suivi
-   - Filtres + tri
+   assets/cv.js — CV generator
+   - Publications via /.netlify/functions/public-suivi (pagination)
+   - Ne charge les publications que si Auteur contient "Nom Prénom"
    - Blocs texte en Markdown (Edit/Aperçu) sauvegardés en localStorage
-   - Export HTML / PDF (html2pdf) / DOCX (docx) avec **gras**, *italique*, listes, liens
+   - Export HTML / PDF "propres" : exporte UNIQUEMENT le CV avec CSS d'export
+   - Export DOCX (baseline)
    ========================================================== */
 
 (function () {
@@ -84,7 +85,6 @@
   function hasFullNameQuery(q) {
     const tokens = norm(q).split(' ').filter(Boolean);
     if (tokens.length < 2) return false;
-    // évite de déclencher sur "a b" : au moins 2 caractères par token
     if (tokens.some(t => t.length < 2)) return false;
     return true;
   }
@@ -118,7 +118,6 @@
   function mdToHtml(md) {
     const src = String(md || '');
     if (window.marked && typeof window.marked.parse === 'function') {
-      // Simple guard: remove raw HTML tags before parsing
       const noHtml = src.replace(/<[^>]*>/g, '');
       return window.marked.parse(noHtml, { gfm: true, breaks: true });
     }
@@ -172,17 +171,14 @@
     } catch {}
   }
 
-  // ---------- Data fetch
+  // ---------- Data fetch (paginated)
   async function fetchPublicItems() {
-    // ⚠️ On utilise la pagination (100/page) pour éviter un gros JSON d'un coup.
-    // Cette fonction est appelée uniquement quand l'utilisateur a saisi "Nom Prénom".
     const limit = 100;
     let start = 0;
     const MAX_ITEMS = 10000;
 
     const all = [];
     let fetchedAt = new Date().toISOString();
-    let totalResults = null;
 
     while (true) {
       const url = `/.netlify/functions/public-suivi?start=${start}&limit=${limit}`;
@@ -196,29 +192,22 @@
       catch { throw new Error('Réponse JSON invalide depuis public-suivi : ' + text.slice(0, 200)); }
 
       // compat ancien format
-      if (Array.isArray(json)) {
-        return { items: json, fetchedAt: new Date().toISOString() };
-      }
+      if (Array.isArray(json)) return { items: json, fetchedAt: new Date().toISOString() };
 
-      if (!json || !Array.isArray(json.items)) {
-        throw new Error('Format inattendu depuis public-suivi (pas de items[]).');
-      }
+      if (!json || !Array.isArray(json.items)) throw new Error('Format inattendu depuis public-suivi (pas de items[]).');
 
       fetchedAt = json.fetchedAt || fetchedAt;
-      if (typeof json.totalResults === 'number') totalResults = json.totalResults;
-
       all.push(...json.items);
 
       const hasMore = !!json.hasMore;
       const nextStart = (json.nextStart !== undefined && json.nextStart !== null) ? Number(json.nextStart) : null;
-
       if (!hasMore || nextStart === null) break;
 
       start = nextStart;
       if (all.length >= MAX_ITEMS) break;
     }
 
-    return { items: all, fetchedAt, totalResults };
+    return { items: all, fetchedAt };
   }
 
   // ---------- Filtering + sorting
@@ -252,10 +241,9 @@
     const hasMin = Number.isFinite(yMin);
     const hasMax = Number.isFinite(yMax);
     const onlyPubs = (elOnlyPubs.value || 'yes') === 'yes';
-
     const sort = elSort.value || 'date_desc';
 
-    const out = (items || [])
+    return (items || [])
       .filter(it => it && typeof it === 'object')
       .filter(it => !onlyPubs || isPublicationType(it.itemType))
       .filter(it => matchAuthor(it.creatorsText || '', author))
@@ -266,8 +254,6 @@
         return true;
       })
       .sort((a, b) => compareItems(a, b, sort));
-
-    return out;
   }
 
   // ---------- Publications formatting (HTML)
@@ -355,9 +341,8 @@
   }
 
   function writeMdState(state) {
-    try {
-      localStorage.setItem(MD_KEY, JSON.stringify(state || {}));
-    } catch {}
+    try { localStorage.setItem(MD_KEY, JSON.stringify(state || {})); }
+    catch {}
   }
 
   function initMdBlocks() {
@@ -377,7 +362,6 @@
       const renderPreview = () => { preview.innerHTML = mdToHtml(textarea.value || ''); };
       renderPreview();
 
-      // Toggle edit/preview
       toggle?.addEventListener('click', () => {
         const isHidden = textarea.hasAttribute('hidden');
         if (isHidden) {
@@ -408,57 +392,138 @@
     writeMdState(state);
   }
 
-  // ---------- Export HTML
+  // ==========================================================
+  // ✅ EXPORTS PROPRES (CV seul + CSS export)
+  // ==========================================================
+  function exportCss() {
+    // CSS minimal “propre” pour HTML/PDF (A4-friendly)
+    // -> pas de colonne paramètres, pas de UI, typographie lisible
+    return `
+      :root{ --text:#111; --muted:#555; --border:#ddd; --accent:#2c7be5; }
+      *{ box-sizing:border-box; }
+      body{ margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial; color:var(--text); background:#fff; }
+      .page{ max-width: 820px; margin: 0 auto; padding: 28px 34px; }
+      .cv{ border:1px solid var(--border); border-radius:12px; padding:18px; }
+      .cv-title{ display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+      .cv-title h2{ margin:0; font-size:1.6rem; font-weight:750; }
+      .cv-title small{ color:var(--muted); }
+      .section{ margin-top:16px; padding-top:14px; border-top:1px solid var(--border); }
+      .section h3{ margin:0 0 8px; font-size:1.1rem; }
+      .mdpreview{ line-height:1.45; }
+      .mdpreview p{ margin:0 0 8px; }
+      .mdpreview ul, .mdpreview ol{ margin:0 0 8px; padding-left:20px; }
+      .pubs{ margin:0; padding-left:18px; }
+      .pubs li{ margin:0 0 8px; line-height:1.35; }
+      .pill, .controls, button, textarea, .mdtabs, #cv-status { display:none !important; }
+
+      /* Meilleure coupure de page PDF */
+      .section{ break-inside: avoid; page-break-inside: avoid; }
+      .pubs li{ break-inside: avoid; page-break-inside: avoid; }
+
+      @page { margin: 14mm; }
+    `;
+  }
+
+  function buildExportDocumentHtml() {
+    // Rend sûr : on force les previews Markdown à être à jour
+    saveAllMdBlocksNow();
+    saveInline();
+
+    // Clone du CV uniquement
+    const clone = elCvRoot.cloneNode(true);
+
+    // Supprime UI markdown (boutons/textarea) et garde uniquement .mdpreview
+    clone.querySelectorAll('.mdtabs, button, textarea.mdedit').forEach(n => n.remove());
+
+    // Remplace les zones contenteditable par du texte “figé”
+    clone.querySelectorAll('[contenteditable="true"]').forEach(n => {
+      const span = document.createElement(n.tagName.toLowerCase() === 'small' ? 'div' : 'div');
+      span.textContent = n.textContent || '';
+      span.style.font = 'inherit';
+      span.style.whiteSpace = 'pre-wrap';
+      n.replaceWith(span);
+    });
+
+    // Petite amélioration : si meta vide, on enlève
+    const meta = clone.querySelector('#cvMeta');
+    if (meta && !String(meta.textContent || '').trim()) meta.remove();
+
+    const css = exportCss();
+    const title = ($('#cvName')?.textContent || 'CV').trim();
+
+    const html = `<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(title)}</title>
+  <style>${css}</style>
+</head>
+<body>
+  <div class="page">
+    <main class="cv">
+      ${clone.innerHTML}
+    </main>
+  </div>
+</body>
+</html>`;
+
+    return { html, title };
+  }
+
+  // ---------- Export HTML (propre)
   function exportHtml() {
     try {
-      saveAllMdBlocksNow();
-      saveInline();
-      setStatus('⏳ Génération HTML…');
-
-      const html = '<!doctype html>\n' + document.documentElement.outerHTML;
+      const { html, title } = buildExportDocumentHtml();
       const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      const name = $('#cvName')?.textContent || 'cv';
-      downloadBlob(blob, safeFilenameBase(name) + '.html');
-
-      setStatus('✅ Export HTML généré.');
+      downloadBlob(blob, safeFilenameBase(title) + '.html');
+      setStatus('✅ Export HTML (propre) généré.');
     } catch (e) {
       setStatus('❌ Export HTML impossible : ' + (e?.message || e), false);
       console.error('[CV] exportHtml error:', e);
     }
   }
 
-  // ---------- Export PDF
+  // ---------- Export PDF (propre)
   async function exportPdf() {
     try {
-      saveAllMdBlocksNow();
-      saveInline();
-      setStatus('⏳ Génération PDF…');
-
       if (!window.html2pdf) throw new Error('html2pdf.js introuvable (CDN).');
 
-      const name = $('#cvName')?.textContent || 'cv';
+      const { html, title } = buildExportDocumentHtml();
+      setStatus('⏳ Génération PDF…');
+
+      // Injecte le doc d’export dans un conteneur caché (styles stables)
+      const host = document.createElement('div');
+      host.style.position = 'fixed';
+      host.style.left = '-99999px';
+      host.style.top = '0';
+      host.style.width = '900px';
+      host.style.background = '#fff';
+      host.innerHTML = html;
+
+      document.body.appendChild(host);
+
+      const exportRoot = host.querySelector('.page');
+      if (!exportRoot) throw new Error('Export root introuvable.');
+
       const opt = {
         margin: [8, 8, 8, 8],
-        filename: safeFilenameBase(name) + '.pdf',
+        filename: safeFilenameBase(title) + '.pdf',
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
       };
 
-      // Clone to avoid UI buttons etc.
-      const clone = elCvRoot ? elCvRoot.cloneNode(true) : document.body.cloneNode(true);
+      await window.html2pdf().set(opt).from(exportRoot).save();
 
-      // Remove controls in clone
-      clone.querySelectorAll('.controls, .adminbar, button, .mdtoggle').forEach(n => n.remove());
-      // Ensure textareas replaced by preview
-      clone.querySelectorAll('textarea.mdedit').forEach(n => n.remove());
-
-      await window.html2pdf().set(opt).from(clone).save();
-
-      setStatus('✅ Export PDF généré.');
+      host.remove();
+      setStatus('✅ Export PDF (propre) généré.');
     } catch (e) {
       setStatus('❌ Export PDF impossible : ' + (e?.message || e), false);
       console.error('[CV] exportPdf error:', e);
+      // cleanup safe
+      document.querySelectorAll('div[data-cv-export-host]').forEach(n => n.remove());
     }
   }
 
@@ -477,7 +542,6 @@
     for (const line of lines) {
       const l = line.trim();
 
-      // headings
       const h = l.match(/^(#{1,3})\s+(.*)$/);
       if (h) {
         flushPara();
@@ -485,7 +549,6 @@
         continue;
       }
 
-      // bullets
       const b = l.match(/^[-*]\s+(.*)$/);
       if (b) {
         flushPara();
@@ -501,13 +564,11 @@
   }
 
   function runsFromInlineMarkdown(text) {
-    // Supports **bold**, *italic*, and [link](url) (very small subset)
     const { TextRun, ExternalHyperlink } = window.docx || {};
     if (!TextRun) return [];
 
     const s = String(text || '');
 
-    // Tokenize links first
     const linkRe = /\[([^\]]+)\]\(([^)]+)\)/g;
     let last = 0;
     const parts = [];
@@ -519,29 +580,23 @@
     if (last < s.length) parts.push({ type: 'text', value: s.slice(last) });
 
     const out = [];
-
     const pushInline = (chunk) => {
-      // parse **bold** and *italic* in plain text chunk
       const re = /(\*\*[^*]+\*\*|\*[^*]+\*)/g;
       let i = 0;
       let m;
       while ((m = re.exec(chunk))) {
         if (m.index > i) out.push(new TextRun({ text: chunk.slice(i, m.index) }));
         const token = m[0];
-        if (token.startsWith('**')) {
-          out.push(new TextRun({ text: token.slice(2, -2), bold: true }));
-        } else if (token.startsWith('*')) {
-          out.push(new TextRun({ text: token.slice(1, -1), italics: true }));
-        }
+        if (token.startsWith('**')) out.push(new TextRun({ text: token.slice(2, -2), bold: true }));
+        else if (token.startsWith('*')) out.push(new TextRun({ text: token.slice(1, -1), italics: true }));
         i = m.index + token.length;
       }
       if (i < chunk.length) out.push(new TextRun({ text: chunk.slice(i) }));
     };
 
     for (const p of parts) {
-      if (p.type === 'text') {
-        pushInline(p.value);
-      } else if (p.type === 'link' && ExternalHyperlink) {
+      if (p.type === 'text') pushInline(p.value);
+      else if (p.type === 'link' && ExternalHyperlink) {
         out.push(new ExternalHyperlink({
           link: p.url,
           children: [new TextRun({ text: p.label, style: 'Hyperlink' })]
@@ -570,19 +625,10 @@
 
       const children = [];
 
-      // Header
-      children.push(new Paragraph({
-        text: name,
-        heading: HeadingLevel.HEADING_1
-      }));
-      if (contact) {
-        children.push(new Paragraph({
-          children: [new TextRun({ text: contact })]
-        }));
-      }
+      children.push(new Paragraph({ text: name, heading: HeadingLevel.HEADING_1 }));
+      if (contact) children.push(new Paragraph({ children: [new TextRun({ text: contact })] }));
       children.push(new Paragraph({ text: ' ' }));
 
-      // Markdown blocks (in order)
       const blocks = document.querySelectorAll('[data-mdblock]');
       const state = readMdState();
 
@@ -591,48 +637,32 @@
         const title = wrap.querySelector('h3')?.textContent || '';
         const md = (key && typeof state[key] === 'string') ? state[key] : (wrap.querySelector('textarea.mdedit')?.value || '');
 
-        if (title) {
-          children.push(new Paragraph({ text: title, heading: HeadingLevel.HEADING_2 }));
-        }
+        if (title) children.push(new Paragraph({ text: title, heading: HeadingLevel.HEADING_2 }));
 
         const parts = splitMarkdownBlocks(md);
-
         for (const part of parts) {
           if (part.type === 'bullet') {
-            children.push(new Paragraph({
-              children: runsFromInlineMarkdown(part.text),
-              bullet: { level: 0 }
-            }));
-            continue;
-          }
-
-          if (part.type === 'heading') {
+            children.push(new Paragraph({ children: runsFromInlineMarkdown(part.text), bullet: { level: 0 } }));
+          } else if (part.type === 'heading') {
             const level = part.level === 1 ? HeadingLevel.HEADING_2 : HeadingLevel.HEADING_3;
             children.push(new Paragraph({ text: part.text, heading: level }));
-            continue;
+          } else {
+            children.push(new Paragraph({ children: runsFromInlineMarkdown(part.text || '') }));
           }
-
-          children.push(new Paragraph({
-            children: runsFromInlineMarkdown(part.text || '')
-          }));
         }
-
         children.push(new Paragraph({ text: ' ' }));
       }
 
-      // Publications as list
       const pubs = Array.from(elPubList?.querySelectorAll('li') || []).map(li => li.textContent || '').filter(Boolean);
       if (pubs.length) {
         children.push(new Paragraph({ text: 'Productions principales en recherche', heading: HeadingLevel.HEADING_2 }));
-        for (const p of pubs) {
-          children.push(new Paragraph({ text: p, bullet: { level: 0 } }));
-        }
+        for (const p of pubs) children.push(new Paragraph({ text: p, bullet: { level: 0 } }));
       }
 
       const doc = new Document({ sections: [{ properties: {}, children }] });
       const blob = await Packer.toBlob(doc);
       downloadBlob(blob, safeFilenameBase(name) + '.docx');
-      setStatus('✅ Export DOCX généré (Markdown conservé).');
+      setStatus('✅ Export DOCX généré.');
     } catch (e) {
       setStatus('❌ Export DOCX impossible : ' + (e?.message || e), false);
       console.error('[CV] exportDocx error:', e);
@@ -645,7 +675,6 @@
 
     const authorQuery = elAuthor?.value || '';
     if (!hasFullNameQuery(authorQuery)) {
-      // ✅ Pas de chargement tant qu'on n'a pas "Nom Prénom"
       if (elPubList) {
         elPubList.innerHTML = '<li style="color:var(--muted)">' +
           'Tapez <b>Nom Prénom</b> dans le filtre <b>Auteur</b> pour charger les publications.' +
@@ -662,12 +691,10 @@
     try {
       if (btnRefresh) btnRefresh.disabled = true;
 
-      // ✅ charge Zotero une seule fois (ou si force=true)
       if (force || !PUBS_CACHE) {
         const payload = await fetchPublicItems();
         const items = Array.isArray(payload.items) ? payload.items : [];
 
-        // ✅ réinjecte creatorsText si l’API ne le fournit pas
         PUBS_CACHE = items.map(it => ({
           ...it,
           creatorsText: (it && typeof it === 'object')
@@ -680,7 +707,10 @@
       const filtered = applyFilters(PUBS_CACHE);
       renderList(filtered);
 
-      if (elMeta) elMeta.textContent = 'MAJ: ' + nowFr() + ' · source: Zotero';
+      if (elMeta) {
+        const ts = PUBS_FETCHED_AT ? new Date(PUBS_FETCHED_AT) : new Date();
+        elMeta.textContent = `MAJ: ${ts.toLocaleString('fr-FR')} · source: Zotero`;
+      }
       setStatus('✅ ' + filtered.length + ' référence(s) affichée(s).');
     } catch (e) {
       setStatus(
@@ -702,7 +732,7 @@
   function saveAllTexts() {
     saveAllMdBlocksNow();
     saveInline();
-    setStatus('✅ Textes Markdown sauvegardés (' + nowFr() + ').');
+    setStatus('✅ Textes sauvegardés (' + nowFr() + ').');
   }
 
   // ---------- Events
@@ -720,7 +750,6 @@
     t = setTimeout(() => {
       const authorQuery = elAuthor?.value || '';
       if (!hasFullNameQuery(authorQuery)) {
-        // Pas de fetch : on affiche juste un hint + vide
         if (elPubList) {
           elPubList.innerHTML = '<li style="color:var(--muted)">' +
             'Tapez <b>Nom Prénom</b> dans le filtre <b>Auteur</b> pour charger les publications.' +
@@ -731,10 +760,10 @@
         setStatus('ℹ️ Publications non chargées (saisir Nom + Prénom dans Auteur).');
         return;
       }
-      // Auteur OK : on applique filtres (et charge si besoin)
       refresh(false);
     }, 250);
   };
+
   [elAuthor, elYearMin, elYearMax, elOnlyPubs, elSort].forEach((el) => {
     el?.addEventListener('input', schedule);
     el?.addEventListener('change', schedule);
