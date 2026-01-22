@@ -4,9 +4,7 @@
    - Ne charge les publications que si Auteur contient "Nom Prénom"
    - Blocs texte en Markdown (Edit/Aperçu) sauvegardés en localStorage
    - Export HTML / PDF "propres" : exporte UNIQUEMENT le CV avec CSS "pandoc-like"
-   - HTML: OK, on ne touche plus (pas de MAJ/source)
-   - DOCX: OK, on ne touche plus
-   - PDF: suppression explicite de tout cadre (border/radius/shadow) + réglages html2canvas
+   - PDF: suppression explicite de tout "cadre" (notamment .mdblock)
    ========================================================== */
 
 (function () {
@@ -70,7 +68,6 @@
     return m ? Number(m[0]) : null;
   }
 
-  // ---------- Creators helpers
   function creatorsToText(creators) {
     if (!Array.isArray(creators)) return '';
     const names = creators
@@ -126,7 +123,7 @@
     return escapeHtml(src).replace(/\n/g, '<br>');
   }
 
-  // ---------- Persist inline (Name / Contact)
+  // ---------- Persist inline
   function loadInline() {
     try {
       const raw = localStorage.getItem(INLINE_KEY);
@@ -193,7 +190,6 @@
       try { json = JSON.parse(text); }
       catch { throw new Error('Réponse JSON invalide depuis public-suivi : ' + text.slice(0, 200)); }
 
-      // compat ancien format
       if (Array.isArray(json)) return { items: json, fetchedAt: new Date().toISOString() };
 
       if (!json || !Array.isArray(json.items)) throw new Error('Format inattendu depuis public-suivi (pas de items[]).');
@@ -233,7 +229,7 @@
     if (mode === 'title_asc') {
       return String(a.title || '').localeCompare(String(b.title || ''), 'fr', { sensitivity: 'base' });
     }
-    return yb - ya; // date_desc
+    return yb - ya;
   }
 
   function applyFilters(items) {
@@ -318,12 +314,9 @@
   }
 
   function renderList(items) {
-    const list = elPubList;
-    if (!list) return;
-
+    if (!elPubList) return;
     const arr = Array.isArray(items) ? items : [];
-    list.innerHTML = arr.map(it => `<li>${formatOne(it)}</li>`).join('');
-
+    elPubList.innerHTML = arr.map(it => `<li>${formatOne(it)}</li>`).join('');
     if (elPubCount) {
       const n = arr.length;
       elPubCount.textContent = n + (n <= 1 ? ' référence' : ' références');
@@ -383,19 +376,17 @@
   function saveAllMdBlocksNow() {
     const blocks = document.querySelectorAll('[data-mdblock]');
     const state = readMdState();
-
     blocks.forEach((wrap) => {
       const key = wrap.getAttribute('data-mdblock');
       const textarea = wrap.querySelector('textarea.mdedit');
       if (!key || !textarea) return;
       state[key] = textarea.value || '';
     });
-
     writeMdState(state);
   }
 
   // ==========================================================
-  // ✅ EXPORTS PROPRES — CSS “pandoc-like” + anti-cadre
+  // ✅ EXPORTS — CSS “pandoc-like” + anti-cadre (mdblock inclus)
   // ==========================================================
   function exportCssPandocLike() {
     return `
@@ -407,10 +398,7 @@
       }
       *{ box-sizing:border-box; }
 
-      html, body {
-        height:auto;
-        background:#fff !important;
-      }
+      html, body { height:auto; background:#fff !important; }
 
       body{
         margin:0;
@@ -420,25 +408,36 @@
         line-height: 1.35;
       }
 
-      /* ⛔️ Anti-cadre : on écrase border/radius/shadow (artefacts html2canvas) */
+      /* ⛔️ Anti-cadre global (artefacts html2canvas) */
       .page, .cv, .cv *{
         box-shadow: none !important;
         outline: none !important;
+        border-radius: 0 !important;
       }
       .page, .cv{
         border: 0 !important;
-        border-radius: 0 !important;
         background: #fff !important;
       }
 
-      /* page width like pandoc */
+      /* ⛔️ Anti-cadre spécifique aux wrappers markdown (.mdblock) */
+      .mdblock{
+        border: 0 !important;
+        background: transparent !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      .mdpreview{
+        padding: 0 !important;
+        margin: 0 !important;
+        background: transparent !important;
+      }
+
       .page{
         max-width: 860px;
         margin: 0 auto;
         padding: 26px 36px;
       }
 
-      /* title block */
       .cv{ padding: 0; }
 
       .cv-title{
@@ -478,7 +477,6 @@
         margin: 10px 0 14px;
       }
 
-      /* sections */
       .section{
         margin-top: 14px;
         padding-top: 0;
@@ -494,7 +492,6 @@
         color: #111;
       }
 
-      /* markdown preview */
       .mdpreview{ line-height:1.45; }
       .mdpreview p{ margin: 0 0 8px; }
       .mdpreview ul, .mdpreview ol{ margin: 0 0 8px; padding-left: 18px; }
@@ -503,7 +500,6 @@
       a{ color: var(--link); text-decoration: none; }
       a:hover{ text-decoration: underline; }
 
-      /* publications: hanging indent */
       .pubs{
         margin: 0;
         padding-left: 0;
@@ -518,10 +514,8 @@
       }
       .pubs li .t{ font-weight: 650; }
 
-      /* hide UI */
       .pill, .controls, button, textarea, .mdtabs, #cv-status, #cvMeta { display:none !important; }
 
-      /* breaks */
       .section{ break-inside: avoid; page-break-inside: avoid; }
       .mdpreview p, .mdpreview li{ orphans: 2; widows: 2; }
 
@@ -536,11 +530,26 @@
 
     const clone = elCvRoot.cloneNode(true);
 
-    // Remove meta “MAJ … source Zotero” in export
+    // Remove meta in export
     clone.querySelectorAll('#cvMeta').forEach(n => n.remove());
 
     // Remove markdown UI (keep mdpreview only)
     clone.querySelectorAll('.mdtabs, button, textarea.mdedit').forEach(n => n.remove());
+
+    // ✅ Supprime réellement les wrappers .mdblock (source des cadres)
+    //    et remplace par le contenu .mdpreview uniquement.
+    clone.querySelectorAll('.mdblock').forEach((mb) => {
+      const prev = mb.querySelector('.mdpreview');
+      if (prev) {
+        const repl = document.createElement('div');
+        repl.className = 'mdpreview';
+        repl.innerHTML = prev.innerHTML;
+        mb.replaceWith(repl);
+      } else {
+        // au pire, on enlève
+        mb.remove();
+      }
+    });
 
     // Title block rebuild
     const nameEl = clone.querySelector('#cvName');
@@ -592,7 +601,7 @@
     return { html, title };
   }
 
-  // ---------- Export HTML (propre)
+  // ---------- Export HTML
   function exportHtml() {
     try {
       const { html, title } = buildExportDocumentHtml();
@@ -605,7 +614,7 @@
     }
   }
 
-  // ---------- Export PDF (propre)
+  // ---------- Export PDF
   async function exportPdf() {
     try {
       if (!window.html2pdf) throw new Error('html2pdf.js introuvable (CDN).');
@@ -613,7 +622,6 @@
       const { html, title } = buildExportDocumentHtml();
       setStatus('⏳ Génération PDF…');
 
-      // Hidden host with stable layout
       const host = document.createElement('div');
       host.style.position = 'fixed';
       host.style.left = '-99999px';
@@ -631,7 +639,7 @@
         filename: safeFilenameBase(title) + '.pdf',
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: {
-          scale: 1.6,              // ↓ réduit certains artefacts de bord (cadres fantômes)
+          scale: 1.6,
           useCORS: true,
           backgroundColor: '#ffffff'
         },
@@ -649,7 +657,7 @@
     }
   }
 
-  // ---------- DOCX helpers (baseline)
+  // ---------- DOCX helpers (baseline — inchangé)
   function splitMarkdownBlocks(md) {
     const lines = String(md || '').split('\n');
     const blocks = [];
@@ -798,7 +806,8 @@
     const authorQuery = elAuthor?.value || '';
     if (!hasFullNameQuery(authorQuery)) {
       if (elPubList) {
-        elPubList.innerHTML = '<li style="color:var(--muted)">' +
+        elPubList.innerHTML =
+          '<li style="color:var(--muted)">' +
           'Tapez <b>Nom Prénom</b> dans le filtre <b>Auteur</b> pour charger les publications.' +
           '</li>';
       }
@@ -873,7 +882,8 @@
       const authorQuery = elAuthor?.value || '';
       if (!hasFullNameQuery(authorQuery)) {
         if (elPubList) {
-          elPubList.innerHTML = '<li style="color:var(--muted)">' +
+          elPubList.innerHTML =
+            '<li style="color:var(--muted)">' +
             'Tapez <b>Nom Prénom</b> dans le filtre <b>Auteur</b> pour charger les publications.' +
             '</li>';
         }
@@ -891,7 +901,6 @@
     el?.addEventListener('change', schedule);
   });
 
-  // Save inline on blur
   $('#cvName')?.addEventListener('blur', saveInline);
   $('#cvContact')?.addEventListener('blur', saveInline);
 
