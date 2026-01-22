@@ -32,6 +32,8 @@
     button{cursor:pointer}
     button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:650}
     button.ghost{background:#fff}
+    button:disabled{opacity:.6;cursor:not-allowed}
+
     .stats{display:flex;gap:10px;flex-wrap:wrap}
     .stat{min-width:160px}
     .stat b{display:block;font-size:1.05rem}
@@ -238,6 +240,13 @@
     // ✅ Pagination du tableau
     let PAGE_INDEX = 0;
     let PAGE_SIZE = 25;
+
+    // ✅ Debounce recherche (perf)
+    let __tSearch = null;
+    function debouncedRender(ms=200){
+      clearTimeout(__tSearch);
+      __tSearch = setTimeout(() => render(), ms);
+    }
 
     const $ = (id) => document.getElementById(id);
 
@@ -456,7 +465,6 @@
         return (b.date || '').localeCompare(a.date || '');
       });
 
-      // ✅ Pagination table (après tri)
       updatePagerUI();
       const startIdx = PAGE_INDEX * PAGE_SIZE;
       const endIdx = startIdx + PAGE_SIZE;
@@ -599,7 +607,7 @@
     }
 
     // ✅ listeners robustes + reset page
-    $('q').addEventListener('input', () => { PAGE_INDEX = 0; render(); });
+    $('q').addEventListener('input', () => { PAGE_INDEX = 0; debouncedRender(200); });
     ['filterType','filterNeeds','filterAxis','filterYear'].forEach(id =>
       $(id).addEventListener('change', () => { PAGE_INDEX = 0; render(); })
     );
