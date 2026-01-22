@@ -90,7 +90,7 @@
     .status.ok{color:#1b7c3a}
     .status.err{color:#b32020}
 
-    /* -------- Markdown blocks (Option 2a) -------- */
+    /* -------- Markdown blocks (compat cv.js "mdtoggle") -------- */
     .mdblock{
       border:1px solid var(--border);
       border-radius:12px;
@@ -112,10 +112,6 @@
       cursor:pointer;
       font-weight:650;
       font-size:.85rem;
-    }
-    .mdtabs .tab.active{
-      border-color:var(--accent);
-      background:var(--accent-soft);
     }
     .mdtabs .mdhint{
       color:var(--muted);
@@ -224,7 +220,11 @@
 
         <p class="hint">
           ✍️ Les blocs texte utilisent du Markdown : <code>**gras**</code>, <code>*italique*</code>, listes (<code>- item</code>), liens (<code>[texte](url)</code>).
-          Clique “Aperçu” pour voir le rendu, “Sauver les textes” pour conserver dans le navigateur.
+          Cliquez “Éditer/Aperçu” dans chaque section puis “Sauver les textes” (stockage local navigateur).
+        </p>
+
+        <p class="hint">
+          📚 Pour éviter un chargement long, les publications ne se chargent <b>que</b> quand vous tapez <b>Nom Prénom</b> dans le filtre Auteur.
         </p>
 
         <p id="cv-status" class="status"></p>
@@ -240,44 +240,48 @@
           <small id="cvMeta"></small>
         </div>
 
-        <!-- Markdown block: Présentation -->
-        <section class="section">
+        <!-- ✅ Markdown block: Présentation -->
+        <section class="section" data-mdblock="cv.presentation">
           <h3>Présentation</h3>
-          <div class="mdblock" data-md-key="cv.presentation" data-md-default="Je suis…&#10;&#10;- Thématique 1&#10;- Thématique 2&#10;&#10;[Mon site](https://exemple.fr)">
+          <div class="mdblock">
             <div class="mdtabs">
-              <button class="tab active" type="button" data-tab="preview">Aperçu</button>
-              <button class="tab" type="button" data-tab="edit">Éditer</button>
+              <button class="tab mdtoggle" type="button">Éditer</button>
               <span class="mdhint">Markdown</span>
             </div>
-            <textarea class="mdedit" hidden></textarea>
+            <textarea class="mdedit" hidden>Je suis…
+
+- Thématique 1
+- Thématique 2
+
+[Mon site](https://exemple.fr)</textarea>
             <div class="mdpreview"></div>
           </div>
         </section>
 
-        <!-- Markdown block: Titres -->
-        <section class="section">
+        <!-- ✅ Markdown block: Titres -->
+        <section class="section" data-mdblock="cv.titles">
           <h3>Titres et fonctions</h3>
-          <div class="mdblock" data-md-key="cv.titles" data-md-default="- Ingénieur d’études (IGE)&#10;- Appui aux projets de recherche">
+          <div class="mdblock">
             <div class="mdtabs">
-              <button class="tab active" type="button" data-tab="preview">Aperçu</button>
-              <button class="tab" type="button" data-tab="edit">Éditer</button>
+              <button class="tab mdtoggle" type="button">Éditer</button>
               <span class="mdhint">Markdown</span>
             </div>
-            <textarea class="mdedit" hidden></textarea>
+            <textarea class="mdedit" hidden>- Ingénieur d’études (IGE)
+- Appui aux projets de recherche</textarea>
             <div class="mdpreview"></div>
           </div>
         </section>
 
-        <!-- Markdown block: Diplômes -->
-        <section class="section">
+        <!-- ✅ Markdown block: Diplômes -->
+        <section class="section" data-mdblock="cv.degrees">
           <h3>Principaux diplômes</h3>
-          <div class="mdblock" data-md-key="cv.degrees" data-md-default="- Master … (année, établissement)&#10;- Licence … (année, établissement)">
+          <div class="mdblock">
             <div class="mdtabs">
-              <button class="tab active" type="button" data-tab="preview">Aperçu</button>
-              <button class="tab" type="button" data-tab="edit">Éditer</button>
+              <button class="tab mdtoggle" type="button">Éditer</button>
               <span class="mdhint">Markdown</span>
             </div>
-            <textarea class="mdedit" hidden></textarea>
+            <textarea class="mdedit" hidden>- Master … (année, établissement)
+- Licence … (année, établissement)</textarea>
             <div class="mdpreview"></div>
           </div>
         </section>
@@ -286,22 +290,24 @@
         <section class="section">
           <h3>Productions principales en recherche</h3>
           <div style="margin:4px 0 10px;color:var(--muted);font-size:.9rem">
-            Bibliographie formatée (côté navigateur).
-            <span class="pill" id="pubCount">0 référence</span>
+            Les publications ne se chargent que lorsque le filtre Auteur contient <b>Nom + Prénom</b>.
+            <span class="pill" id="pubCount">—</span>
           </div>
-          <ol class="pubs" id="pubList"></ol>
+          <ol class="pubs" id="pubList">
+            <li style="color:var(--muted)">Tapez <b>Nom Prénom</b> dans le filtre <b>Auteur</b> pour charger les publications.</li>
+          </ol>
         </section>
 
-        <!-- Markdown block: Teaching -->
-        <section class="section">
+        <!-- ✅ Markdown block: Teaching -->
+        <section class="section" data-mdblock="cv.teaching">
           <h3>Investissement pédagogique et diffusion de la connaissance</h3>
-          <div class="mdblock" data-md-key="cv.teaching" data-md-default="- Cours / interventions…&#10;- Vulgarisation / diffusion…">
+          <div class="mdblock">
             <div class="mdtabs">
-              <button class="tab active" type="button" data-tab="preview">Aperçu</button>
-              <button class="tab" type="button" data-tab="edit">Éditer</button>
+              <button class="tab mdtoggle" type="button">Éditer</button>
               <span class="mdhint">Markdown</span>
             </div>
-            <textarea class="mdedit" hidden></textarea>
+            <textarea class="mdedit" hidden>- Cours / interventions…
+- Vulgarisation / diffusion…</textarea>
             <div class="mdpreview"></div>
           </div>
         </section>
