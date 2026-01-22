@@ -13,48 +13,35 @@ exports.handler = async (event) => {
       return json(500, { error: 'Missing Zotero env vars' });
     }
 
-    const url = `https://api.zotero.org/${libraryType}/${libraryId}/items?limit=200&sort=dateModified&direction=desc`;
+    const qs = event.queryStringParameters || {};
+    const start = qs.start !== undefined ? Math.max(0, parseInt(qs.start, 10) || 0) : null;
+    const limitReq = qs.limit !== undefined ? (parseInt(qs.limit, 10) || 100) : null;
 
-    const res = await fetch(url, {
-      headers: {
-        'Zotero-API-Key': apiKey,
-        'Zotero-API-Version': '3'
-      }
-    });
+    // Zotero max limit = 100
+    const limit = limitReq !== null ? Math.min(100, Math.max(1, limitReq)) : 100;
 
-    const raw = await res.text();
-    if (!res.ok) return json(res.status, { error: 'Zotero error', details: raw });
+    // ✅ Mode "page" si start/limit fournis (un seul appel Zotero)
+    if (start !== null || limitReq !== null) {
+      const page = await fetchZoteroPage({ apiKey, libraryType, libraryId, start: start || 0, limit });
+      const filtered = mapItems(page.items);
 
-    const items = JSON.parse(raw);
+      return json(200, {
+        fetchedAt: new Date().toISOString(),
+        mode: 'page',
+        start: page.start,
+        limit: page.limit,
+        totalResults: page.totalResults,
+        hasMore: page.hasMore,
+        nextStart: page.hasMore ? (page.start + page.items.length) : null,
+        items: filtered
+      });
+    }
 
-    const filtered = items
-      .map(z => z?.data)
-      .filter(Boolean)
-      .filter(d => d.itemType === 'book' || d.itemType === 'bookSection' || d.itemType === 'journalArticle')
-      .map(d => ({
-        key: d.key,
-        itemType: d.itemType,
-        title: d.title || '',
-        date: d.date || '',
-        year: extractYear(d.date || ''),
-        creatorsText: (d.creators || [])
-          .filter(c => c && (c.creatorType === 'author' || c.creatorType === 'editor'))
-          .map(c => `${(c.lastName || '').trim()} ${(c.firstName || '').trim()}`.trim())
-          .filter(Boolean)
-          .join(', '),
-        bookTitle: d.bookTitle || '',
-        publicationTitle: d.publicationTitle || d.journalAbbreviation || '',
-        publisher: d.publisher || '',
-        place: d.place || '',
-        isbn: d.ISBN || d.isbn || '',
-        doi: d.DOI || d.doi || '',
-        volume: d.volume || '',
-        issue: d.issue || '',
-        pages: d.pages || '',
-        flags: parseDLABFlags(d.extra || '')
-      }));
+    // ✅ Mode "all" par défaut (compat: si ton admin.html appelle sans params)
+    const all = await fetchAllZoteroItems({ apiKey, libraryType, libraryId });
+    const filtered = mapItems(all);
 
-    return json(200, { fetchedAt: new Date().toISOString(), items: filtered });
+    return json(200, { fetchedAt: new Date().toISOString(), mode: 'all', items: filtered });
   } catch (err) {
     return json(500, { error: 'Server error', message: err.message });
   }
@@ -69,6 +56,88 @@ function json(statusCode, obj) {
     },
     body: JSON.stringify(obj)
   };
+}
+
+async function fetchZoteroPage({ apiKey, libraryType, libraryId, start, limit }) {
+  const url =
+    `https://api.zotero.org/${libraryType}/${libraryId}/items` +
+    `?limit=${limit}&start=${start}&sort=dateModified&direction=desc`;
+
+  const res = await fetch(url, {
+    headers: {
+      'Zotero-API-Key': apiKey,
+      'Zotero-API-Version': '3',
+      'Accept': 'application/json'
+    }
+  });
+
+  const raw = await res.text();
+  if (!res.ok) throw new Error(`Zotero error HTTP ${res.status}: ${raw}`);
+
+  const items = JSON.parse(raw);
+  const totalResults = parseInt(res.headers.get('Total-Results') || '', 10);
+  const total = Number.isFinite(totalResults) ? totalResults : null;
+
+  const hasMore = total !== null
+    ? (start + items.length) < total
+    : (Array.isArray(items) && items.length === limit);
+
+  return {
+    start,
+    limit,
+    totalResults: total,
+    hasMore,
+    items: Array.isArray(items) ? items : []
+  };
+}
+
+async function fetchAllZoteroItems({ apiKey, libraryType, libraryId }) {
+  const limit = 100;
+  let start = 0;
+  const MAX_ITEMS = 10000;
+
+  const all = [];
+  while (true) {
+    const page = await fetchZoteroPage({ apiKey, libraryType, libraryId, start, limit });
+    if (!page.items.length) break;
+
+    all.push(...page.items);
+    if (!page.hasMore) break;
+
+    start += page.items.length;
+    if (all.length >= MAX_ITEMS) break;
+  }
+
+  return all;
+}
+
+function mapItems(zoteroWrappedItems) {
+  return (zoteroWrappedItems || [])
+    .map(z => z?.data)
+    .filter(Boolean)
+    .filter(d => d.itemType === 'book' || d.itemType === 'bookSection' || d.itemType === 'journalArticle')
+    .map(d => ({
+      key: d.key,
+      itemType: d.itemType,
+      title: d.title || '',
+      date: d.date || '',
+      year: extractYear(d.date || ''),
+      creatorsText: (d.creators || [])
+        .filter(c => c && (c.creatorType === 'author' || c.creatorType === 'editor'))
+        .map(c => `${(c.lastName || '').trim()} ${(c.firstName || '').trim()}`.trim())
+        .filter(Boolean)
+        .join(', '),
+      bookTitle: d.bookTitle || '',
+      publicationTitle: d.publicationTitle || d.journalAbbreviation || '',
+      publisher: d.publisher || '',
+      place: d.place || '',
+      isbn: d.ISBN || d.isbn || '',
+      doi: d.DOI || d.doi || '',
+      volume: d.volume || '',
+      issue: d.issue || '',
+      pages: d.pages || '',
+      flags: parseDLABFlags(d.extra || '')
+    }));
 }
 
 function extractYear(dateStr) {
