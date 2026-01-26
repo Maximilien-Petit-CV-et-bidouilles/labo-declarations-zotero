@@ -20,7 +20,7 @@
     .bar{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
     .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px}
 
-    .controls{display:grid;grid-template-columns: 1.2fr 1fr 1fr 1fr auto;gap:10px}
+    .controls{display:grid;grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr;gap:10px}
     @media (max-width: 1100px){ .controls{grid-template-columns:1fr 1fr 1fr} }
     @media (max-width: 800px){ .controls{grid-template-columns:1fr 1fr} }
     @media (max-width: 520px){ .controls{grid-template-columns:1fr} }
@@ -31,18 +31,19 @@
     button{cursor:pointer}
     button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:650}
     button.ghost{background:#fff}
-    button:disabled{opacity:.6;cursor:not-allowed}
+
+    .stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    .stat{min-width:160px}
+    .stat b{display:block;font-size:1.05rem}
+    .stat span{color:var(--muted);font-size:.85rem}
 
     table{width:100%;border-collapse:separate;border-spacing:0;margin-top:12px}
     th,td{padding:10px 10px;border-bottom:1px solid var(--border);vertical-align:top}
     th{font-size:.82rem;color:var(--muted);text-align:left;white-space:nowrap}
     td{font-size:.92rem}
-
-    .title{font-weight:700}
+    .title a{color:inherit;text-decoration:none}
+    .title a:hover{text-decoration:underline}
     .muted{color:var(--muted)}
-    .mini{font-size:.82rem}
-    .right{white-space:nowrap}
-
     .tag{
       display:inline-flex;align-items:center;gap:6px;
       padding:4px 8px;border-radius:999px;border:1px solid var(--border);
@@ -51,6 +52,8 @@
     .tag.ok{border-color:rgba(27,124,58,.35);background:rgba(27,124,58,.08);color:var(--ok)}
     .tag.warn{border-color:rgba(178,106,0,.35);background:rgba(178,106,0,.08);color:var(--warn)}
     .tag.bad{border-color:rgba(179,32,32,.35);background:rgba(179,32,32,.08);color:var(--bad)}
+    .mini{font-size:.82rem;color:var(--muted)}
+    .right{white-space:nowrap}
 
     .axes{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
     .chip{
@@ -59,21 +62,16 @@
       font-size:.78rem;font-weight:650;color:#1d3c76;white-space:nowrap;
     }
 
-    .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    .chk{display:flex;gap:8px;align-items:center}
-    .chk input{transform:translateY(1px)}
     .statusline{margin-top:10px;color:var(--muted);font-size:.9rem;white-space:pre-wrap}
+    .loading{display:inline-flex;gap:8px;align-items:center}
+    .dot{width:8px;height:8px;border-radius:99px;background:var(--accent);display:inline-block;animation:pulse 1s infinite ease-in-out}
+    .dot:nth-child(2){animation-delay:.15s}
+    .dot:nth-child(3){animation-delay:.3s}
+    @keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
 
-    /* ✅ Auteurs : clamp pour éviter que la colonne explose */
-    td.authorsCol{max-width:230px;}
-    td.authorsCol .clamp{
-      display:-webkit-box;
-      -webkit-line-clamp:2; /* 2 lignes max */
-      -webkit-box-orient:vertical;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      word-break:break-word;
-    }
+    /* Pagination */
+    .pager{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:10px}
+    .pager .left,.pager .right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   </style>
 </head>
 <body>
@@ -81,26 +79,27 @@
     <header>
       <div>
         <h1>Back-office — Suivi HAL & Communication</h1>
-        <p class="sub">Connexion Netlify Identity requise. Les modifications sont enregistrées dans Zotero.</p>
+        <p class="sub">Gestion interne (inclut livres, chapitres, articles et communications).</p>
       </div>
-      <div class="pill" id="authPill">🔒 Non connecté</div>
+      <div class="pill" id="lastUpdate">Chargement…</div>
     </header>
 
     <div class="bar">
-      <div class="card" style="flex:1;min-width:320px">
+      <div class="card" style="flex:1;min-width:260px">
         <div class="controls">
-          <input id="q" type="search" placeholder="Rechercher (titre, auteur, revue, axes, éditeur, ISBN, DOI…)" />
-          <select id="filterNeed">
-            <option value="all">Toutes demandes</option>
-            <option value="needsAction">À traiter</option>
-            <option value="hal">HAL demandé</option>
-            <option value="comms">Com demandée</option>
-          </select>
+          <input id="q" type="search" placeholder="Rechercher (titre, auteur, revue, conférence, axes, éditeur, ISBN, DOI…)" />
           <select id="filterType">
             <option value="all">Tous types</option>
             <option value="book">Livres</option>
             <option value="bookSection">Chapitres</option>
             <option value="journalArticle">Articles</option>
+            <option value="conferencePaper">Communications</option>
+          </select>
+          <select id="filterNeeds">
+            <option value="all">Toutes demandes</option>
+            <option value="needsAction">À traiter</option>
+            <option value="halYes">HAL demandé</option>
+            <option value="commsYes">Com demandé</option>
           </select>
 
           <select id="filterAxis">
@@ -111,108 +110,142 @@
             <option value="none">Sans axe</option>
           </select>
 
-          <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
-            <button class="ghost" id="login">Se connecter</button>
-            <button class="ghost" id="logout">Se déconnecter</button>
-            <button class="primary" id="refresh">Rafraîchir</button>
-          </div>
+          <select id="filterYear">
+            <option value="all">Toutes années</option>
+          </select>
+
+          <button class="ghost" id="reset">Réinitialiser</button>
+          <button class="primary" id="refresh">Rafraîchir</button>
         </div>
 
         <div class="statusline" id="msg"></div>
 
-        <table>
-          <thead>
-            <tr>
-              <th style="width:80px">Année</th>
-              <th style="width:90px">Type</th>
-              <th>Titre</th>
-              <th style="width:230px">Auteur(s)</th>
-              <th style="width:170px">HAL</th>
-              <th style="width:200px">Communication</th>
-              <th style="width:210px">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="rows">
-            <tr><td colspan="7" class="mini">Connecte-toi via Netlify Identity.</td></tr>
-          </tbody>
-        </table>
+        <div class="stats">
+          <div class="stat">
+            <b id="sTotal">—</b><span>items</span>
+          </div>
+          <div class="stat">
+            <b id="sNeed">—</b><span>à traiter</span>
+          </div>
+          <div class="stat">
+            <b id="sHal">—</b><span>HAL demandés</span>
+          </div>
+          <div class="stat">
+            <b id="sComms">—</b><span>Communications demandées</span>
+          </div>
+        </div>
 
-        <!-- ✅ Pagination tableau (après filtrage) -->
-        <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:10px">
-          <div class="pill" id="pagerInfo">Page —</div>
-
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <label class="pill" style="gap:6px">
-              Lignes/page
-              <select id="pageSize" style="padding:6px 8px;border-radius:10px">
-                <option value="25" selected>25</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-              </select>
-            </label>
-
-            <button class="ghost" id="prevPage">◀ Précédent</button>
-            <button class="ghost" id="nextPage">Suivant ▶</button>
+        <div class="pager">
+          <div class="left">
+            <button class="ghost" id="prev">←</button>
+            <button class="ghost" id="next">→</button>
+            <span class="muted" id="pageInfo">—</span>
+          </div>
+          <div class="right">
+            <span class="muted">Par page</span>
+            <select id="pageSize">
+              <option value="25">25</option>
+              <option value="50" selected>50</option>
+              <option value="100">100</option>
+              <option value="200">200</option>
+            </select>
           </div>
         </div>
       </div>
     </div>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:90px">Année</th>
+            <th style="width:120px">Type</th>
+            <th>Titre</th>
+            <th style="width:240px">Auteur(s)</th>
+            <th style="width:140px">HAL</th>
+            <th style="width:170px">Communication</th>
+            <th style="width:140px">Statut</th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+          <tr><td colspan="7">
+            <span class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span> Chargement…</span>
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
-  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <script>
     let ALL = [];
-    let PAGE_INDEX = 0;
-    let PAGE_SIZE = 25;
+    let VIEW = [];
 
-    // ✅ Debounce recherche (perf)
-    let __tSearch = null;
-    function debouncedRender(ms=200){
-      clearTimeout(__tSearch);
-      __tSearch = setTimeout(() => render(), ms);
-    }
+    let PAGE = 1;
+    let PAGE_SIZE = 50;
 
     const $ = (id) => document.getElementById(id);
 
     function norm(s){
       return (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
     }
+
     function escapeHtml(str){
       return String(str || '')
-        .replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')
-        .replaceAll('"','&quot;').replaceAll("'","&#039;");
+        .replaceAll('&','&amp;')
+        .replaceAll('<','&lt;')
+        .replaceAll('>','&gt;')
+        .replaceAll('"','&quot;')
+        .replaceAll("'","&#039;");
     }
+
     function typeLabel(t){
       if (t === 'book') return 'Livre';
       if (t === 'bookSection') return 'Chapitre';
       if (t === 'journalArticle') return 'Article';
+      if (t === 'conferencePaper') return 'Communication';
       return t || '';
     }
+
     function yearFromDate(dateStr){
       const m = (dateStr || '').match(/\b(19|20)\d{2}\b/);
       return m ? m[0] : '';
     }
 
-    function setMsg(s){ $('msg').textContent = s || ''; }
+    function joinCreators(creators){
+      if (!Array.isArray(creators)) return '';
+      const names = creators
+        .filter(c => c && (c.creatorType === 'author' || c.creatorType === 'editor' || c.creatorType === 'presenter'))
+        .map(c => {
+          const fn = (c.firstName || '').trim();
+          const ln = (c.lastName || '').trim();
+          return (ln && fn) ? (ln + ' ' + fn) : (ln || fn);
+        })
+        .filter(Boolean);
+      return names.join(', ');
+    }
 
-    function showAuthedUI(authed){
-      $('authPill').textContent = authed ? '✅ Connecté' : '🔒 Non connecté';
-      $('login').style.display = authed ? 'none' : '';
-      $('logout').style.display = authed ? '' : 'none';
-      $('refresh').disabled = !authed;
-      $('q').disabled = !authed;
-      $('filterNeed').disabled = !authed;
-      $('filterType').disabled = !authed;
-      $('filterAxis').disabled = !authed;
-      $('pageSize').disabled = !authed;
-      $('prevPage').disabled = !authed;
-      $('nextPage').disabled = !authed;
+    function truncateAuthors(text, maxNames = 6){
+      const s = String(text || '').trim();
+      if (!s) return { short:'', full:'' };
+      const parts = s.split(/\s*,\s*/).filter(Boolean);
+      if (parts.length <= maxNames) return { short:s, full:s };
+      return { short: parts.slice(0,maxNames).join(', ') + `, … (+${parts.length-maxNames})`, full:s };
+    }
+
+    function tagYesNo(val){
+      if (val === 'yes') return { txt:'Oui', cls:'ok' };
+      if (val === 'no') return { txt:'Non', cls:'' };
+      return { txt:'—', cls:'' };
     }
 
     function parseAxes(flags){
       const raw = (flags && flags.axes) ? String(flags.axes).trim() : '';
       if (!raw || raw === 'none') return [];
-      return raw.split(/[,;|]/).map(s => s.trim()).filter(Boolean).map(s => s.toUpperCase());
+      return raw
+        .split(/[,;|]/)
+        .map(s => s.trim())
+        .filter(Boolean)
+        .map(s => s.toUpperCase());
     }
 
     function statusFor(flags){
@@ -230,105 +263,53 @@
       return { txt:'Traité', cls:'ok' };
     }
 
-    async function authedFetch(url, opts={}){
-      const user = netlifyIdentity.currentUser();
-      if (!user) throw new Error('Not logged in');
-      const token = await user.jwt();
-      const headers = Object.assign({}, opts.headers || {}, { Authorization: `Bearer ${token}` });
-      return fetch(url, Object.assign({}, opts, { headers }));
+    function fillYears(items){
+      const years = [...new Set(items.map(i => i.year).filter(Boolean))].sort((a,b)=>b.localeCompare(a));
+      const sel = $('filterYear');
+      const cur = sel.value;
+      sel.innerHTML = `<option value="all">Toutes années</option>` + years.map(y => `<option value="${y}">${y}</option>`).join('');
+      sel.value = years.includes(cur) ? cur : 'all';
     }
 
-    function clampPageIndex(total){
+    function setMsg(s){ $('msg').textContent = s || ''; }
+
+    function setPage(n){
+      const totalPages = Math.max(1, Math.ceil(VIEW.length / PAGE_SIZE));
+      PAGE = Math.min(Math.max(1, n), totalPages);
+      renderTable();
+      renderPager();
+    }
+
+    function renderPager(){
+      const total = VIEW.length;
       const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-      if (PAGE_INDEX >= totalPages) PAGE_INDEX = totalPages - 1;
-      if (PAGE_INDEX < 0) PAGE_INDEX = 0;
-      return totalPages;
+      const from = total ? ((PAGE - 1) * PAGE_SIZE + 1) : 0;
+      const to = Math.min(total, PAGE * PAGE_SIZE);
+      $('pageInfo').textContent = `${from}-${to} / ${total}`;
+      $('prev').disabled = PAGE <= 1;
+      $('next').disabled = PAGE >= totalPages;
     }
 
-    function updatePagerUI(total){
-      const totalPages = clampPageIndex(total);
-      const from = total ? (PAGE_INDEX * PAGE_SIZE + 1) : 0;
-      const to = Math.min(total, (PAGE_INDEX + 1) * PAGE_SIZE);
-      $('pagerInfo').textContent = `Page ${PAGE_INDEX + 1}/${totalPages} — ${from}-${to} / ${total}`;
-      $('prevPage').disabled = PAGE_INDEX <= 0;
-      $('nextPage').disabled = PAGE_INDEX >= (totalPages - 1);
-    }
-
-    // ✅ Chargement progressif: affiche vite 100 items puis charge le reste en arrière-plan
-    async function load(){
-      setMsg('⏳ Chargement…');
-      $('rows').innerHTML = `<tr><td colspan="7" class="mini">Chargement…</td></tr>`;
-
-      // 1) Première page rapide (100 max)
-      const first = await authedFetch('/.netlify/functions/admin-items?start=0&limit=100');
-      const data1 = await first.json().catch(()=>({}));
-
-      if (!first.ok){
-        setMsg('❌ Erreur: ' + (data1?.error || 'accès refusé'));
-        $('rows').innerHTML = `<tr><td colspan="7" class="mini">Erreur serveur.</td></tr>`;
-        return;
-      }
-
-      ALL = (data1.items || []).map(it => ({
-        ...it,
-        year: it.year || yearFromDate(it.date),
-      }));
-
-      PAGE_INDEX = 0;
-      PAGE_SIZE = parseInt($('pageSize').value, 10) || 25;
-
-      // Au début: recherche sur 100 (chargé). Puis re-render quand le reste arrive.
-      setMsg(`✅ ${ALL.length} item(s) chargés (partiel).`);
-      render();
-
-      // 2) Charger le reste en arrière-plan
-      if (data1.hasMore && data1.nextStart !== null) {
-        let nextStart = data1.nextStart;
-        const limit = 100;
-
-        setMsg(`⏳ Chargement du reste… (${ALL.length}/${data1.totalResults || '…'})`);
-
-        while (nextStart !== null) {
-          const r = await authedFetch(`/.netlify/functions/admin-items?start=${nextStart}&limit=${limit}`);
-          const d = await r.json().catch(()=>({}));
-          if (!r.ok) break;
-
-          const more = (d.items || []).map(it => ({
-            ...it,
-            year: it.year || yearFromDate(it.date),
-          }));
-
-          ALL.push(...more);
-
-          setMsg(`⏳ Chargement du reste… (${ALL.length}/${d.totalResults || '…'})`);
-          nextStart = d.hasMore ? d.nextStart : null;
-        }
-
-        setMsg(`✅ ${ALL.length} item(s) chargés.`);
-        render();
-      } else {
-        setMsg(`✅ ${ALL.length} item(s) chargés.`);
-        render();
-      }
-    }
-
-    function render(){
+    function applyFilters(){
       const q = norm($('q').value);
-      const fNeed = $('filterNeed').value;
       const fType = $('filterType').value;
+      const fNeed = $('filterNeeds').value;
       const fAxis = $('filterAxis').value;
+      const fYear = $('filterYear').value;
 
-      const rows = ALL.filter(it => {
+      VIEW = ALL.filter(it => {
         if (fType !== 'all' && it.itemType !== fType) return false;
+
+        const y = it.year || '';
+        if (fYear !== 'all' && y !== fYear) return false;
 
         const flags = it.flags || {};
         const st = statusFor(flags);
 
         if (fNeed === 'needsAction' && st.txt !== 'À traiter') return false;
-        if (fNeed === 'hal' && flags.hal_create !== 'yes') return false;
-        if (fNeed === 'comms' && flags.comms_publish !== 'yes') return false;
+        if (fNeed === 'halYes' && flags.hal_create !== 'yes') return false;
+        if (fNeed === 'commsYes' && flags.comms_publish !== 'yes') return false;
 
-        // Filtre Axe
         const axes = parseAxes(flags);
         const axisSel = String(fAxis || 'all').toUpperCase();
         if (axisSel !== 'ALL') {
@@ -343,6 +324,7 @@
           it.title,
           it.bookTitle,
           it.publicationTitle,
+          it.conferenceName,
           it.publisher,
           it.place,
           it.isbn,
@@ -357,36 +339,45 @@
         return hay.includes(q);
       });
 
-      rows.sort((a,b) => {
+      $('sTotal').textContent = VIEW.length;
+      $('sNeed').textContent = VIEW.filter(it => statusFor(it.flags || {}).txt === 'À traiter').length;
+      $('sHal').textContent = VIEW.filter(it => it.flags?.hal_create === 'yes').length;
+      $('sComms').textContent = VIEW.filter(it => it.flags?.comms_publish === 'yes').length;
+
+      VIEW.sort((a,b) => {
         const ay = parseInt(a.year || '0',10);
         const by = parseInt(b.year || '0',10);
         if (by !== ay) return by - ay;
         return (b.date || '').localeCompare(a.date || '');
       });
 
+      setPage(1);
+    }
+
+    function renderTable(){
       const tbody = $('rows');
       tbody.innerHTML = '';
 
-      if (!rows.length){
-        updatePagerUI(0);
-        tbody.innerHTML = `<tr><td colspan="7" class="mini">Aucun résultat.</td></tr>`;
+      if (!VIEW.length){
+        tbody.innerHTML = `<tr><td colspan="7" class="muted">Aucun résultat.</td></tr>`;
         return;
       }
 
-      updatePagerUI(rows.length);
+      const start = (PAGE - 1) * PAGE_SIZE;
+      const slice = VIEW.slice(start, start + PAGE_SIZE);
 
-      const startIdx = PAGE_INDEX * PAGE_SIZE;
-      const endIdx = startIdx + PAGE_SIZE;
-      const pageItems = rows.slice(startIdx, endIdx);
-
-      for (const it of pageItems){
+      for (const it of slice){
         const flags = it.flags || {};
         const st = statusFor(flags);
 
-        const halWanted = flags.hal_create === 'yes';
-        const commWanted = flags.comms_publish === 'yes';
+        const hal = tagYesNo(flags.hal_create);
+        const comms = tagYesNo(flags.comms_publish);
+
         const halDone = flags.hal_done === 'yes';
         const commDone = flags.comms_done === 'yes';
+
+        const halTxt = halDone ? 'Demandé (traité)' : (hal.txt === 'Oui' ? 'Demandé' : hal.txt);
+        const commTxt = commDone ? 'Demandé (traité)' : (comms.txt === 'Oui' ? 'Demandé' : comms.txt);
 
         let infoTop = '';
         let infoBottom = '';
@@ -395,6 +386,8 @@
           infoTop = `<div class="mini">Dans : ${escapeHtml(it.bookTitle)}</div>`;
         } else if (it.itemType === 'journalArticle' && it.publicationTitle) {
           infoTop = `<div class="mini">Revue : ${escapeHtml(it.publicationTitle)}</div>`;
+        } else if (it.itemType === 'conferencePaper' && it.conferenceName) {
+          infoTop = `<div class="mini">Conférence : ${escapeHtml(it.conferenceName)}</div>`;
         }
 
         if (it.itemType === 'journalArticle') {
@@ -412,145 +405,94 @@
           infoBottom = parts.length ? `<div class="mini">${parts.join(' — ')}</div>` : '';
         }
 
+        const title = it.title || '(sans titre)';
+        const titleHtml = it.zoteroUrl
+          ? `<a href="${it.zoteroUrl}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a>`
+          : escapeHtml(title);
+
         const axes = parseAxes(flags);
         const axesHtml = axes.length
           ? `<div class="axes">` + axes.map(a => `<span class="chip">${escapeHtml(a)}</span>`).join('') + `</div>`
           : '';
 
-        const authorsFull = it.creatorsText || '';
+        const creators = truncateAuthors(it.creatorsText || '');
+        const authorsHtml = `<span title="${escapeHtml(creators.full)}">${escapeHtml(creators.short)}</span>`;
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td class="right">${escapeHtml(it.year || '')}</td>
           <td><span class="tag">${escapeHtml(typeLabel(it.itemType))}</span></td>
-          <td>
-            <div class="title">${escapeHtml(it.title || '(sans titre)')}</div>
-            ${infoTop}
-            ${infoBottom}
-            ${axesHtml}
-          </td>
-          <td class="authorsCol">
-            <div class="clamp" title="${escapeHtml(authorsFull)}">${escapeHtml(authorsFull)}</div>
-          </td>
-
-          <td>
-            <div class="tag ${halWanted ? 'warn' : ''}">
-              ${halWanted ? (halDone ? 'Demandé (traité)' : 'Demandé') : 'Non'}
-            </div>
-            ${halWanted ? `
-              <div class="chk mini" style="margin-top:8px">
-                <input type="checkbox" data-k="${it.key}" data-field="hal_done" ${halDone ? 'checked' : ''}/>
-                <span>HAL traité</span>
-              </div>
-            ` : `<div class="mini muted">—</div>`}
-          </td>
-
-          <td>
-            <div class="tag ${commWanted ? 'warn' : ''}">
-              ${commWanted ? (commDone ? 'Demandé (traité)' : 'Demandé') : 'Non'}
-            </div>
-            ${commWanted ? `
-              <div class="chk mini" style="margin-top:8px">
-                <input type="checkbox" data-k="${it.key}" data-field="comms_done" ${commDone ? 'checked' : ''}/>
-                <span>Com traitée</span>
-              </div>
-            ` : `<div class="mini muted">—</div>`}
-          </td>
-
-          <td>
-            <div class="actions">
-              <button class="primary" data-save="${it.key}">Enregistrer</button>
-              <span class="tag ${st.cls}">${escapeHtml(st.txt)}</span>
-            </div>
-            <div class="mini muted">Key: ${escapeHtml(it.key)}</div>
-          </td>
+          <td class="title">${titleHtml}${infoTop}${infoBottom}${axesHtml}</td>
+          <td>${authorsHtml}</td>
+          <td><span class="tag ${hal.cls}">${escapeHtml(halTxt)}</span></td>
+          <td><span class="tag ${comms.cls}">${escapeHtml(commTxt)}</span></td>
+          <td><span class="tag ${st.cls}">${escapeHtml(st.txt)}</span></td>
         `;
         tbody.appendChild(tr);
       }
-
-      // Bind actions
-      tbody.querySelectorAll('button[data-save]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const key = btn.getAttribute('data-save');
-          await saveRow(key, btn);
-        });
-      });
     }
 
-    async function saveRow(key, btn){
-      const checks = [...document.querySelectorAll(`input[type="checkbox"][data-k="${key}"]`)];
-      const payload = { key };
-      for (const c of checks){
-        const field = c.getAttribute('data-field');
-        payload[field] = c.checked ? 'yes' : 'no';
-      }
-
-      btn.disabled = true;
-      const old = btn.textContent;
-      btn.textContent = 'Enregistrement…';
-      setMsg('⏳ Mise à jour Zotero…');
+    async function load(){
+      setMsg('');
+      $('rows').innerHTML = `<tr><td colspan="7"><span class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span> Chargement des données…</span></td></tr>`;
 
       try{
-        const r = await authedFetch('/.netlify/functions/admin-update-status', {
-          method:'POST',
-          headers:{ 'Content-Type':'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const data = await r.json().catch(()=>({}));
+        const r = await fetch('/.netlify/functions/admin-items', { cache: 'no-store' });
+        const data = await r.json();
 
-        if (!r.ok){
-          setMsg('❌ Erreur: ' + (data?.error || 'mise à jour impossible'));
-        } else {
-          setMsg('✅ Mis à jour. Rechargement…');
-          await load();
+        if (!r.ok) {
+          setMsg('Erreur côté serveur.');
+          $('rows').innerHTML = `<tr><td colspan="7" class="muted">Erreur.</td></tr>`;
+          return;
         }
-      } finally {
-        btn.disabled = false;
-        btn.textContent = old;
+
+        ALL = (data.items || []).map(it => {
+          const y = it.year || yearFromDate(it.date);
+          return {
+            ...it,
+            year: y || '',
+            creatorsText: it.creatorsText || joinCreators(it.creators || []),
+          };
+        });
+
+        fillYears(ALL);
+
+        const ts = data.fetchedAt ? new Date(data.fetchedAt) : new Date();
+        $('lastUpdate').textContent = `Dernière mise à jour : ${ts.toLocaleString('fr-FR')}`;
+
+        applyFilters();
+      } catch(err){
+        console.error(err);
+        setMsg('Erreur réseau.');
+        $('rows').innerHTML = `<tr><td colspan="7" class="muted">Impossible de charger les données.</td></tr>`;
       }
     }
 
-    $('login').addEventListener('click', () => netlifyIdentity.open());
-    $('logout').addEventListener('click', () => netlifyIdentity.logout());
+    $('q').addEventListener('input', applyFilters);
+    ['filterType','filterNeeds','filterAxis','filterYear'].forEach(id => $(id).addEventListener('change', applyFilters));
+
+    $('reset').addEventListener('click', () => {
+      $('q').value = '';
+      $('filterType').value = 'all';
+      $('filterNeeds').value = 'all';
+      $('filterAxis').value = 'all';
+      $('filterYear').value = 'all';
+      applyFilters();
+    });
+
     $('refresh').addEventListener('click', load);
 
-    // ✅ listeners : debounce sur recherche + reset page
-    $('q').addEventListener('input', () => { PAGE_INDEX = 0; debouncedRender(200); });
-    ['filterNeed','filterType','filterAxis'].forEach(id =>
-      $(id).addEventListener('change', () => { PAGE_INDEX = 0; render(); })
-    );
-
-    // Pagination tableau
+    $('prev').addEventListener('click', () => setPage(PAGE - 1));
+    $('next').addEventListener('click', () => setPage(PAGE + 1));
     $('pageSize').addEventListener('change', () => {
-      PAGE_SIZE = parseInt($('pageSize').value, 10) || 25;
-      PAGE_INDEX = 0;
-      render();
-    });
-    $('prevPage').addEventListener('click', () => { PAGE_INDEX--; render(); });
-    $('nextPage').addEventListener('click', () => { PAGE_INDEX++; render(); });
-
-    netlifyIdentity.on('init', user => {
-      showAuthedUI(!!user);
-      updatePagerUI(0);
-      setMsg(user ? '✅ Connecté. Clique “Rafraîchir”.' : '🔒 Non connecté.');
+      const v = parseInt($('pageSize').value, 10);
+      if (Number.isFinite(v) && v > 0 && v <= 500) {
+        PAGE_SIZE = v;
+        setPage(1);
+      }
     });
 
-    netlifyIdentity.on('login', user => {
-      showAuthedUI(true);
-      netlifyIdentity.close();
-      setMsg('✅ Connecté. Chargement…');
-      load();
-    });
-
-    netlifyIdentity.on('logout', () => {
-      showAuthedUI(false);
-      ALL = [];
-      updatePagerUI(0);
-      $('rows').innerHTML = `<tr><td colspan="7" class="mini">Déconnecté.</td></tr>`;
-      setMsg('🔒 Déconnecté.');
-    });
-
-    netlifyIdentity.init();
+    load();
   </script>
 </body>
 </html>
