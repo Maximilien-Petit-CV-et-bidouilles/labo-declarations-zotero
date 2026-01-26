@@ -13,76 +13,74 @@
     *{box-sizing:border-box}
     body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text)}
     .page{max-width:900px;margin:32px auto;padding:0 16px}
+
     header{margin-bottom:18px}
     h1{margin:0 0 6px;font-size:1.7rem;font-weight:650}
     .subtitle{margin:0;color:var(--muted);font-size:.95rem}
 
-    .switcher{display:flex;gap:8px;margin:18px 0 14px}
-    .switcher button{
-      flex:1;border-radius:999px;border:1px solid var(--border);
-      background:#fff;padding:10px 16px;font-size:.95rem;cursor:pointer;
-      display:inline-flex;justify-content:center;align-items:center;gap:8px;
+    form{
+      background:var(--card);
+      padding:18px;
+      border-radius:10px;
+      border:1px solid var(--border);
     }
-    .switcher button.active{background:var(--accent-soft);border-color:var(--accent)}
-    .hint{color:var(--muted);font-size:.9rem;margin:0 0 14px}
-
-    form{background:var(--card);padding:18px;border-radius:10px;border:1px solid var(--border)}
-    label{display:block;margin:0 0 10px;font-weight:600;font-size:.9rem}
+    label{
+      display:block;
+      margin:0 0 10px;
+      font-weight:600;
+      font-size:.9rem;
+    }
     label span{display:block;margin:0 0 3px}
     input,select,textarea{
-      width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);
-      font:inherit;background:#fff
+      width:100%;
+      padding:8px;
+      border-radius:6px;
+      border:1px solid var(--border);
+      font:inherit;
+      background:#fff;
     }
     textarea{resize:vertical}
 
-    .two-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px 16px}
-
-    button[type="submit"]{
-      margin-top:8px;padding:8px 16px;border-radius:999px;border:none;
-      background:var(--accent);color:#fff;font-weight:700;cursor:pointer
-    }
-    button[disabled]{opacity:.7;cursor:default}
-
-    .status{margin-top:8px;font-size:.9rem;white-space:pre-wrap}
-    .status.ok{color:#1b7c3a}
-    .status.err{color:#b32020}
-
-    .authors-title{font-weight:700;margin:10px 0 6px}
-    .author-row{border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px}
-    .btn-secondary{border-radius:999px;border:1px solid var(--border);background:#fff;padding:6px 12px;cursor:pointer}
-    .small-muted{color:var(--muted);font-size:.85rem;margin-left:8px}
-
-    .opts {
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px;
-      margin: 12px 0;
-      background: #fff;
-    }
-    .opts h3 {
-      margin: 0 0 8px;
-      font-size: .95rem;
-    }
-    .opts p {
-      margin: 0 0 10px;
-      color: var(--muted);
-      font-size: .85rem;
+    .two-cols{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+      gap:10px 16px;
     }
 
-    /* ✅ AXES */
+    .switcher{
+      display:flex;
+      gap:10px;
+      margin-bottom:14px;
+      flex-wrap:wrap;
+    }
+    .switcher button{
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:#fff;
+      padding:8px 12px;
+      cursor:pointer;
+      font-weight:650;
+    }
+    .switcher button.active{
+      border-color:var(--accent);
+      background:var(--accent-soft);
+    }
+
+    .hidden{display:none}
+
     .checks{
       display:flex;
+      gap:10px;
       flex-wrap:wrap;
-      gap:10px 14px;
       margin-top:6px;
     }
     .check{
       display:inline-flex;
-      align-items:center;
       gap:8px;
-      padding:6px 10px;
+      align-items:center;
       border:1px solid var(--border);
       border-radius:999px;
+      padding:7px 10px;
       background:#fff;
       font-weight:600;
       font-size:.85rem;
@@ -126,6 +124,14 @@
     Import par lot (CSV HAL → Zotero)
   </a>
 </p>
+  <p style="margin-top:6px;font-size:.9rem">
+    🎤
+    <a href="/conference.html"
+       style="color:var(--accent);text-decoration:none;font-weight:600">
+      Déclarer une communication (Conference Paper)
+    </a>
+  </p>
+
 
 </header>
 
@@ -134,179 +140,196 @@
       <button type="button" class="active">Nouvelle publication</button>
     </div>
 
-    <p class="hint">Choisissez le type (Livre / Chapitre / Article), puis remplissez les champs requis.</p>
-
-    <form id="pub-form">
+    <form id="publication-form">
+      <!-- Type -->
       <label>
         <span>Type de publication *</span>
-        <select name="pubType" id="pubType">
+        <select id="pubType" name="pubType" required>
+          <option value="journalArticle">Article</option>
+          <option value="bookSection">Chapitre d'ouvrage</option>
           <option value="book">Livre</option>
-          <option value="bookSection">Chapitre d’ouvrage</option>
-          <option value="journalArticle">Article (revue)</option>
         </select>
       </label>
 
+      <!-- Common -->
       <label>
         <span>Title *</span>
         <input name="title" required>
       </label>
 
-      <div class="authors-title">Author(s) *</div>
-      <div id="authors-list"></div>
-      <div style="display:flex;align-items:center;gap:8px;margin:8px 0 12px">
-        <button type="button" id="add-author-btn" class="btn-secondary">+ Ajouter un auteur</button>
-        <span class="small-muted">Prénom/Nom (minimum : un auteur)</span>
+      <div class="two-cols">
+        <label>
+          <span>Prénom auteur *</span>
+          <input name="firstName" required>
+        </label>
+        <label>
+          <span>Nom auteur *</span>
+          <input name="lastName" required>
+        </label>
       </div>
 
-      <!-- ====== CHAMPS LIVRE ====== -->
-      <div id="book-fields">
+      <!-- Book fields -->
+      <div id="book-fields" class="hidden">
         <div class="two-cols">
-          <label><span>Date *</span><input name="date" placeholder="2024 ou 2024-06-15"></label>
-          <label><span>Language</span><input name="language" placeholder="fr / en"></label>
-        </div>
-
-        <div class="two-cols">
-          <label><span>Publisher *</span><input name="publisher"></label>
-          <label><span>Place *</span><input name="place"></label>
-        </div>
-
-        <label><span>ISBN</span><input name="isbn" placeholder="978-..."></label>
-        <label><span>Abstract</span><textarea name="abstract" rows="4"></textarea></label>
-      </div>
-
-      <!-- ====== CHAMPS CHAPITRE ====== -->
-      <div id="section-fields" style="display:none">
-        <label><span>Book Title *</span><input name="bookTitle"></label>
-
-        <div class="two-cols">
-          <label><span>Pages</span><input name="pages" placeholder="123-145"></label>
-          <label><span>Edition</span><input name="edition"></label>
-        </div>
-
-        <div class="two-cols">
-          <label><span>Series</span><input name="series"></label>
-          <label><span>Series Number</span><input name="seriesNumber"></label>
-        </div>
-
-        <div class="two-cols">
-          <label><span>Volume</span><input name="volume"></label>
-          <label><span>Date *</span><input name="sectionDate" placeholder="2024 ou 2024-06-15"></label>
-        </div>
-
-        <div class="two-cols">
-          <label><span>Publisher *</span><input name="sectionPublisher"></label>
-          <label><span>Place *</span><input name="sectionPlace"></label>
-        </div>
-
-        <label><span>ISBN</span><input name="sectionIsbn" placeholder="978-..."></label>
-      </div>
-
-      <!-- ====== CHAMPS ARTICLE ====== -->
-      <div id="article-fields" style="display:none">
-        <div class="two-cols">
-          <label><span>Publication (revue) *</span><input name="articlePublication" placeholder="Nom de la revue"></label>
-          <label><span>Date *</span><input name="articleDate" placeholder="2024 ou 2024-06-15"></label>
-        </div>
-
-        <div class="two-cols">
-          <label><span>Volume</span><input name="articleVolume"></label>
-          <label><span>Issue</span><input name="articleIssue"></label>
-        </div>
-
-        <div class="two-cols">
-          <label><span>Pages</span><input name="articlePages" placeholder="123-145"></label>
-          <label><span>DOI</span>
-            <div style="display:flex;gap:8px;align-items:center">
-              <input name="articleDoi" id="articleDoi" placeholder="10.xxxx/xxxxx" style="flex:1">
-              <button type="button" id="doi-prefill" class="btn-secondary" title="Préremplir à partir du DOI">⚡ DOI</button>
-            </div>
-            <span class="small-muted">Collez un DOI (ou une URL doi.org), puis cliquez sur ⚡</span>
+          <label>
+            <span>Publisher</span>
+            <input name="publisher">
+          </label>
+          <label>
+            <span>Place</span>
+            <input name="place">
           </label>
         </div>
-
-        <div class="two-cols">
-          <label><span>Publisher</span><input name="articlePublisher"></label>
-          <label><span>Place</span><input name="articlePlace"></label>
-        </div>
-      </div>
-
-      <!-- ====== OPTIONS (HAL / COMMS / AXES) ====== -->
-      <div class="opts">
-        <h3>Options</h3>
-        <p>Ces choix seront enregistrés dans Zotero (champ “Extra”).</p>
 
         <div class="two-cols">
           <label>
-            <span>Souhaitez-vous la création d’une notice sur HAL ? *</span>
-            <select name="optHal" required>
-              <option value="">— Choisir —</option>
-              <option value="yes">Oui</option>
-              <option value="no">Non</option>
-            </select>
+            <span>Date</span>
+            <input name="date" placeholder="2024 ou 2024-06-01">
           </label>
-
           <label>
-            <span>Souhaitez-vous une communication (newsletter + réseaux sociaux) ? *</span>
-            <select name="optComms" required>
-              <option value="">— Choisir —</option>
-              <option value="yes">Oui</option>
-              <option value="no">Non</option>
-            </select>
+            <span>ISBN</span>
+            <input name="isbn">
           </label>
         </div>
 
-        <!-- ✅ Nouvelle option AXES -->
-        <div style="margin-top:10px">
-          <div style="font-weight:700;font-size:.9rem;margin:0 0 6px">
-            Est-ce que votre publication/événement est rattachée à un axe thématique de recherche ?
-          </div>
-          <div class="checks">
-            <label class="check"><input type="checkbox" name="axisPICMAP" value="PICMAP"> PICMAP</label>
-            <label class="check"><input type="checkbox" name="axisMOPTIS" value="MOPTIS"> MOPTIS</label>
-            <label class="check"><input type="checkbox" name="axisOCSO" value="OCSO"> OCSO</label>
-          </div>
-          <div class="small-muted" style="margin-top:6px">Vous pouvez cocher plusieurs axes.</div>
+        <label>
+          <span>Language</span>
+          <input name="language">
+        </label>
+      </div>
+
+      <!-- Book section fields -->
+      <div id="chapter-fields" class="hidden">
+        <label>
+          <span>Book Title *</span>
+          <input name="bookTitle">
+        </label>
+
+        <div class="two-cols">
+          <label>
+            <span>Publisher</span>
+            <input name="publisher_chapter">
+          </label>
+          <label>
+            <span>Place</span>
+            <input name="place_chapter">
+          </label>
+        </div>
+
+        <div class="two-cols">
+          <label>
+            <span>Date</span>
+            <input name="date_chapter" placeholder="2024 ou 2024-06-01">
+          </label>
+          <label>
+            <span>Pages</span>
+            <input name="pages">
+          </label>
+        </div>
+
+        <div class="two-cols">
+          <label>
+            <span>ISBN</span>
+            <input name="isbn_chapter">
+          </label>
+          <label>
+            <span>Language</span>
+            <input name="language_chapter">
+          </label>
         </div>
       </div>
+
+      <!-- Article fields -->
+      <div id="article-fields" class="hidden">
+        <label>
+          <span>Journal *</span>
+          <input name="publication">
+        </label>
+
+        <div class="two-cols">
+          <label>
+            <span>Date</span>
+            <input name="date_article" placeholder="2024 ou 2024-06-01">
+          </label>
+          <label>
+            <span>DOI</span>
+            <input name="doi">
+          </label>
+        </div>
+
+        <div class="two-cols">
+          <label>
+            <span>Volume</span>
+            <input name="articleVolume">
+          </label>
+          <label>
+            <span>Issue</span>
+            <input name="articleIssue">
+          </label>
+        </div>
+
+        <div class="two-cols">
+          <label>
+            <span>Pages</span>
+            <input name="articlePages">
+          </label>
+          <label>
+            <span>Language</span>
+            <input name="language_article">
+          </label>
+        </div>
+      </div>
+
+      <hr style="border:0;border-top:1px solid var(--border);margin:14px 0">
 
       <label>
-        <span>Extra</span>
-        <textarea name="extra" rows="4" placeholder="Infos internes, HAL, projet, axe, etc."></textarea>
+        <span>Souhaitez-vous la création d’une notice sur HAL ? *</span>
+        <select name="optHal" required>
+          <option value="">—</option>
+          <option value="yes">Oui</option>
+          <option value="no">Non</option>
+        </select>
       </label>
 
-      <button type="submit">Envoyer vers Zotero</button>
-      <p id="pub-status" class="status"></p>
+      <label>
+        <span>Souhaitez-vous une communication (newsletter + réseaux sociaux) ? *</span>
+        <select name="optComms" required>
+          <option value="">—</option>
+          <option value="yes">Oui</option>
+          <option value="no">Non</option>
+        </select>
+      </label>
 
-      <footer>Les champs marqués d’un * sont obligatoires.</footer>
+      <div style="margin-top:10px">
+        <div style="font-weight:700;font-size:.9rem;margin:0 0 6px">
+          Est-ce que votre publication/événement est rattachée à un axe thématique de recherche ?
+        </div>
+        <div class="checks">
+          <label class="check"><input type="checkbox" name="axisPICMAP" value="PICMAP"> PICMAP</label>
+          <label class="check"><input type="checkbox" name="axisMOPTIS" value="MOPTIS"> MOPTIS</label>
+          <label class="check"><input type="checkbox" name="axisOCSO" value="OCSO"> OCSO</label>
+        </div>
+      </div>
+
+      <label style="margin-top:12px">
+        <span>Extra (texte libre)</span>
+        <textarea name="extra" rows="4"></textarea>
+      </label>
+
+      <button type="submit"
+              style="margin-top:10px;background:var(--accent);border:1px solid var(--accent);color:#fff;padding:10px 14px;border-radius:8px;cursor:pointer;font-weight:650">
+        Envoyer vers Zotero
+      </button>
+
+      <div id="status"
+           style="margin-top:12px;font-size:.92rem;color:var(--muted);white-space:pre-wrap"></div>
     </form>
+
+    <footer>
+      <p>Les informations envoyées sont stockées dans la bibliothèque Zotero du laboratoire.</p>
+    </footer>
   </div>
 
-  <script src="assets/app.js"></script>
-  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-<script>
-  // Initialise le widget
-  if (window.netlifyIdentity) {
-    window.netlifyIdentity.on("init", (user) => {
-      // Si on arrive via un lien d'invitation / confirmation, Netlify met souvent un hash dans l’URL
-      // On ouvre le widget automatiquement pour permettre la création/validation.
-      if (!user) {
-        const h = window.location.hash || "";
-        if (h.includes("invite_token") || h.includes("confirmation_token") || h.includes("recovery_token")) {
-          window.netlifyIdentity.open();
-        }
-      }
-    });
-    window.netlifyIdentity.init();
-  }
-</script>
-<script>
-  (function(){
-    var h = window.location.hash || "";
-    if (h.includes("invite_token=") || h.includes("confirmation_token=") || h.includes("recovery_token=") || h.includes("email_change_token=")) {
-      window.location.replace("/auth.html" + h);
-    }
-  })();
-</script>
-
+  <script src="/assets/app.js"></script>
 </body>
 </html>
