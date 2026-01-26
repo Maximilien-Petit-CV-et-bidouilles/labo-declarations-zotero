@@ -28,113 +28,65 @@
 
     form{background:var(--card);padding:18px;border-radius:10px;border:1px solid var(--border)}
     label{display:block;margin:0 0 10px;font-weight:600;font-size:.9rem}
-    label span{display:block;margin:0 0 3px}
+    label span{display:block;color:var(--muted);font-weight:650;margin:0 0 6px;font-size:.85rem}
     input,select,textarea{
-      width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);
+      width:100%;padding:10px 10px;border-radius:10px;border:1px solid var(--border);
       font:inherit;background:#fff
     }
     textarea{resize:vertical}
-
-    .two-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px 16px}
-
     button[type="submit"]{
-      margin-top:8px;padding:8px 16px;border-radius:999px;border:none;
-      background:var(--accent);color:#fff;font-weight:700;cursor:pointer
+      width:100%;margin-top:12px;background:var(--accent);color:#fff;border:0;
+      padding:12px 14px;border-radius:10px;font-weight:700;cursor:pointer
     }
-    button[disabled]{opacity:.7;cursor:default}
+    button[type="submit"]:disabled{opacity:.6;cursor:not-allowed}
+    footer{margin-top:12px;color:var(--muted);font-size:.85rem}
 
-    .status{margin-top:8px;font-size:.9rem;white-space:pre-wrap}
+    .two-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    @media (max-width: 740px){ .two-cols{grid-template-columns:1fr} }
+
+    .authors-title{margin:10px 0 8px;font-weight:700;font-size:.9rem}
+    .author-row{
+      display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center;margin-bottom:8px
+    }
+    @media (max-width: 740px){ .author-row{grid-template-columns:1fr 1fr} .author-row button{grid-column:1 / -1} }
+    .btn-secondary{
+      background:#fff;border:1px solid var(--border);border-radius:10px;padding:9px 10px;cursor:pointer;
+      font-weight:650
+    }
+    .btn-danger{
+      background:#fff;border:1px solid #e1b8b8;color:#b32020;border-radius:10px;padding:9px 10px;cursor:pointer;
+      font-weight:700
+    }
+    .small-muted{color:var(--muted);font-size:.82rem}
+
+    .opts{
+      margin-top:14px;border-top:1px solid var(--border);padding-top:14px
+    }
+    .opts h3{margin:0 0 6px;font-size:1rem}
+    .opts p{margin:0 0 10px;color:var(--muted);font-size:.9rem}
+    .checks{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}
+    .check{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--border);padding:8px 10px;border-radius:999px;background:#fff}
+    .check input{width:auto}
+
+    .status{margin:10px 0 0;font-size:.9rem;color:var(--muted);white-space:pre-wrap}
     .status.ok{color:#1b7c3a}
     .status.err{color:#b32020}
-
-    .authors-title{font-weight:700;margin:10px 0 6px}
-    .author-row{border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px}
-    .btn-secondary{border-radius:999px;border:1px solid var(--border);background:#fff;padding:6px 12px;cursor:pointer}
-    .small-muted{color:var(--muted);font-size:.85rem;margin-left:8px}
-
-    .opts {
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px;
-      margin: 12px 0;
-      background: #fff;
-    }
-    .opts h3 {
-      margin: 0 0 8px;
-      font-size: .95rem;
-    }
-    .opts p {
-      margin: 0 0 10px;
-      color: var(--muted);
-      font-size: .85rem;
-    }
-
-    /* ✅ AXES */
-    .checks{
-      display:flex;
-      flex-wrap:wrap;
-      gap:10px 14px;
-      margin-top:6px;
-    }
-    .check{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:6px 10px;
-      border:1px solid var(--border);
-      border-radius:999px;
-      background:#fff;
-      font-weight:600;
-      font-size:.85rem;
-      cursor:pointer;
-      user-select:none;
-    }
-    .check input{
-      width:16px;height:16px;
-      margin:0;
-    }
-
-    footer{margin-top:18px;color:var(--muted);font-size:.8rem}
   </style>
 </head>
 
 <body>
   <div class="page">
     <header>
-  <h1>Déclarations du laboratoire</h1>
-  <p class="subtitle">Les données sont envoyées automatiquement dans Zotero.</p>
+      <h1>Déclarations</h1>
+      <p class="subtitle">Déclarez une publication dans Zotero, et indiquez si vous souhaitez une action HAL / communication.</p>
 
-  <p style="margin-top:8px;font-size:.9rem">
-    📊
-    <a href="/suivi.html" target="_blank" rel="noopener noreferrer"
-       style="color:var(--accent);text-decoration:none;font-weight:600">
-      Voir le suivi public des demandes (HAL & communication)
-    </a>
-  </p>
+      <div class="switcher">
+        <button id="tab-publication" class="active" type="button">📚 Publication</button>
+        <button id="tab-event" type="button">📅 Événement</button>
+      </div>
+    </header>
 
-  <p style="margin-top:6px;font-size:.9rem">
-    🧾
-    <a href="/cv.html" target="_blank" rel="noopener noreferrer"
-       style="color:var(--accent);text-decoration:none;font-weight:600">
-      Générateur de CV (à partir des publications Zotero)
-    </a>
-  </p>
-<p style="margin-top:6px;font-size:.9rem">
-  📥
-  <a href="/import.html"
-     style="color:var(--accent);text-decoration:none;font-weight:600">
-    Import par lot (CSV HAL → Zotero)
-  </a>
-</p>
-
-</header>
-
-
-    <div class="switcher">
-      <button type="button" class="active">Nouvelle publication</button>
-    </div>
-
-    <p class="hint">Choisissez le type (Livre / Chapitre / Article), puis remplissez les champs requis.</p>
+    <p class="hint">Choisissez le type (Livre / Chapitre / Article / Communication), puis remplissez les champs requis.</p>
 
     <form id="pub-form">
       <label>
@@ -143,6 +95,7 @@
           <option value="book">Livre</option>
           <option value="bookSection">Chapitre d’ouvrage</option>
           <option value="journalArticle">Article (revue)</option>
+          <option value="conferencePaper">Communication (conference paper)</option>
         </select>
       </label>
 
@@ -230,6 +183,85 @@
         </div>
       </div>
 
+      <!-- ====== CHAMPS COMMUNICATION (CONFERENCE PAPER) ====== -->
+      <div id="conference-fields" style="display:none">
+        <div class="two-cols">
+          <label><span>Conference Name *</span><input name="conferenceName" placeholder="Nom de la conférence / colloque"></label>
+          <label><span>Date *</span><input name="conferenceDate" placeholder="2015 ou 2015-06-15"></label>
+        </div>
+
+        <div class="two-cols">
+          <label><span>Publisher</span><input name="conferencePublisher" placeholder="Éditeur (si actes publiés)"></label>
+          <label><span>Place</span><input name="conferencePlace" placeholder="Lieu de publication"></label>
+        </div>
+
+        <label><span>Language</span><input name="conferenceLanguage" placeholder="fr / en"></label>
+
+        <div class="opts" style="margin-top:14px">
+          <h3>Extra (conférence)</h3>
+          <p>Ces informations seront ajoutées dans Zotero (champ “Extra”).</p>
+
+          <div class="two-cols">
+            <label><span>tex.conferencestartdate</span><input name="tex_conferencestartdate" placeholder="2015-06-01"></label>
+            <label><span>tex.conferenceenddate</span><input name="tex_conferenceenddate" placeholder="2015-06-03"></label>
+          </div>
+
+          <label><span>tex.conferenceorganizer</span><input name="tex_conferenceorganizer" placeholder="Organisateur·rice / comité, etc."></label>
+
+          <div class="two-cols">
+            <label>
+              <span>tex.x-audience</span>
+              <input name="tex_x_audience" value="Not set" readonly>
+            </label>
+
+            <label>
+              <span>tex.x-language</span>
+              <input name="tex_x_language" placeholder="fr / en (si différent de Language)">
+            </label>
+          </div>
+
+          <div class="two-cols">
+            <label>
+              <span>tex.x-invitedcommunication</span>
+              <select name="tex_x_invitedcommunication">
+                <option value="">— Choisir —</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </label>
+
+            <label>
+              <span>tex.x-peerreviewing</span>
+              <select name="tex_x_peerreviewing">
+                <option value="">— Choisir —</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="two-cols">
+            <label>
+              <span>tex.x-popularlevel</span>
+              <select name="tex_x_popularlevel">
+                <option value="">— Choisir —</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </label>
+
+            <label>
+              <span>tex.x-proceedings</span>
+              <select name="tex_x_proceedings">
+                <option value="">— Choisir —</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </label>
+          </div>
+        </div>
+      </div>
+
       <!-- ====== OPTIONS (HAL / COMMS / AXES) ====== -->
       <div class="opts">
         <h3>Options</h3>
@@ -296,16 +328,7 @@
         }
       }
     });
-    window.netlifyIdentity.init();
   }
-</script>
-<script>
-  (function(){
-    var h = window.location.hash || "";
-    if (h.includes("invite_token=") || h.includes("confirmation_token=") || h.includes("recovery_token=") || h.includes("email_change_token=")) {
-      window.location.replace("/auth.html" + h);
-    }
-  })();
 </script>
 
 </body>
