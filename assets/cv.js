@@ -129,19 +129,20 @@
       const raw = localStorage.getItem(INLINE_KEY);
       if (!raw) return;
       const obj = JSON.parse(raw);
-      const n = $('#cvName');
-      const c = $('#cvContact');
-      if (n && typeof obj.name === 'string') n.textContent = obj.name;
-      if (c && typeof obj.contact === 'string') c.textContent = obj.contact;
-    } catch {}
+      if (!obj || typeof obj !== 'object') return;
+      const name = $('#cvName');
+      const contact = $('#cvContact');
+      if (name && typeof obj.name === 'string') name.value = obj.name;
+      if (contact && typeof obj.contact === 'string') contact.value = obj.contact;
+    } catch { }
   }
 
   function saveInline() {
     try {
-      const n = $('#cvName')?.textContent || '';
-      const c = $('#cvContact')?.textContent || '';
-      localStorage.setItem(INLINE_KEY, JSON.stringify({ name: n, contact: c }));
-    } catch {}
+      const name = $('#cvName')?.value || '';
+      const contact = $('#cvContact')?.value || '';
+      localStorage.setItem(INLINE_KEY, JSON.stringify({ name, contact }));
+    } catch { }
   }
 
   // ---------- Persist filters
@@ -150,67 +151,64 @@
       const raw = localStorage.getItem(FILTER_KEY);
       if (!raw) return;
       const obj = JSON.parse(raw);
+      if (!obj || typeof obj !== 'object') return;
+
       if (elAuthor && typeof obj.author === 'string') elAuthor.value = obj.author;
       if (elYearMin && typeof obj.yearMin === 'string') elYearMin.value = obj.yearMin;
       if (elYearMax && typeof obj.yearMax === 'string') elYearMax.value = obj.yearMax;
       if (elOnlyPubs && typeof obj.onlyPubs === 'string') elOnlyPubs.value = obj.onlyPubs;
       if (elSort && typeof obj.sort === 'string') elSort.value = obj.sort;
-    } catch {}
+    } catch { }
   }
 
   function saveFilters() {
     try {
-      localStorage.setItem(FILTER_KEY, JSON.stringify({
-        author: elAuthor.value || '',
-        yearMin: elYearMin.value || '',
-        yearMax: elYearMax.value || '',
-        onlyPubs: elOnlyPubs.value || 'yes',
-        sort: elSort.value || 'date_desc'
-      }));
-    } catch {}
+      const obj = {
+        author: elAuthor?.value || '',
+        yearMin: elYearMin?.value || '',
+        yearMax: elYearMax?.value || '',
+        onlyPubs: elOnlyPubs?.value || 'yes',
+        sort: elSort?.value || 'date_desc'
+      };
+      localStorage.setItem(FILTER_KEY, JSON.stringify(obj));
+    } catch { }
   }
 
-  // ---------- Data fetch (paginated)
-  async function fetchPublicItems() {
-    const limit = 100;
+  // ---------- Fetch publications (server paginated)
+  async function fetchAllPublicationsPaged() {
+    const PAGE_SIZE = 200;
     let start = 0;
-    const MAX_ITEMS = 10000;
+    const out = [];
 
-    const all = [];
-    let fetchedAt = new Date().toISOString();
-
-    while (true) {
-      const url = `/.netlify/functions/public-suivi?start=${start}&limit=${limit}`;
-      const res = await fetch(url, { headers: { 'Accept': 'application/json' }, cache: 'no-store' });
-      const text = await res.text();
-
-      if (!res.ok) throw new Error('Function public-suivi: HTTP ' + res.status + ' – ' + text.slice(0, 500));
-
-      let json;
-      try { json = JSON.parse(text); }
-      catch { throw new Error('Réponse JSON invalide depuis public-suivi : ' + text.slice(0, 200)); }
-
-      if (Array.isArray(json)) return { items: json, fetchedAt: new Date().toISOString() };
-
-      if (!json || !Array.isArray(json.items)) throw new Error('Format inattendu depuis public-suivi (pas de items[]).');
-
-      fetchedAt = json.fetchedAt || fetchedAt;
-      all.push(...json.items);
-
-      const hasMore = !!json.hasMore;
-      const nextStart = (json.nextStart !== undefined && json.nextStart !== null) ? Number(json.nextStart) : null;
-      if (!hasMore || nextStart === null) break;
-
-      start = nextStart;
-      if (all.length >= MAX_ITEMS) break;
+    for (let guard = 0; guard < 200; guard++) {
+      const url = `/.netlify/functions/public-suivi?start=${start}&limit=${PAGE_SIZE}`;
+      const r = await fetch(url, { cache: 'no-store' });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data?.error || `Erreur serveur (${r.status})`);
+      const items = Array.isArray(data.items) ? data.items : [];
+      out.push(...items);
+      if (!data.hasMore || items.length === 0) break;
+      start += items.length;
     }
-
-    return { items: all, fetchedAt };
+    return out;
   }
 
-  // ---------- Filtering + sorting
-  function matchAuthor(itemCreatorsText, userQuery) {
-    const q = norm(userQuery);
+  async function getPublications() {
+    if (PUBS_CACHE && Array.isArray(PUBS_CACHE)) return PUBS_CACHE;
+    setStatus('Chargement des publications…', true);
+    const items = await fetchAllPublicationsPaged();
+    const mapped = (items || []).map(it => ({
+      ...it,
+      creatorsText: it.creatorsText || creatorsToText(it.creators || [])
+    }));
+    PUBS_CACHE = mapped;
+    PUBS_FETCHED_AT = new Date();
+    return mapped;
+  }
+
+  // ---------- Filtering
+  function isAuthorMatch(itemCreatorsText, authorQuery) {
+    const q = norm(authorQuery);
     if (!q) return true;
     const hay = norm(itemCreatorsText);
     if (!hay) return false;
@@ -219,7 +217,7 @@
   }
 
   function isPublicationType(itemType) {
-    return itemType === 'book' || itemType === 'bookSection' || itemType === 'journalArticle';
+    return itemType === 'book' || itemType === 'bookSection' || itemType === 'journalArticle' || itemType === 'conferencePaper';
   }
 
   function compareItems(a, b, mode) {
@@ -243,8 +241,14 @@
 
     return (items || [])
       .filter(it => it && typeof it === 'object')
-      .filter(it => !onlyPubs || isPublicationType(it.itemType))
-      .filter(it => matchAuthor(it.creatorsText || '', author))
+      .filter(it => {
+        if (onlyPubs && !isPublicationType(it.itemType)) return false;
+        return true;
+      })
+      .filter(it => {
+        if (!isAuthorMatch(it.creatorsText || '', author)) return false;
+        return true;
+      })
       .filter(it => {
         const y = extractYear(it.date);
         if (hasMin && (y === null || y < yMin)) return false;
@@ -306,6 +310,21 @@
       if (ed.length) tail.push(ed.join(', '));
       if (pages) tail.push('pp. ' + escapeHtml(pages));
       if (isbn) tail.push('ISBN: ' + escapeHtml(isbn));
+
+      if (tail.length) parts.push(tail.join(', ') + '.');
+    } else if (it === 'conferencePaper') {
+      const conf = String(item.conferenceName || '').trim();
+      const publisher = String(item.publisher || '').trim();
+      const place = String(item.place || '').trim();
+      const pages = String(item.pages || '').trim();
+
+      const tail = [];
+      if (conf) tail.push('<i>' + escapeHtml(conf) + '</i>');
+      const ed = [];
+      if (place) ed.push(escapeHtml(place));
+      if (publisher) ed.push(escapeHtml(publisher));
+      if (ed.length) tail.push(ed.join(', '));
+      if (pages) tail.push('pp. ' + escapeHtml(pages));
 
       if (tail.length) parts.push(tail.join(', ') + '.');
     }
@@ -451,462 +470,266 @@
       .cv-title .title-right{
         flex: 0 0 auto;
         text-align:right;
-        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-        font-size: 10.5pt;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+        font-size: 10.2pt;
         color: var(--muted);
         line-height: 1.25;
-        white-space: pre-wrap;
       }
-      .cv-title .name{
-        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-        font-weight: 750;
-        font-size: 24pt;
-        letter-spacing: .2px;
-        margin: 0;
-        line-height: 1.1;
+      .cv-title h1{
+        margin:0 0 2px 0;
+        font-size: 18pt;
+        font-weight: 700;
+        letter-spacing: .1px;
       }
-      .cv-title .subtitle{
-        margin-top: 6px;
-        color: var(--muted);
-        font-size: 10.8pt;
+      .cv-title .meta{
+        margin:0;
+        color:var(--muted);
+        font-size: 10.2pt;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial;
       }
 
-      hr.rule{
-        border:0;
-        border-top: 1px solid var(--rule);
-        margin: 10px 0 14px;
+      h2{
+        margin: 16px 0 6px;
+        padding: 0 0 4px;
+        font-size: 12.8pt;
+        font-weight: 700;
+        border-bottom: 1px solid var(--rule);
       }
 
-      .section{
-        margin-top: 14px;
-        padding-top: 0;
-        border-top: 0 !important;
-      }
-      .section h3{
-        margin: 0 0 8px;
-        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-        font-variant: small-caps;
-        letter-spacing: .6px;
-        font-weight: 800;
-        font-size: 11.2pt;
-        color: #111;
-      }
-
-      .mdpreview{ line-height:1.45; }
+      /* Bloc texte (markdown rendu) */
       .mdpreview p{ margin: 0 0 8px; }
-      .mdpreview ul, .mdpreview ol{ margin: 0 0 8px; padding-left: 18px; }
-      .mdpreview li{ margin: 0 0 3px; }
+      .mdpreview ul{ margin: 0 0 8px 18px; }
+      .mdpreview li{ margin: 0 0 2px; }
+      .mdpreview a{ color: var(--link); text-decoration: none; }
+      .mdpreview a:hover{ text-decoration: underline; }
 
-      a{ color: var(--link); text-decoration: none; }
-      a:hover{ text-decoration: underline; }
-
-      .pubs{
-        margin: 0;
-        padding-left: 0;
-        list-style: none;
+      /* Publications */
+      .pubs{ margin: 6px 0 0; padding-left: 18px; }
+      .pubs li{ margin: 0 0 6px; }
+      .pubs .t{ font-weight: 650; }
+      .small{
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+        font-size: 9.7pt;
+        color: var(--muted);
+        margin-top: 8px;
       }
-      .pubs li{
-        margin: 0 0 7px;
-        padding-left: 1.35em;
-        text-indent: -1.35em;
-        break-inside: avoid;
-        page-break-inside: avoid;
+
+      /* Impression */
+      @page { margin: 18mm 16mm; }
+      @media print{
+        .no-print{ display:none !important; }
+        .page{ padding: 0 !important; }
       }
-      .pubs li .t{ font-weight: 650; }
-
-      .pill, .controls, button, textarea, .mdtabs, #cv-status, #cvMeta { display:none !important; }
-
-      .section{ break-inside: avoid; page-break-inside: avoid; }
-      .mdpreview p, .mdpreview li{ orphans: 2; widows: 2; }
-
-      @page { margin: 14mm; }
     `;
   }
 
-  function buildExportDocumentHtml() {
-    // Sync state
+  function buildExportHtmlDoc(title, bodyHtml) {
+    const css = exportCssPandocLike();
+    return `<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(title)}</title>
+<style>${css}</style>
+</head>
+<body>
+<div class="page">${bodyHtml}</div>
+</body>
+</html>`;
+  }
+
+  function getCvInnerHtmlForExport() {
+    if (!elCvRoot) return '';
+    // clone CV root and remove controls / meta non exportés
+    const clone = elCvRoot.cloneNode(true);
+
+    // supprime les contrôles (zone filtre/export)
+    clone.querySelectorAll('.no-print, .controls, .toolbar, .cv-tools, #cvMeta').forEach(n => n.remove());
+
+    // s'assurer que les previews markdown soient visibles et propres
+    clone.querySelectorAll('textarea.mdedit').forEach(t => t.remove());
+    clone.querySelectorAll('button.mdtoggle').forEach(b => b.remove());
+
+    // supprimer status/meta s'il existe
+    clone.querySelectorAll('#cv-status').forEach(n => n.remove());
+
+    // wrapper outer HTML
+    return clone.innerHTML;
+  }
+
+  async function exportHtml() {
+    saveAllMdBlocksNow();
+    saveInline();
+    const name = $('#cvName')?.value || 'CV';
+    const base = safeFilenameBase(name);
+    const html = buildExportHtmlDoc(name, getCvInnerHtmlForExport());
+    downloadBlob(new Blob([html], { type: 'text/html;charset=utf-8' }), `${base}.html`);
+  }
+
+  // PDF export (html2canvas + jsPDF)
+  async function exportPdf() {
     saveAllMdBlocksNow();
     saveInline();
 
-    const clone = elCvRoot.cloneNode(true);
-
-    // Remove meta in export
-    clone.querySelectorAll('#cvMeta').forEach(n => n.remove());
-
-    // Remove markdown UI (keep mdpreview only)
-    clone.querySelectorAll('.mdtabs, button, textarea.mdedit').forEach(n => n.remove());
-
-    // ✅ Supprime réellement les wrappers .mdblock (source des cadres)
-    //    et remplace par le contenu .mdpreview uniquement.
-    clone.querySelectorAll('.mdblock').forEach((mb) => {
-      const prev = mb.querySelector('.mdpreview');
-      if (prev) {
-        const repl = document.createElement('div');
-        repl.className = 'mdpreview';
-        repl.innerHTML = prev.innerHTML;
-        mb.replaceWith(repl);
-      } else {
-        // au pire, on enlève
-        mb.remove();
-      }
-    });
-
-    // Title block rebuild
-    const nameEl = clone.querySelector('#cvName');
-    const contactEl = clone.querySelector('#cvContact');
-
-    const nameTxt = (nameEl?.textContent || '').trim() || 'Nom Prénom';
-    const contactTxt = (contactEl?.textContent || '').trim();
-
-    if (nameEl) nameEl.remove();
-    if (contactEl) contactEl.remove();
-
-    const cvTitle = clone.querySelector('.cv-title') || clone.firstElementChild;
-    if (cvTitle) {
-      cvTitle.innerHTML = `
-        <div class="title-left">
-          <div class="name">${escapeHtml(nameTxt)}</div>
-          <div class="subtitle"></div>
-        </div>
-        <div class="title-right">${escapeHtml(contactTxt)}</div>
-      `;
-      const hr = document.createElement('hr');
-      hr.className = 'rule';
-      cvTitle.insertAdjacentElement('afterend', hr);
-    }
-
-    // Remove contenteditable attrs
-    clone.querySelectorAll('[contenteditable]').forEach(n => n.removeAttribute('contenteditable'));
-
-    const css = exportCssPandocLike();
-    const title = nameTxt;
-
-    const html = `<!doctype html>
-<html lang="fr">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${escapeHtml(title)}</title>
-  <style>${css}</style>
-</head>
-<body>
-  <div class="page">
-    <main class="cv">
-      ${clone.innerHTML}
-    </main>
-  </div>
-</body>
-</html>`;
-
-    return { html, title };
-  }
-
-  // ---------- Export HTML
-  function exportHtml() {
-    try {
-      const { html, title } = buildExportDocumentHtml();
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      downloadBlob(blob, safeFilenameBase(title) + '.html');
-      setStatus('✅ Export HTML (propre) généré.');
-    } catch (e) {
-      setStatus('❌ Export HTML impossible : ' + (e?.message || e), false);
-      console.error('[CV] exportHtml error:', e);
-    }
-  }
-
-  // ---------- Export PDF
-  async function exportPdf() {
-    try {
-      if (!window.html2pdf) throw new Error('html2pdf.js introuvable (CDN).');
-
-      const { html, title } = buildExportDocumentHtml();
-      setStatus('⏳ Génération PDF…');
-
-      const host = document.createElement('div');
-      host.style.position = 'fixed';
-      host.style.left = '-99999px';
-      host.style.top = '0';
-      host.style.width = '980px';
-      host.style.background = '#fff';
-      host.innerHTML = html;
-      document.body.appendChild(host);
-
-      const exportRoot = host.querySelector('.page');
-      if (!exportRoot) throw new Error('Export root introuvable.');
-
-      const opt = {
-        margin: [8, 8, 8, 8],
-        filename: safeFilenameBase(title) + '.pdf',
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: {
-          scale: 1.6,
-          useCORS: true,
-          backgroundColor: '#ffffff'
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-      };
-
-      await window.html2pdf().set(opt).from(exportRoot).save();
-
-      host.remove();
-      setStatus('✅ Export PDF (pandoc-like) généré.');
-    } catch (e) {
-      setStatus('❌ Export PDF impossible : ' + (e?.message || e), false);
-      console.error('[CV] exportPdf error:', e);
-    }
-  }
-
-  // ---------- DOCX helpers (baseline — inchangé)
-  function splitMarkdownBlocks(md) {
-    const lines = String(md || '').split('\n');
-    const blocks = [];
-    let buf = [];
-
-    const flushPara = () => {
-      if (!buf.length) return;
-      blocks.push({ type: 'para', text: buf.join('\n') });
-      buf = [];
-    };
-
-    for (const line of lines) {
-      const l = line.trim();
-
-      const h = l.match(/^(#{1,3})\s+(.*)$/);
-      if (h) {
-        flushPara();
-        blocks.push({ type: 'heading', level: h[1].length, text: h[2] });
-        continue;
-      }
-
-      const b = l.match(/^[-*]\s+(.*)$/);
-      if (b) {
-        flushPara();
-        blocks.push({ type: 'bullet', text: b[1] });
-        continue;
-      }
-
-      buf.push(line);
-    }
-
-    flushPara();
-    return blocks;
-  }
-
-  function runsFromInlineMarkdown(text) {
-    const { TextRun, ExternalHyperlink } = window.docx || {};
-    if (!TextRun) return [];
-
-    const s = String(text || '');
-
-    const linkRe = /\[([^\]]+)\]\(([^)]+)\)/g;
-    let last = 0;
-    const parts = [];
-    for (let m; (m = linkRe.exec(s)); ) {
-      if (m.index > last) parts.push({ type: 'text', value: s.slice(last, m.index) });
-      parts.push({ type: 'link', label: m[1], url: m[2] });
-      last = m.index + m[0].length;
-    }
-    if (last < s.length) parts.push({ type: 'text', value: s.slice(last) });
-
-    const out = [];
-    const pushInline = (chunk) => {
-      const re = /(\*\*[^*]+\*\*|\*[^*]+\*)/g;
-      let i = 0;
-      let m;
-      while ((m = re.exec(chunk))) {
-        if (m.index > i) out.push(new TextRun({ text: chunk.slice(i, m.index) }));
-        const token = m[0];
-        if (token.startsWith('**')) out.push(new TextRun({ text: token.slice(2, -2), bold: true }));
-        else if (token.startsWith('*')) out.push(new TextRun({ text: token.slice(1, -1), italics: true }));
-        i = m.index + token.length;
-      }
-      if (i < chunk.length) out.push(new TextRun({ text: chunk.slice(i) }));
-    };
-
-    for (const p of parts) {
-      if (p.type === 'text') pushInline(p.value);
-      else if (p.type === 'link' && ExternalHyperlink) {
-        out.push(new ExternalHyperlink({
-          link: p.url,
-          children: [new TextRun({ text: p.label, style: 'Hyperlink' })]
-        }));
-      } else if (p.type === 'link') {
-        pushInline(p.label + ' (' + p.url + ')');
-      }
-    }
-
-    return out;
-  }
-
-  async function exportDocx() {
-    try {
-      saveAllMdBlocksNow();
-      saveInline();
-      setStatus('⏳ Génération DOCX…');
-
-      const docx = window.docx;
-      if (!docx) throw new Error('docx (CDN) introuvable.');
-
-      const { Document, Packer, Paragraph, TextRun, HeadingLevel } = docx;
-
-      const name = $('#cvName')?.textContent || 'CV';
-      const contact = $('#cvContact')?.textContent || '';
-
-      const children = [];
-
-      children.push(new Paragraph({ text: name, heading: HeadingLevel.HEADING_1 }));
-      if (contact) children.push(new Paragraph({ children: [new TextRun({ text: contact })] }));
-      children.push(new Paragraph({ text: ' ' }));
-
-      const blocks = document.querySelectorAll('[data-mdblock]');
-      const state = readMdState();
-
-      for (const wrap of blocks) {
-        const key = wrap.getAttribute('data-mdblock');
-        const title = wrap.querySelector('h3')?.textContent || '';
-        const md = (key && typeof state[key] === 'string') ? state[key] : (wrap.querySelector('textarea.mdedit')?.value || '');
-
-        if (title) children.push(new Paragraph({ text: title, heading: HeadingLevel.HEADING_2 }));
-
-        const parts = splitMarkdownBlocks(md);
-        for (const part of parts) {
-          if (part.type === 'bullet') {
-            children.push(new Paragraph({ children: runsFromInlineMarkdown(part.text), bullet: { level: 0 } }));
-          } else if (part.type === 'heading') {
-            const level = part.level === 1 ? HeadingLevel.HEADING_2 : HeadingLevel.HEADING_3;
-            children.push(new Paragraph({ text: part.text, heading: level }));
-          } else {
-            children.push(new Paragraph({ children: runsFromInlineMarkdown(part.text || '') }));
-          }
-        }
-        children.push(new Paragraph({ text: ' ' }));
-      }
-
-      const pubs = Array.from(elPubList?.querySelectorAll('li') || []).map(li => li.textContent || '').filter(Boolean);
-      if (pubs.length) {
-        children.push(new Paragraph({ text: 'Productions principales en recherche', heading: HeadingLevel.HEADING_2 }));
-        for (const p of pubs) children.push(new Paragraph({ text: p, bullet: { level: 0 } }));
-      }
-
-      const doc = new Document({ sections: [{ properties: {}, children }] });
-      const blob = await Packer.toBlob(doc);
-      downloadBlob(blob, safeFilenameBase(name) + '.docx');
-      setStatus('✅ Export DOCX généré.');
-    } catch (e) {
-      setStatus('❌ Export DOCX impossible : ' + (e?.message || e), false);
-      console.error('[CV] exportDocx error:', e);
-    }
-  }
-
-  // ---------- Refresh
-  async function refresh(force = false) {
-    saveFilters();
-
-    const authorQuery = elAuthor?.value || '';
-    if (!hasFullNameQuery(authorQuery)) {
-      if (elPubList) {
-        elPubList.innerHTML =
-          '<li style="color:var(--muted)">' +
-          'Tapez <b>Nom Prénom</b> dans le filtre <b>Auteur</b> pour charger les publications.' +
-          '</li>';
-      }
-      if (elPubCount) elPubCount.textContent = '—';
-      if (elMeta) elMeta.textContent = '';
-      setStatus('ℹ️ Publications non chargées (saisir Nom + Prénom dans Auteur).');
+    if (!window.html2canvas || !window.jspdf || !window.jspdf.jsPDF) {
+      setStatus('Erreur: librairies PDF manquantes (html2canvas / jsPDF).', false);
       return;
     }
 
-    setStatus('⏳ Chargement des publications…');
+    const name = $('#cvName')?.value || 'CV';
+    const base = safeFilenameBase(name);
+
+    // Construire un document isolé (évite styles UI)
+    const html = buildExportHtmlDoc(name, getCvInnerHtmlForExport());
+
+    // Iframe invisible pour rendre avec CSS pandoc-like
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.left = '-10000px';
+    iframe.style.top = '0';
+    iframe.style.width = '900px';
+    iframe.style.height = '1200px';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentDocument;
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    await new Promise(resolve => {
+      iframe.onload = resolve;
+      // fallback
+      setTimeout(resolve, 600);
+    });
+
+    const target = doc.querySelector('.page');
+    if (!target) {
+      iframe.remove();
+      setStatus('Erreur: export PDF (cible introuvable).', false);
+      return;
+    }
+
+    // Render canvas
+    const canvas = await window.html2canvas(target, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false
+    });
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const pdf = new window.jspdf.jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+
+    // Calcul ratio
+    const imgWidth = pageWidth;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+    let y = 0;
+    let heightLeft = imgHeight;
+
+    pdf.addImage(imgData, 'JPEG', 0, y, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+
+    while (heightLeft > 0) {
+      pdf.addPage();
+      y = heightLeft - imgHeight;
+      pdf.addImage(imgData, 'JPEG', 0, y, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
+
+    iframe.remove();
+    pdf.save(`${base}.pdf`);
+  }
+
+  // DOCX export (html -> docx)
+  async function exportDocx() {
+    saveAllMdBlocksNow();
+    saveInline();
+
+    if (!window.htmlDocx || typeof window.htmlDocx.asBlob !== 'function') {
+      setStatus('Erreur: librairie html-docx-js manquante.', false);
+      return;
+    }
+
+    const name = $('#cvName')?.value || 'CV';
+    const base = safeFilenameBase(name);
+
+    const html = buildExportHtmlDoc(name, getCvInnerHtmlForExport());
+    const blob = window.htmlDocx.asBlob(html);
+    downloadBlob(blob, `${base}.docx`);
+  }
+
+  // ---------- Main refresh (load + render)
+  async function refresh() {
+    saveFilters();
+    saveInline();
+
+    const author = elAuthor.value || '';
+
+    // 💡 N'affiche / ne charge les publications que si Auteur contient "Nom Prénom"
+    if (!hasFullNameQuery(author)) {
+      renderList([]);
+      if (elMeta) elMeta.textContent = '';
+      setStatus('Pour afficher les productions, tapez "Nom Prénom" (au moins 2 mots) dans le filtre Auteur.', true);
+      return;
+    }
 
     try {
-      if (btnRefresh) btnRefresh.disabled = true;
+      const pubs = await getPublications();
 
-      if (force || !PUBS_CACHE) {
-        const payload = await fetchPublicItems();
-        const items = Array.isArray(payload.items) ? payload.items : [];
-
-        PUBS_CACHE = items.map(it => ({
-          ...it,
-          creatorsText: (it && typeof it === 'object')
-            ? (it.creatorsText || creatorsToText(it.creators || []))
-            : ''
-        }));
-        PUBS_FETCHED_AT = payload.fetchedAt || new Date().toISOString();
-      }
-
-      const filtered = applyFilters(PUBS_CACHE);
+      const filtered = applyFilters(pubs);
       renderList(filtered);
 
       if (elMeta) {
-        const ts = PUBS_FETCHED_AT ? new Date(PUBS_FETCHED_AT) : new Date();
-        elMeta.textContent = `MAJ: ${ts.toLocaleString('fr-FR')} · source: Zotero`;
+        const fetched = PUBS_FETCHED_AT ? PUBS_FETCHED_AT.toLocaleString('fr-FR') : nowFr();
+        elMeta.textContent = `Source : Zotero · Maj : ${fetched}`;
       }
-      setStatus('✅ ' + filtered.length + ' référence(s) affichée(s).');
+      setStatus('OK — ' + (filtered.length || 0) + ' résultat(s).', true);
     } catch (e) {
-      setStatus(
-        '❌ Publications non chargées.\n' +
-        '👉 Teste: /.netlify/functions/public-suivi\n' +
-        'Détail: ' + String(e?.message || e),
-        false
-      );
-      if (elMeta) elMeta.textContent = '';
-      if (elPubList) elPubList.innerHTML = '';
-      if (elPubCount) elPubCount.textContent = '0 référence';
-      console.error('[CV] refresh error:', e);
-    } finally {
-      if (btnRefresh) btnRefresh.disabled = false;
+      console.error(e);
+      setStatus('Erreur: ' + String(e?.message || e), false);
     }
   }
 
-  // ---------- Save button
-  function saveAllTexts() {
-    saveAllMdBlocksNow();
-    saveInline();
-    setStatus('✅ Textes sauvegardés (' + nowFr() + ').');
+  // ---------- Wire UI
+  function init() {
+    loadFilters();
+    loadInline();
+    initMdBlocks();
+
+    btnRefresh?.addEventListener('click', refresh);
+
+    btnSaveText?.addEventListener('click', () => {
+      saveAllMdBlocksNow();
+      saveInline();
+      setStatus('Texte sauvegardé.', true);
+    });
+
+    btnExportHtml?.addEventListener('click', exportHtml);
+    btnExportPdf?.addEventListener('click', exportPdf);
+    btnExportDocx?.addEventListener('click', exportDocx);
+
+    // auto refresh on filter changes (mais garde le “gate” Nom+Prénom)
+    [elAuthor, elYearMin, elYearMax, elOnlyPubs, elSort].forEach(el => {
+      el?.addEventListener('input', () => {
+        saveFilters();
+        refresh();
+      });
+      el?.addEventListener('change', () => {
+        saveFilters();
+        refresh();
+      });
+    });
+
+    // First render
+    refresh();
   }
 
-  // ---------- Events
-  btnRefresh?.addEventListener('click', () => refresh(true));
-  btnSaveText?.addEventListener('click', saveAllTexts);
-  btnExportHtml?.addEventListener('click', exportHtml);
-  btnExportPdf?.addEventListener('click', exportPdf);
-  btnExportDocx?.addEventListener('click', exportDocx);
+  init();
 
-  // Auto refresh on filter change (debounced)
-  let t = null;
-  const schedule = () => {
-    saveFilters();
-    clearTimeout(t);
-    t = setTimeout(() => {
-      const authorQuery = elAuthor?.value || '';
-      if (!hasFullNameQuery(authorQuery)) {
-        if (elPubList) {
-          elPubList.innerHTML =
-            '<li style="color:var(--muted)">' +
-            'Tapez <b>Nom Prénom</b> dans le filtre <b>Auteur</b> pour charger les publications.' +
-            '</li>';
-        }
-        if (elPubCount) elPubCount.textContent = '—';
-        if (elMeta) elMeta.textContent = '';
-        setStatus('ℹ️ Publications non chargées (saisir Nom + Prénom dans Auteur).');
-        return;
-      }
-      refresh(false);
-    }, 250);
-  };
-
-  [elAuthor, elYearMin, elYearMax, elOnlyPubs, elSort].forEach((el) => {
-    el?.addEventListener('input', schedule);
-    el?.addEventListener('change', schedule);
-  });
-
-  $('#cvName')?.addEventListener('blur', saveInline);
-  $('#cvContact')?.addEventListener('blur', saveInline);
-
-  // ---------- Init
-  loadInline();
-  loadFilters();
-  initMdBlocks();
-  refresh();
 })();
