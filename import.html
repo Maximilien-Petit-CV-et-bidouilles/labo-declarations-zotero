@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Import par lot (CSV HAL → Zotero)</title>
+
+  <style>
+    :root{
+      --bg:#0b0f14;
+      --card:#0f1621;
+      --text:#e7eef7;
+      --muted:#9fb0c3;
+      --border:#223042;
+      --accent:#7dd3fc;
+      --accent2:#a78bfa;
+      --danger:#fb7185;
+      --ok:#34d399;
+      --warn:#fbbf24;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 16px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+    @media (prefers-color-scheme: light){
+      :root{
+        --bg:#f6f8fc;
+        --card:#ffffff;
+        --text:#0b1220;
+        --muted:#50627a;
+        --border:#d9e2ef;
+        --accent:#0284c7;
+        --accent2:#7c3aed;
+        --shadow: 0 10px 30px rgba(2,8,23,.08);
+      }
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:var(--sans);
+      background:var(--bg);
+      color:var(--text);
+      line-height:1.35;
+    }
+
+    .page{
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    header{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:16px;
+      margin: 12px 0 18px;
+    }
+    h1{
+      margin:0;
+      font-size:1.25rem;
+      letter-spacing:.2px;
+    }
+    .subtitle{
+      margin:.25rem 0 0;
+      color:var(--muted);
+      font-size:.95rem;
+    }
+    .top-actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+    a.btn, button.btn{
+      appearance:none;
+      border:1px solid var(--border);
+      background:transparent;
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      font-weight:650;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      box-shadow:none;
+      transition: transform .05s ease, border-color .15s ease, background .15s ease;
+      user-select:none;
+    }
+    a.btn:hover, button.btn:hover{ border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+    a.btn:active, button.btn:active{ transform: translateY(1px); }
+
+    .btn.primary{
+      background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 30%, transparent), color-mix(in srgb, var(--accent2) 25%, transparent));
+      border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+    }
+    .btn.primary:disabled{
+      opacity:.5;
+      cursor:not-allowed;
+    }
+
+    .grid{
+      display:grid;
+      gap:14px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 980px){
+      .grid{ grid-template-columns: 420px 1fr; }
+    }
+
+    .card{
+      background: var(--card);
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 14px;
+    }
+
+    .card h2{
+      margin:0 0 10px;
+      font-size: 1rem;
+    }
+    .hint{
+      color:var(--muted);
+      font-size:.9rem;
+      margin: 6px 0 0;
+    }
+
+    label{
+      display:block;
+      margin: 10px 0 6px;
+      color:var(--muted);
+      font-size:.9rem;
+      font-weight:650;
+    }
+
+    input[type="file"]{
+      width:100%;
+      padding:10px;
+      border-radius:12px;
+      border:1px dashed var(--border);
+      background: transparent;
+      color:var(--text);
+    }
+
+    .row{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-top:12px;
+    }
+
+    .pill{
+      border:1px solid var(--border);
+      border-radius:999px;
+      padding:6px 10px;
+      font-size:.85rem;
+      color:var(--muted);
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+    }
+    .dot{
+      width:10px;height:10px;border-radius:50%;
+      display:inline-block;
+      background: var(--muted);
+    }
+    .dot.ok{ background: var(--ok); }
+    .dot.warn{ background: var(--warn); }
+    .dot.bad{ background: var(--danger); }
+
+    .status{
+      margin-top:12px;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      background: color-mix(in srgb, var(--card) 86%, transparent);
+      color:var(--text);
+      font-size:.92rem;
+      white-space: pre-wrap;
+    }
+    .status.info{ border-color: color-mix(in srgb, var(--accent) 25%, var(--border)); }
+    .status.ok{ border-color: color-mix(in srgb, var(--ok) 30%, var(--border)); }
+    .status.warn{ border-color: color-mix(in srgb, var(--warn) 35%, var(--border)); }
+    .status.bad{ border-color: color-mix(in srgb, var(--danger) 35%, var(--border)); }
+
+    table{
+      width:100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      overflow:hidden;
+      border-radius: 14px;
+      border:1px solid var(--border);
+      background: transparent;
+      font-size:.92rem;
+    }
+    thead th{
+      text-align:left;
+      padding:10px 10px;
+      color:var(--muted);
+      font-weight:800;
+      border-bottom:1px solid var(--border);
+      background: color-mix(in srgb, var(--card) 85%, transparent);
+    }
+    tbody td{
+      padding:10px 10px;
+      border-bottom:1px solid var(--border);
+      vertical-align:top;
+    }
+    tbody tr:last-child td{ border-bottom:none; }
+
+    .mono{ font-family: var(--mono); }
+    .small{ font-size:.85rem; color:var(--muted); }
+
+    footer{
+      margin-top: 16px;
+      color:var(--muted);
+      font-size:.85rem;
+    }
+    code{
+      font-family:var(--mono);
+      font-size:.9em;
+      padding:.15em .35em;
+      border-radius: 8px;
+      border:1px solid var(--border);
+      background: color-mix(in srgb, var(--card) 85%, transparent);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page">
+    <header>
+      <div>
+        <h1>Import par lot (CSV HAL → Zotero)</h1>
+        <p class="subtitle">
+          Téléverse un CSV HAL (comme ton export). On utilise <code>halId_s</code> pour récupérer les métadonnées via l’API HAL,
+          puis on crée des items Zotero <code>book</code>, <code>bookSection</code>, <code>journalArticle</code>.
+        </p>
+      </div>
+      <div class="top-actions">
+        <a class="btn" href="/index.html">← Retour</a>
+        <a class="btn" href="/suivi.html" target="_blank" rel="noopener noreferrer">📊 Suivi</a>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- LEFT -->
+      <section class="card">
+        <h2>1) Choisir un fichier CSV</h2>
+
+        <label for="csvFile">Fichier</label>
+        <input id="csvFile" type="file" accept=".csv,text/csv" />
+
+        <p class="hint">
+          Le fichier doit contenir au minimum les colonnes <code>halId_s</code> et <code>docType_s</code>.
+          Les autres colonnes (ex. <code>citationFull_s</code>) sont ignorées.
+        </p>
+
+        <div class="row" style="margin-top:14px">
+          <span class="pill" title="Total lignes lues">
+            <span class="dot" id="dotTotal"></span>
+            <span>Total : <b id="kpiTotal">0</b></span>
+          </span>
+          <span class="pill" title="Lignes exploitables (halId_s présent)">
+            <span class="dot ok"></span>
+            <span>Exploitables : <b id="kpiUsable">0</b></span>
+          </span>
+          <span class="pill" title="Types importables (livres/chapitres/articles)">
+            <span class="dot warn"></span>
+            <span>Importables : <b id="kpiImportable">0</b></span>
+          </span>
+        </div>
+
+        <div class="row">
+          <button class="btn primary" id="btnImport" disabled>📥 Importer dans Zotero</button>
+          <button class="btn" id="btnReset" type="button">Réinitialiser</button>
+        </div>
+
+        <div id="statusBox" class="status info" style="display:none"></div>
+
+        <footer>
+          <div>Import côté serveur : <code>/.netlify/functions/zotero-import-hal-batch</code></div>
+          <div class="small" style="margin-top:6px">
+            Astuce : si tu veux tester vite, commence avec 5–10 lignes pour valider le mapping.
+          </div>
+        </footer>
+      </section>
+
+      <!-- RIGHT -->
+      <section class="card">
+        <h2>2) Aperçu</h2>
+        <div class="hint" style="margin-bottom:10px">
+          On affiche les 50 premières lignes exploitables (halId + type). Le bouton d’import s’active si au moins 1 ligne importable.
+        </div>
+
+        <div style="overflow:auto; max-height: 70vh;">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:140px">docType</th>
+                <th>halId</th>
+                <th style="width:160px">Statut</th>
+              </tr>
+            </thead>
+            <tbody id="previewBody">
+              <tr>
+                <td colspan="3" class="small">Aucun fichier chargé.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="small" style="margin-top:10px">
+          Types HAL attendus (généralement) :
+          <span class="mono">ART</span> (article),
+          <span class="mono">OUV</span> (livre),
+          <span class="mono">COUV</span> (chapitre).
+          Les autres types seront ignorés.
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="/assets/import.js"></script>
+</body>
+</html>

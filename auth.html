@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Activation du compte</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:40px;max-width:780px}
+    .muted{color:#666}
+    .ok{color:#1b7c3a}
+    .err{color:#b32020}
+    button{font:inherit;padding:10px 14px;border-radius:10px;border:1px solid #ddd;background:#fff;cursor:pointer}
+    button.primary{background:#2c7be5;color:#fff;border-color:#2c7be5;font-weight:650}
+    code{background:#f2f2f6;padding:2px 6px;border-radius:6px}
+  </style>
+</head>
+<body>
+  <h1>Activation du compte</h1>
+  <p class="muted">
+    Lien d’invitation détecté (<code>invite_token</code>). Cette page active l’invitation puis ouvre l’écran pour définir le mot de passe.
+  </p>
+
+  <p>
+    <button id="retry" class="primary">Relancer l’activation</button>
+    <button id="openLogin">Ouvrir login</button>
+    <button id="openRecovery">Mot de passe oublié</button>
+  </p>
+
+  <p id="status" class="muted"></p>
+
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <script>
+    const statusEl = document.getElementById('status');
+
+    // Verrou anti “double ouverture”
+    // (évite le switch signup -> login en <1 seconde)
+    let OPEN_LOCK = false;
+
+    function setStatus(msg, cls){
+      statusEl.className = cls || 'muted';
+      statusEl.textContent = msg;
+    }
+
+    function getInviteToken(){
+      const h = (window.location.hash || '').replace(/^#/, '');
+      const params = new URLSearchParams(h);
+      return params.get('invite_token') || '';
+    }
+
+    async function runInviteFlow(){
+      if (OPEN_LOCK) return;
+      OPEN_LOCK = true;
+
+      if (!window.netlifyIdentity) {
+        setStatus("❌ Le widget Netlify Identity ne se charge pas (bloqueur / protection navigateur).", "err");
+        OPEN_LOCK = false;
+        return;
+      }
+
+      const inviteToken = getInviteToken();
+      if (!inviteToken) {
+        setStatus("ℹ️ Aucun invite_token dans l’URL. Utilise Login ou Recovery.", "muted");
+        OPEN_LOCK = false;
+        return;
+      }
+
+      setStatus("⏳ Activation de l’invitation…", "muted");
+
+      try {
+        const gotrue = window.netlifyIdentity.gotrue;
+        if (!gotrue || !gotrue.confirm) throw new Error("GoTrue indisponible");
+
+        // Confirme l’invite (crée/active l’utilisateur)
+        await gotrue.confirm(inviteToken);
+
+        // Important : on enlève le hash pour éviter des ré-inits bizarres si la page se ré-évalue
+        history.replaceState(null, document.title, window.location.pathname + window.location.search);
+
+        setStatus("✅ Invitation activée. Définis ton mot de passe dans la fenêtre.", "ok");
+
+        // Ouvrir UNE seule fois la vue la plus pertinente pour définir le mot de passe :
+        // => 'signup' fonctionne même si les signups publics sont off, car on est dans un flow d'invite confirmée.
+        // Et surtout : on n'ouvre PAS login ensuite.
+        window.netlifyIdentity.open('signup');
+
+      } catch (e) {
+        // Si déjà confirmé, ou si Netlify renvoie un état particulier : on aide l’utilisateur
+        setStatus("⚠️ L’invitation semble déjà activée ou non confirmable. Essaie “Mot de passe oublié”.", "muted");
+        window.netlifyIdentity.open('recovery');
+      } finally {
+        // on ne relâche pas le lock tout de suite : sinon certains handlers réouvrent le widget
+        setTimeout(() => { OPEN_LOCK = false; }, 1500);
+      }
+    }
+
+    // Boutons manuels (utile si tu retombes sur cette page sans hash)
+    document.getElementById('retry').addEventListener('click', runInviteFlow);
+    document.getElementById('openLogin').addEventListener('click', () => window.netlifyIdentity && window.netlifyIdentity.open('login'));
+    document.getElementById('openRecovery').addEventListener('click', () => window.netlifyIdentity && window.netlifyIdentity.open('recovery'));
+
+    if (!window.netlifyIdentity) {
+      setStatus("❌ Script Identity non chargé. Désactive temporairement les protections/extension pour tester.", "err");
+    } else {
+      // IMPORTANT : on ne fait PAS d’auto-open “login” dans init
+      // sinon ça écrase l’écran de création du mot de passe.
+      window.netlifyIdentity.on('init', (user) => {
+        if (user) {
+          setStatus("✅ Déjà connecté. Redirection vers le back-office…", "ok");
+          window.location.href = "/admin.html";
+          return;
+        }
+        runInviteFlow();
+      });
+
+      window.netlifyIdentity.on('login', () => {
+        window.netlifyIdentity.close();
+        window.location.href = "/admin.html";
+      });
+
+      window.netlifyIdentity.init();
+    }
+  </script>
+</body>
+</html>

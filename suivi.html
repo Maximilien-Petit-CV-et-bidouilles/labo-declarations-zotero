@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Suivi des demandes (HAL / Communication)</title>
+  <style>
+    :root{
+      --bg:#f5f5f8; --card:#fff; --text:#222; --muted:#666; --border:#ddd;
+      --accent:#2c7be5; --ok:#1b7c3a; --warn:#b26a00; --bad:#b32020;
+      --chip:#f2f6ff; --chip-border:#cfe0ff;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--text)}
+    .wrap{max-width:1100px;margin:28px auto;padding:0 16px}
+    header{display:flex;gap:14px;align-items:flex-end;justify-content:space-between;flex-wrap:wrap}
+    h1{margin:0;font-size:1.45rem}
+    .sub{margin:6px 0 0;color:var(--muted);font-size:.92rem}
+    .pill{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#fff;font-size:.85rem;color:var(--muted)}
+    .bar{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px}
+
+    /* 5 colonnes de filtres */
+    .controls{display:grid;grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr;gap:10px}
+    @media (max-width: 1100px){ .controls{grid-template-columns:1fr 1fr 1fr} }
+    @media (max-width: 800px){ .controls{grid-template-columns:1fr 1fr} }
+    @media (max-width: 520px){ .controls{grid-template-columns:1fr} }
+
+    input,select,button{
+      font:inherit;padding:9px 10px;border-radius:10px;border:1px solid var(--border);background:#fff
+    }
+    button{cursor:pointer}
+    button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:650}
+    button.ghost{background:#fff}
+    button:disabled{opacity:.6;cursor:not-allowed}
+
+    .stats{display:flex;gap:10px;flex-wrap:wrap}
+    .stat{min-width:160px}
+    .stat b{display:block;font-size:1.05rem}
+    .stat span{color:var(--muted);font-size:.85rem}
+
+    .charts{
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap:10px;
+      margin-top:12px;
+    }
+    .chartCard{
+      background:#fff;
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:10px;
+    }
+    .chartTitle{
+      margin:0 0 8px;
+      font-size:.9rem;
+      color:var(--muted);
+      font-weight:650;
+    }
+    .chartWrap{position:relative; height:210px;}
+    @media (max-width: 520px){ .chartWrap{height:190px;} }
+
+    table{width:100%;border-collapse:separate;border-spacing:0;margin-top:12px}
+    th,td{padding:10px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+    th{font-size:.82rem;color:var(--muted);text-align:left;white-space:nowrap}
+    td{font-size:.92rem}
+    .title a{color:inherit;text-decoration:none}
+    .title a:hover{text-decoration:underline}
+    .muted{color:var(--muted)}
+    .tag{
+      display:inline-flex;align-items:center;gap:6px;
+      padding:4px 8px;border-radius:999px;border:1px solid var(--border);
+      font-size:.82rem;background:#fff;white-space:nowrap
+    }
+    .tag.ok{border-color:rgba(27,124,58,.35);background:rgba(27,124,58,.08);color:var(--ok)}
+    .tag.warn{border-color:rgba(178,106,0,.35);background:rgba(178,106,0,.08);color:var(--warn)}
+    .tag.bad{border-color:rgba(179,32,32,.35);background:rgba(179,32,32,.08);color:var(--bad)}
+    .mini{font-size:.82rem}
+    .right{white-space:nowrap}
+
+    /* Axes chips */
+    .axes{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+    .chip{
+      display:inline-flex;align-items:center;padding:3px 8px;border-radius:999px;
+      border:1px solid var(--chip-border);background:var(--chip);
+      font-size:.78rem;font-weight:650;color:#1d3c76;white-space:nowrap;
+    }
+
+    .statusline{margin-top:10px;color:var(--muted);font-size:.9rem;white-space:pre-wrap}
+    .loading{display:inline-flex;gap:8px;align-items:center}
+    .dot{width:8px;height:8px;border-radius:99px;background:var(--accent);display:inline-block;animation:pulse 1s infinite ease-in-out}
+    .dot:nth-child(2){animation-delay:.15s}
+    .dot:nth-child(3){animation-delay:.3s}
+    @keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
+
+    /* ✅ Auteurs : clamp pour éviter que la colonne explose */
+    td.authorsCol{max-width:220px;}
+    td.authorsCol .clamp{
+      display:-webkit-box;
+      -webkit-line-clamp:2; /* 2 lignes max */
+      -webkit-box-orient:vertical;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      word-break:break-word;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Suivi public — HAL & Communication</h1>
+        <p class="sub">
+          Ce tableau montre les demandes issues des déclarations (Zotero) et l’état de traitement par le laboratoire.
+        </p>
+      </div>
+      <div class="pill" id="lastUpdate">Chargement…</div>
+    </header>
+
+    <div class="bar">
+      <div class="card" style="flex:1;min-width:260px">
+        <div class="controls">
+          <input id="q" type="search" placeholder="Rechercher (titre, auteur, revue, axes, éditeur, ISBN, DOI…)" />
+          <select id="filterType">
+            <option value="all">Tous types</option>
+            <option value="book">Livres</option>
+            <option value="bookSection">Chapitres</option>
+            <option value="journalArticle">Articles</option>
+          </select>
+          <select id="filterNeeds">
+            <option value="all">Toutes demandes</option>
+            <option value="needsAction">À traiter</option>
+            <option value="halYes">HAL demandé</option>
+            <option value="commsYes">Com demandé</option>
+          </select>
+
+          <!-- Filtre Axe -->
+          <select id="filterAxis">
+            <option value="all">Tous axes</option>
+            <option value="PICMAP">PICMAP</option>
+            <option value="MOPTIS">MOPTIS</option>
+            <option value="OCSO">OCSO</option>
+            <option value="none">Sans axe</option>
+          </select>
+
+          <select id="filterYear">
+            <option value="all">Toutes années</option>
+          </select>
+
+          <button class="ghost" id="reset">Réinitialiser</button>
+          <button class="primary" id="refresh">Rafraîchir</button>
+        </div>
+
+        <div class="statusline" id="msg"></div>
+
+        <div class="stats" style="margin-top:12px">
+          <div class="stat">
+            <b id="sTotal">—</b><span>items (livres + chapitres + articles)</span>
+          </div>
+          <div class="stat">
+            <b id="sNeed">—</b><span>à traiter (HAL ou com demandés)</span>
+          </div>
+          <div class="stat">
+            <b id="sHal">—</b><span>HAL demandés</span>
+          </div>
+          <div class="stat">
+            <b id="sComms">—</b><span>Communications demandées</span>
+          </div>
+        </div>
+
+        <div class="charts">
+          <div class="chartCard">
+            <p class="chartTitle">Déclarations par année</p>
+            <div class="chartWrap"><canvas id="chartYear"></canvas></div>
+          </div>
+          <div class="chartCard">
+            <p class="chartTitle">Répartition des demandes</p>
+            <div class="chartWrap"><canvas id="chartSplit"></canvas></div>
+          </div>
+          <div class="chartCard">
+            <p class="chartTitle">Statut de traitement</p>
+            <div class="chartWrap"><canvas id="chartStatus"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:90px">Date</th>
+            <th style="width:90px">Type</th>
+            <th>Titre</th>
+            <th style="width:220px">Auteur(s)</th>
+            <th style="width:140px">HAL</th>
+            <th style="width:170px">Communication</th>
+            <th style="width:140px">Statut</th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+          <tr><td colspan="7">
+            <span class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span> Chargement des données…</span>
+          </td></tr>
+        </tbody>
+      </table>
+
+      <!-- ✅ Pagination tableau (après filtrage) -->
+      <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:10px">
+        <div class="pill" id="pagerInfo">Page —</div>
+
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <label class="pill" style="gap:6px">
+            Lignes/page
+            <select id="pageSize" style="padding:6px 8px;border-radius:10px">
+              <option value="25" selected>25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </label>
+
+          <button class="ghost" id="prevPage">◀ Précédent</button>
+          <button class="ghost" id="nextPage">Suivant ▶</button>
+        </div>
+      </div>
+    </div>
+
+    <p class="sub" style="margin-top:12px">
+      Astuce : si vous voyez “HAL demandé” ou “Communication demandée”, le labo traite les demandes dans l’ordre (priorité aux échéances).
+    </p>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script>
+    let ALL = [];
+    let VIEW = [];
+    let CHARTS = { year:null, split:null, status:null };
+
+    // ✅ Pagination du tableau
+    let PAGE_INDEX = 0;
+    let PAGE_SIZE = 25;
+
+    // ✅ Debounce recherche (perf)
+    let __tSearch = null;
+    function debouncedRender(ms=200){
+      clearTimeout(__tSearch);
+      __tSearch = setTimeout(() => render(), ms);
+    }
+
+    const $ = (id) => document.getElementById(id);
+
+    function norm(s){
+      return (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    }
+
+    function typeLabel(t){
+      if (t === 'book') return 'Livre';
+      if (t === 'bookSection') return 'Chapitre';
+      if (t === 'journalArticle') return 'Article';
+      return t || '';
+    }
+
+    function yearFromDate(dateStr){
+      const m = (dateStr || '').match(/\b(19|20)\d{2}\b/);
+      return m ? m[0] : '';
+    }
+
+    function joinCreators(creators){
+      if (!Array.isArray(creators)) return '';
+      const names = creators
+        .filter(c => c && (c.creatorType === 'author' || c.creatorType === 'editor' || c.creatorType === 'presenter'))
+        .map(c => {
+          const fn = (c.firstName || '').trim();
+          const ln = (c.lastName || '').trim();
+          return (ln && fn) ? (ln + ' ' + fn) : (ln || fn);
+        })
+        .filter(Boolean);
+      return names.join(', ');
+    }
+
+    function tagYesNo(val){
+      if (val === 'yes') return { txt:'Oui', cls:'ok' };
+      if (val === 'no') return { txt:'Non', cls:'' };
+      return { txt:'—', cls:'' };
+    }
+
+    function statusFor(item){
+      const f = item.flags || {};
+      const halWanted = f.hal_create === 'yes';
+      const commWanted = f.comms_publish === 'yes';
+      const halDone = f.hal_done === 'yes';
+      const commDone = f.comms_done === 'yes';
+
+      if (!halWanted && !commWanted) return { txt:'Non demandé', cls:'' };
+
+      const needHal = halWanted && !halDone;
+      const needCom = commWanted && !commDone;
+
+      if (needHal || needCom) return { txt:'À traiter', cls:'warn' };
+      return { txt:'Traité', cls:'ok' };
+    }
+
+    // ✅ Robust parse: accepte , ; | et normalise en MAJ
+    function parseAxes(flags){
+      const raw = (flags && flags.axes) ? String(flags.axes).trim() : '';
+      if (!raw || raw === 'none') return [];
+      return raw
+        .split(/[,;|]/)
+        .map(s => s.trim())
+        .filter(Boolean)
+        .map(s => s.toUpperCase());
+    }
+
+    function destroyCharts(){
+      if (CHARTS.year) { CHARTS.year.destroy(); CHARTS.year = null; }
+      if (CHARTS.split) { CHARTS.split.destroy(); CHARTS.split = null; }
+      if (CHARTS.status) { CHARTS.status.destroy(); CHARTS.status = null; }
+    }
+
+    function renderCharts(items){
+      destroyCharts();
+
+      const byYear = new Map();
+      for (const it of items){
+        const y = it.year || '—';
+        byYear.set(y, (byYear.get(y) || 0) + 1);
+      }
+      const years = [...byYear.keys()]
+        .sort((a,b) => {
+          if (a === '—') return 1;
+          if (b === '—') return -1;
+          return b.localeCompare(a);
+        });
+      const yearCounts = years.map(y => byYear.get(y));
+
+      let halOnly=0, commOnly=0, both=0, none=0;
+      for (const it of items){
+        const f = it.flags || {};
+        const hal = f.hal_create === 'yes';
+        const com = f.comms_publish === 'yes';
+        if (hal && com) both++;
+        else if (hal) halOnly++;
+        else if (com) commOnly++;
+        else none++;
+      }
+
+      const statusCounts = { 'À traiter':0, 'Traité':0, 'Non demandé':0 };
+      for (const it of items){
+        const s = statusFor(it).txt;
+        statusCounts[s] = (statusCounts[s] || 0) + 1;
+      }
+
+      const commonOpts = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } }
+      };
+
+      CHARTS.year = new Chart($('chartYear'), {
+        type: 'bar',
+        data: { labels: years, datasets: [{ label: 'Déclarations', data: yearCounts }] },
+        options: { ...commonOpts, plugins: { legend: { display:false } }, scales: { y: { beginAtZero:true, ticks:{ precision:0 } } } }
+      });
+
+      CHARTS.split = new Chart($('chartSplit'), {
+        type: 'doughnut',
+        data: { labels: ['HAL seul', 'Com seule', 'HAL + Com', 'Aucune demande'], datasets: [{ data: [halOnly, commOnly, both, none] }] },
+        options: commonOpts
+      });
+
+      CHARTS.status = new Chart($('chartStatus'), {
+        type: 'doughnut',
+        data: { labels: ['À traiter', 'Traité', 'Non demandé'], datasets: [{ data: [statusCounts['À traiter'], statusCounts['Traité'], statusCounts['Non demandé']] }] },
+        options: commonOpts
+      });
+    }
+
+    function clampPageIndex(){
+      const totalPages = Math.max(1, Math.ceil(VIEW.length / PAGE_SIZE));
+      if (PAGE_INDEX >= totalPages) PAGE_INDEX = totalPages - 1;
+      if (PAGE_INDEX < 0) PAGE_INDEX = 0;
+      return totalPages;
+    }
+
+    function updatePagerUI(){
+      const totalPages = clampPageIndex();
+      const from = VIEW.length ? (PAGE_INDEX * PAGE_SIZE + 1) : 0;
+      const to = Math.min(VIEW.length, (PAGE_INDEX + 1) * PAGE_SIZE);
+
+      $('pagerInfo').textContent = `Page ${PAGE_INDEX + 1}/${totalPages} — ${from}-${to} / ${VIEW.length}`;
+      $('prevPage').disabled = PAGE_INDEX <= 0;
+      $('nextPage').disabled = PAGE_INDEX >= (totalPages - 1);
+    }
+
+    function render(){
+      const q = norm($('q').value);
+      const fType = $('filterType').value;
+      const fNeeds = $('filterNeeds').value;
+      const fAxis = $('filterAxis').value;   // PICMAP/MOPTIS/OCSO/none/all
+      const fYear = $('filterYear').value;
+
+      VIEW = ALL.filter(it => {
+        if (fType !== 'all' && it.itemType !== fType) return false;
+
+        const y = it.year || '';
+        if (fYear !== 'all' && y !== fYear) return false;
+
+        const flags = it.flags || {};
+        const st = statusFor(it);
+
+        if (fNeeds === 'needsAction' && st.txt !== 'À traiter') return false;
+        if (fNeeds === 'halYes' && flags.hal_create !== 'yes') return false;
+        if (fNeeds === 'commsYes' && flags.comms_publish !== 'yes') return false;
+
+        // ✅ Filtre Axe (robuste)
+        const axes = parseAxes(flags);
+        const axisSel = String(fAxis || 'all').toUpperCase();
+        if (axisSel !== 'ALL') {
+          if (axisSel === 'NONE' && axes.length) return false;
+          if (axisSel !== 'NONE' && !axes.includes(axisSel)) return false;
+        }
+
+        if (!q) return true;
+
+        const axesStr = (flags.axes && flags.axes !== 'none') ? String(flags.axes) : '';
+        const hay = norm([
+          it.title,
+          it.bookTitle,
+          it.publicationTitle,
+          it.publisher,
+          it.place,
+          it.isbn,
+          it.doi,
+          it.volume,
+          it.issue,
+          it.pages,
+          axesStr,
+          it.creatorsText
+        ].filter(Boolean).join(' | '));
+        return hay.includes(q);
+      });
+
+      $('sTotal').textContent = VIEW.length;
+      const need = VIEW.filter(it => statusFor(it).txt === 'À traiter').length;
+      $('sNeed').textContent = need;
+      $('sHal').textContent = VIEW.filter(it => (it.flags?.hal_create === 'yes')).length;
+      $('sComms').textContent = VIEW.filter(it => (it.flags?.comms_publish === 'yes')).length;
+
+      renderCharts(VIEW);
+
+      const tbody = $('rows');
+      tbody.innerHTML = '';
+
+      if (!VIEW.length){
+        updatePagerUI();
+        tbody.innerHTML = `<tr><td colspan="7" class="muted">Aucun résultat avec ces filtres.</td></tr>`;
+        return;
+      }
+
+      VIEW.sort((a,b) => {
+        const ay = parseInt(a.year || '0', 10);
+        const by = parseInt(b.year || '0', 10);
+        if (by !== ay) return by - ay;
+        return (b.date || '').localeCompare(a.date || '');
+      });
+
+      updatePagerUI();
+      const startIdx = PAGE_INDEX * PAGE_SIZE;
+      const endIdx = startIdx + PAGE_SIZE;
+      const pageItems = VIEW.slice(startIdx, endIdx);
+
+      for (const it of pageItems){
+        const st = statusFor(it);
+        const hal = tagYesNo(it.flags?.hal_create);
+        const comms = tagYesNo(it.flags?.comms_publish);
+
+        const halDone = it.flags?.hal_done === 'yes';
+        const commDone = it.flags?.comms_done === 'yes';
+
+        const halTxt = halDone ? 'Demandé (traité)' : (hal.txt === 'Oui' ? 'Demandé' : hal.txt);
+        const commTxt = commDone ? 'Demandé (traité)' : (comms.txt === 'Oui' ? 'Demandé' : comms.txt);
+
+        const title = it.title || '(sans titre)';
+        const titleHtml = it.zoteroUrl
+          ? `<a href="${it.zoteroUrl}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a>`
+          : escapeHtml(title);
+
+        let extraMini = '';
+        if (it.bookTitle) {
+          extraMini += `<div class="mini muted">Dans : ${escapeHtml(it.bookTitle)}</div>`;
+        } else if (it.publicationTitle) {
+          extraMini += `<div class="mini muted">Revue : ${escapeHtml(it.publicationTitle)}</div>`;
+        }
+        if (it.doi) extraMini += `<div class="mini muted">DOI : ${escapeHtml(it.doi)}</div>`;
+
+        const axes = parseAxes(it.flags || {});
+        const axesHtml = axes.length
+          ? `<div class="axes">` + axes.map(a => `<span class="chip">${escapeHtml(a)}</span>`).join('') + `</div>`
+          : '';
+
+        const authorsFull = it.creatorsText || '';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="right">${escapeHtml(it.year || '')}</td>
+          <td><span class="tag">${escapeHtml(typeLabel(it.itemType))}</span></td>
+          <td class="title">${titleHtml}${extraMini}${axesHtml}</td>
+          <td class="authorsCol">
+            <div class="clamp" title="${escapeHtml(authorsFull)}">${escapeHtml(authorsFull)}</div>
+          </td>
+          <td><span class="tag ${hal.cls}">${escapeHtml(halTxt)}</span></td>
+          <td><span class="tag ${comms.cls}">${escapeHtml(commTxt)}</span></td>
+          <td><span class="tag ${st.cls}">${escapeHtml(st.txt)}</span></td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    function escapeHtml(str){
+      return String(str || '')
+        .replaceAll('&','&amp;')
+        .replaceAll('<','&lt;')
+        .replaceAll('>','&gt;')
+        .replaceAll('"','&quot;')
+        .replaceAll("'","&#039;");
+    }
+
+    function fillYears(items){
+      const years = [...new Set(items.map(i => i.year).filter(Boolean))].sort((a,b)=>b.localeCompare(a));
+      const sel = $('filterYear');
+      const cur = sel.value;
+      sel.innerHTML = `<option value="all">Toutes années</option>` + years.map(y => `<option value="${y}">${y}</option>`).join('');
+      sel.value = years.includes(cur) ? cur : 'all';
+    }
+
+    // ✅ Chargement progressif: affiche vite 100 items puis charge le reste en arrière-plan
+    async function load(){
+      $('msg').textContent = '';
+      $('rows').innerHTML = `<tr><td colspan="7"><span class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span> Chargement des données…</span></td></tr>`;
+
+      try{
+        const first = await fetch('/.netlify/functions/public-suivi?start=0&limit=100', { cache: 'no-store' });
+        const data1 = await first.json();
+
+        if (!first.ok) {
+          $('msg').textContent = 'Erreur de chargement.';
+          $('rows').innerHTML = `<tr><td colspan="7" class="muted">Erreur côté serveur.</td></tr>`;
+          return;
+        }
+
+        ALL = (data1.items || []).map(it => {
+          const y = it.year || yearFromDate(it.date);
+          return {
+            ...it,
+            year: y || '',
+            creatorsText: it.creatorsText || joinCreators(it.creators || []),
+          };
+        });
+
+        fillYears(ALL);
+
+        const ts = data1.fetchedAt ? new Date(data1.fetchedAt) : new Date();
+        $('lastUpdate').textContent = `Dernière mise à jour : ${ts.toLocaleString('fr-FR')}`;
+
+        PAGE_INDEX = 0;
+        PAGE_SIZE = parseInt($('pageSize').value, 10) || 25;
+        render();
+
+        // arrière-plan : charger toutes les pages restantes
+        if (data1.hasMore && data1.nextStart !== null) {
+          $('msg').textContent = `Chargement du reste… (${ALL.length}/${data1.totalResults || '…'})`;
+
+          let nextStart = data1.nextStart;
+          const limit = 100;
+
+          while (nextStart !== null) {
+            const r = await fetch(`/.netlify/functions/public-suivi?start=${nextStart}&limit=${limit}`, { cache: 'no-store' });
+            const d = await r.json();
+            if (!r.ok) break;
+
+            const more = (d.items || []).map(it => {
+              const y = it.year || yearFromDate(it.date);
+              return {
+                ...it,
+                year: y || '',
+                creatorsText: it.creatorsText || joinCreators(it.creators || []),
+              };
+            });
+
+            ALL.push(...more);
+            $('msg').textContent = `Chargement du reste… (${ALL.length}/${d.totalResults || '…'})`;
+
+            nextStart = d.hasMore ? d.nextStart : null;
+          }
+
+          fillYears(ALL);
+          $('msg').textContent = '';
+          render();
+        }
+
+      } catch(err){
+        console.error(err);
+        $('msg').textContent = 'Erreur réseau.';
+        $('rows').innerHTML = `<tr><td colspan="7" class="muted">Impossible de charger les données.</td></tr>`;
+      }
+    }
+
+    // ✅ listeners robustes + reset page
+    $('q').addEventListener('input', () => { PAGE_INDEX = 0; debouncedRender(200); });
+    ['filterType','filterNeeds','filterAxis','filterYear'].forEach(id =>
+      $(id).addEventListener('change', () => { PAGE_INDEX = 0; render(); })
+    );
+
+    $('reset').addEventListener('click', () => {
+      $('q').value = '';
+      $('filterType').value = 'all';
+      $('filterNeeds').value = 'all';
+      $('filterAxis').value = 'all';
+      $('filterYear').value = 'all';
+      PAGE_INDEX = 0;
+      render();
+    });
+
+    $('refresh').addEventListener('click', load);
+
+    // Pagination UI
+    $('pageSize').addEventListener('change', () => {
+      PAGE_SIZE = parseInt($('pageSize').value, 10) || 25;
+      PAGE_INDEX = 0;
+      render();
+    });
+
+    $('prevPage').addEventListener('click', () => {
+      PAGE_INDEX--;
+      render();
+    });
+
+    $('nextPage').addEventListener('click', () => {
+      PAGE_INDEX++;
+      render();
+    });
+
+    load();
+  </script>
+</body>
+</html>
