@@ -5,6 +5,7 @@
 // - Mode "all" (par défaut) : récupère tout (pagination interne)
 //
 // ✅ Optimisation perf : cache HTTP court (60s) pour éviter de re-puller 1500 items à chaque visite
+// ✅ Ajout : inclut aussi les items "conferencePaper"
 
 exports.handler = async (event) => {
   try {
@@ -18,119 +19,133 @@ exports.handler = async (event) => {
 
     const qs = event.queryStringParameters || {};
     const start = qs.start !== undefined ? Math.max(0, parseInt(qs.start, 10) || 0) : null;
-    const limitReq = qs.limit !== undefined ? (parseInt(qs.limit, 10) || 100) : null;
+    const limit = qs.limit !== undefined ? Math.max(1, Math.min(500, parseInt(qs.limit, 10) || 100)) : null;
 
-    // Zotero max=100
-    const limit = limitReq !== null ? Math.min(100, Math.max(1, limitReq)) : 100;
+    // Mode "page"
+    if (Number.isFinite(start) && Number.isFinite(limit)) {
+      const { items, hasMore } = await fetchZoteroPage({
+        apiKey,
+        libraryType,
+        libraryId,
+        start,
+        limit
+      });
 
-    // ✅ Mode "page" si start/limit fournis => un seul appel Zotero
-    if (start !== null || limitReq !== null) {
-      const page = await fetchZoteroPage({ apiKey, libraryType, libraryId, start: start || 0, limit });
-      const items = mapItems(page.items, libraryType, libraryId);
+      const mapped = mapItems(items, libraryType, libraryId);
 
       return json(200, {
-        fetchedAt: new Date().toISOString(),
         mode: "page",
-        start: page.start,
-        limit: page.limit,
-        totalResults: page.totalResults,
-        hasMore: page.hasMore,
-        nextStart: page.hasMore ? (page.start + page.items.length) : null,
-        count: items.length,
-        items,
+        start,
+        limit,
+        count: mapped.length,
+        hasMore,
+        items: mapped,
+        fetchedAt: new Date().toISOString()
       });
     }
 
-    // ✅ Mode "all" (compat)
+    // Mode "all"
     const all = await fetchAllZoteroItems({ apiKey, libraryType, libraryId });
-    const items = mapItems(all, libraryType, libraryId);
+    const mapped = mapItems(all, libraryType, libraryId);
 
     return json(200, {
-      fetchedAt: new Date().toISOString(),
       mode: "all",
-      count: items.length,
-      items,
+      count: mapped.length,
+      items: mapped,
+      fetchedAt: new Date().toISOString()
     });
-  } catch (e) {
-    return json(500, { error: e.message || String(e) });
+  } catch (err) {
+    return json(500, { error: String(err && err.message ? err.message : err) });
   }
 };
 
-function json(statusCode, obj) {
+// ---------------- helpers ----------------
+
+function json(statusCode, body) {
   return {
     statusCode,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      // ✅ cache court (page publique interne)
-      // stale-while-revalidate : Netlify/CDN peut servir une version encore fraîche
-      // pendant qu'il récupère la nouvelle (meilleure UX sur gros volumes)
-      "Cache-Control": "public, max-age=60, stale-while-revalidate=60",
+      "Cache-Control": "public, max-age=60"
     },
-    body: JSON.stringify(obj),
+    body: JSON.stringify(body)
   };
 }
 
 async function fetchZoteroPage({ apiKey, libraryType, libraryId, start, limit }) {
-  const url =
-    `https://api.zotero.org/${libraryType}/${libraryId}/items` +
-    `?limit=${limit}&start=${start}&sort=dateModified&direction=desc`;
+  const url = new URL(`https://api.zotero.org/${libraryType}/${libraryId}/items`);
+  url.searchParams.set("format", "json");
+  url.searchParams.set("include", "data");
+  url.searchParams.set("start", String(start));
+  url.searchParams.set("limit", String(limit));
+  url.searchParams.set("sort", "dateModified");
+  url.searchParams.set("direction", "desc");
 
-  const res = await fetch(url, {
+  const r = await fetch(url.toString(), {
     headers: {
       "Zotero-API-Key": apiKey,
-      "Zotero-API-Version": "3",
-      "Accept": "application/json",
-    },
+      "Zotero-API-Version": "3"
+    }
   });
 
-  const raw = await res.text();
-  if (!res.ok) throw new Error(`Zotero error HTTP ${res.status}: ${raw}`);
+  const text = await r.text();
+  if (!r.ok) {
+    throw new Error(`Zotero ${r.status}: ${text}`);
+  }
 
-  const items = JSON.parse(raw);
+  const items = JSON.parse(text);
 
-  // Total-Results (souvent présent)
-  const totalResults = parseInt(res.headers.get("Total-Results") || "", 10);
-  const total = Number.isFinite(totalResults) ? totalResults : null;
+  // Link header rel="next"
+  const link = r.headers.get("Link") || "";
+  const hasMore = link.includes('rel="next"');
 
-  const hasMore = total !== null
-    ? (start + items.length) < total
-    : (Array.isArray(items) && items.length === limit);
-
-  return {
-    start,
-    limit,
-    totalResults: total,
-    hasMore,
-    items: Array.isArray(items) ? items : [],
-  };
+  return { items, hasMore };
 }
 
 async function fetchAllZoteroItems({ apiKey, libraryType, libraryId }) {
+  const MAX_ITEMS = 20000;
   const limit = 100;
+
   let start = 0;
-  const MAX_ITEMS = 10000;
+  let out = [];
+  let guard = 0;
 
-  const all = [];
   while (true) {
-    const page = await fetchZoteroPage({ apiKey, libraryType, libraryId, start, limit });
-    if (!page.items.length) break;
+    guard++;
+    if (guard > 500) break; // safety
 
-    all.push(...page.items);
+    const { items, hasMore } = await fetchZoteroPage({
+      apiKey,
+      libraryType,
+      libraryId,
+      start,
+      limit
+    });
 
-    if (!page.hasMore) break;
+    if (!items || !items.length) break;
 
-    start += page.items.length;
-    if (all.length >= MAX_ITEMS) break;
+    out = out.concat(items);
+    if (!hasMore) break;
+
+    start += items.length;
+    if (out.length >= MAX_ITEMS) break;
   }
 
-  return all;
+  return out;
 }
 
 function mapItems(zoteroWrappedItems, libraryType, libraryId) {
   return (zoteroWrappedItems || [])
-    .map((z) => (z && z.data) ? z.data : null)
+    .map((z) => (z && z.data ? z.data : null))
     .filter(Boolean)
-    .filter((d) => d.itemType === "book" || d.itemType === "bookSection" || d.itemType === "journalArticle")
+    // ✅ Ajout conferencePaper
+    .filter(
+      (d) =>
+        d.itemType === "book" ||
+        d.itemType === "bookSection" ||
+        d.itemType === "journalArticle" ||
+        d.itemType === "conferencePaper"
+    )
     .map((d) => ({
       itemType: d.itemType || "",
       title: d.title || "",
@@ -138,6 +153,8 @@ function mapItems(zoteroWrappedItems, libraryType, libraryId) {
 
       bookTitle: d.bookTitle || "",
       publicationTitle: d.publicationTitle || "",
+      conferenceName: d.conferenceName || "",
+
       publisher: d.publisher || "",
       place: d.place || "",
       isbn: d.ISBN || "",
@@ -150,6 +167,7 @@ function mapItems(zoteroWrappedItems, libraryType, libraryId) {
       flags: parseDLABFlags(d.extra || ""),
 
       zoteroUrl: buildZoteroUrl(libraryType, libraryId, d.key),
+      key: d.key || ""
     }));
 }
 
@@ -171,20 +189,11 @@ function parseDLABFlags(extra) {
   const flags = {};
 
   block.split("\n").forEach((line) => {
-    const l = line.trim();
-    if (!l || l.startsWith("#")) return;
-    const idx = l.indexOf(":");
-    if (idx === -1) return;
-
-    const key = l.slice(0, idx).trim();
-    let val = l.slice(idx + 1).trim();
-
+    const m = line.match(/^\s*([^:]+)\s*:\s*(.*?)\s*$/);
+    if (!m) return;
+    const key = m[1].trim();
+    const val = m[2].trim();
     if (!key) return;
-
-    const low = val.toLowerCase();
-    if (low === "yes" || low === "true" || low === "oui") val = "yes";
-    else if (low === "no" || low === "false" || low === "non") val = "no";
-
     flags[key] = val;
   });
 
