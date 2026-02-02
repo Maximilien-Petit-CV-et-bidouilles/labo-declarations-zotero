@@ -574,69 +574,84 @@ ${clone.outerHTML}
     setStatus('Export HTML généré ✅', true);
   }
 
-  // ✅ PDF: render in viewport (invisible) so html2canvas doesn't return blank
-  async function exportPDF() {
-    if (!window.html2pdf) {
-      setStatus("Erreur : html2pdf n'est pas chargé.", false);
-      return;
+ // ✅ PDF: robust capture (no blank page)
+async function exportPDF() {
+  if (!window.html2pdf) {
+    setStatus("Erreur : html2pdf n'est pas chargé.", false);
+    return;
+  }
+
+  const clone = cloneForExport();
+  const title = (cvName ? cvName.textContent.trim() : 'CV') || 'CV';
+  const filename = safeFilenameBase(title) + '.pdf';
+
+  // Holder in viewport, "almost invisible" (NOT opacity 0), so html2canvas captures it.
+  const holder = document.createElement('div');
+  holder.id = 'pdfExportHolder';
+  holder.style.position = 'fixed';
+  holder.style.left = '0';
+  holder.style.top = '0';
+  holder.style.width = '100vw';
+  holder.style.height = '100vh';
+  holder.style.background = '#ffffff';
+  holder.style.opacity = '0.01';          // IMPORTANT: not 0
+  holder.style.pointerEvents = 'none';
+  holder.style.zIndex = '999999';
+
+  // Inject overrides (pandoc-like)
+  const style = document.createElement('style');
+  style.textContent = EXPORT_OVERRIDES_CSS;
+  holder.appendChild(style);
+
+  // The actual exported A4 page (capture THIS)
+  const page = document.createElement('div');
+  page.className = 'a4page';
+  page.style.maxWidth = '210mm';
+  page.style.margin = '0 auto';
+  page.style.padding = '12mm 14mm';
+  page.style.background = '#ffffff';
+  page.appendChild(clone);
+  holder.appendChild(page);
+
+  document.body.appendChild(holder);
+
+  try {
+    // Wait fonts/layout
+    if (document.fonts && document.fonts.ready) {
+      await document.fonts.ready;
     }
-
-    const clone = cloneForExport();
-    const title = (cvName ? cvName.textContent.trim() : 'CV') || 'CV';
-    const filename = safeFilenameBase(title) + '.pdf';
-
-    const holder = document.createElement('div');
-    holder.id = 'pdfExportHolder';
-    holder.style.position = 'absolute';
-    holder.style.left = '0';
-    holder.style.top = '0';
-    holder.style.width = '210mm';
-    holder.style.background = '#fff';
-    holder.style.opacity = '0';
-    holder.style.pointerEvents = 'none';
-    holder.style.zIndex = '-1';
-
-    const style = document.createElement('style');
-    style.textContent = EXPORT_OVERRIDES_CSS;
-    holder.appendChild(style);
-
-    const page = document.createElement('div');
-    page.className = 'a4page';
-    page.appendChild(clone);
-    holder.appendChild(page);
-
-    document.body.appendChild(holder);
-
-    // Ensure layout is computed before capture
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-    try {
-      await window.html2pdf()
-        .set({
-          margin: [0, 0, 0, 0],
-          filename,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: {
-            scale: 2,
-            useCORS: true,
-            backgroundColor: '#ffffff',
-            scrollX: 0,
-            scrollY: 0
-          },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-          pagebreak: { mode: ['css', 'legacy'] }
-        })
-        .from(holder)
-        .save();
+    await window.html2pdf()
+      .set({
+        filename,
+        margin: [0, 0, 0, 0],
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#ffffff',
+          // capture the page as if at the top-left
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: page.scrollWidth || 1200,
+          windowHeight: page.scrollHeight || 1600
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'] }
+      })
+      .from(page)   // IMPORTANT: capture the page, not the holder
+      .save();
 
-      setStatus('Export PDF généré ✅', true);
-    } catch (e) {
-      console.error(e);
-      setStatus('Erreur export PDF : ' + (e?.message || e), false);
-    } finally {
-      holder.remove();
-    }
+    setStatus('Export PDF généré ✅', true);
+  } catch (e) {
+    console.error(e);
+    setStatus('Erreur export PDF : ' + (e?.message || e), false);
+  } finally {
+    holder.remove();
   }
+}
+
 
   // DOCX: keep the version you said is "très bien"
   // (copied as-is from your previous working patch)
