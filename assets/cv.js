@@ -573,11 +573,17 @@ ${clone.outerHTML}
     downloadBlob(new Blob([html], { type: 'text/html;charset=utf-8' }), filename);
     setStatus('Export HTML généré ✅', true);
   }
-
- // ✅ PDF: robust capture (no blank page)
+// ✅ PDF (robuste) : html2canvas -> jsPDF (multi-pages)
+// Remplace uniquement exportPDF() dans assets/cv.js
 async function exportPDF() {
-  if (!window.html2pdf) {
-    setStatus("Erreur : html2pdf n'est pas chargé.", false);
+  // html2canvas doit être disponible (souvent injecté par html2pdf, mais pas toujours)
+  const html2canvasFn = window.html2canvas;
+  const jsPDFCtor =
+    (window.jspdf && window.jspdf.jsPDF) ||
+    window.jsPDF;
+
+  if (!html2canvasFn || !jsPDFCtor) {
+    setStatus("Erreur : html2canvas/jsPDF indisponible. Vérifie les scripts PDF.", false);
     return;
   }
 
@@ -585,30 +591,31 @@ async function exportPDF() {
   const title = (cvName ? cvName.textContent.trim() : 'CV') || 'CV';
   const filename = safeFilenameBase(title) + '.pdf';
 
-  // Holder in viewport, "almost invisible" (NOT opacity 0), so html2canvas captures it.
+  // Holder visible (mais hors écran) : html2canvas capture mieux qu'un élément invisible
   const holder = document.createElement('div');
   holder.id = 'pdfExportHolder';
-  holder.style.position = 'fixed';
+  holder.style.position = 'absolute';
   holder.style.left = '0';
   holder.style.top = '0';
-  holder.style.width = '100vw';
-  holder.style.height = '100vh';
+  holder.style.width = '210mm';
   holder.style.background = '#ffffff';
-  holder.style.opacity = '0.01';          // IMPORTANT: not 0
-  holder.style.pointerEvents = 'none';
+  holder.style.color = '#111';
   holder.style.zIndex = '999999';
 
-  // Inject overrides (pandoc-like)
+  // Place hors viewport, mais PAS display:none / opacity:0
+  holder.style.transform = 'translate(-10000px, 0)';
+
+  // Inject export CSS overrides (pandoc-like, no frames)
   const style = document.createElement('style');
   style.textContent = EXPORT_OVERRIDES_CSS;
   holder.appendChild(style);
 
-  // The actual exported A4 page (capture THIS)
+  // A4 page wrapper
   const page = document.createElement('div');
   page.className = 'a4page';
-  page.style.maxWidth = '210mm';
-  page.style.margin = '0 auto';
+  page.style.width = '210mm';
   page.style.padding = '12mm 14mm';
+  page.style.boxSizing = 'border-box';
   page.style.background = '#ffffff';
   page.appendChild(clone);
   holder.appendChild(page);
@@ -616,33 +623,55 @@ async function exportPDF() {
   document.body.appendChild(holder);
 
   try {
-    // Wait fonts/layout
+    // Attendre que fonts + layout soient prêts
     if (document.fonts && document.fonts.ready) {
       await document.fonts.ready;
     }
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-    await window.html2pdf()
-      .set({
-        filename,
-        margin: [0, 0, 0, 0],
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: '#ffffff',
-          // capture the page as if at the top-left
-          scrollX: 0,
-          scrollY: 0,
-          windowWidth: page.scrollWidth || 1200,
-          windowHeight: page.scrollHeight || 1600
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'] }
-      })
-      .from(page)   // IMPORTANT: capture the page, not the holder
-      .save();
+    // Rendu canvas
+    const canvas = await html2canvasFn(page, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      scrollX: 0,
+      scrollY: 0
+    });
 
+    const imgData = canvas.toDataURL('image/jpeg', 0.98);
+
+    // jsPDF en mm, A4 portrait
+    const pdf = new jsPDFCtor({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+
+    // Dimensions A4 en mm
+    const pdfW = 210;
+    const pdfH = 297;
+
+    // Marges (mm) : cohérentes avec ton padding A4
+    const mTop = 0;
+    const mLeft = 0;
+
+    // Dimensions image dans le PDF : on scale pour tenir en largeur A4
+    const imgW = pdfW - 2 * mLeft;
+    const imgH = (canvas.height * imgW) / canvas.width;
+
+    // Multi-pages : on "coupe" verticalement
+    let y = 0;
+    let pageIndex = 0;
+
+    while (y < imgH - 0.1) {
+      if (pageIndex > 0) pdf.addPage();
+
+      // addImage (image entière) mais décalée vers le haut via "y" négatif
+      // Cela fonctionne car jsPDF ne dessine que la partie visible de la page.
+      pdf.addImage(imgData, 'JPEG', mLeft, mTop - y, imgW, imgH);
+
+      y += pdfH; // on descend d'une hauteur de page A4
+      pageIndex++;
+      if (pageIndex > 50) break; // garde-fou
+    }
+
+    pdf.save(filename);
     setStatus('Export PDF généré ✅', true);
   } catch (e) {
     console.error(e);
@@ -651,7 +680,6 @@ async function exportPDF() {
     holder.remove();
   }
 }
-
 
   // DOCX: keep the version you said is "très bien"
   // (copied as-is from your previous working patch)
