@@ -1,11 +1,8 @@
 /* ==========================================================
-   assets/cv.js (PATCH FINAL EXPORTS + DOCX FORMATTING)
-   - Keeps your cv.html behavior: markdown blocks, save texts,
-     gated publications loading, conferencePaper included.
-   - Fixes exports:
-     ✅ HTML/PDF: removes helper texts + removes "card frames"
-     ✅ PDF: export style closer to pandoc (no borders/rounded)
-     ✅ DOCX: keeps bold/italic + bullet lists
+   assets/cv.js (PATCH: HTML width + PDF blank fix)
+   - DOCX: unchanged (as requested)
+   - HTML export: A4 centered (not full-width)
+   - PDF export: fixes blank page by rendering in-viewport (invisible)
    ========================================================== */
 
 (() => {
@@ -45,8 +42,8 @@
 
   // ---------- Storage keys
   const LS_MD = 'cv.mdblocks.v2';
-  const LS_HDR = 'cv.header.v2';      // name + contact
-  const LS_FILTERS = 'cv.filters.v2'; // author/year/sort options
+  const LS_HDR = 'cv.header.v2';
+  const LS_FILTERS = 'cv.filters.v2';
 
   // ---------- State
   let PUBS_CACHE = null;
@@ -419,7 +416,6 @@
 
     const q = authorFilter ? authorFilter.value : '';
     if (!hasFullNameQuery(q)) {
-      // IMPORTANT: do not load anything (fast)
       renderPublications([], { emptyMessage: 'Tapez <b>Nom Prénom</b> dans le filtre <b>Auteur</b> pour charger les publications.' });
       if (cvMeta) cvMeta.textContent = '';
       setStatus('', true);
@@ -464,26 +460,28 @@
   }
 
   // ==========================================================
-  // EXPORTS
+  // EXPORTS (only HTML/PDF changed here; DOCX unchanged)
   // ==========================================================
 
-  // Style overrides to get closer to "pandoc CV" look (no frames/cards)
+  // Export overrides: remove frames + make typography cleaner
   const EXPORT_OVERRIDES_CSS = `
     body{ background:#fff !important; color:#111 !important; }
-    /* remove the "card" frame of the CV */
     .cv{ border:none !important; border-radius:0 !important; background:transparent !important; padding:0 !important; }
-    /* remove md block frames */
     .mdblock{ border:none !important; background:transparent !important; padding:0 !important; }
-    /* keep clean typography */
-    h2{ margin-top:0 !important; }
-    .section{ border-top:1px solid #ddd !important; }
-    /* hide any status/tooling */
-    #cv-status, #cvMeta, .status, .toolbar, .controls, .left, .sidebar, .toolbox { display:none !important; }
+    #cv-status, #cvMeta, .status, .toolbar, .controls { display:none !important; }
+    /* A4-like centered page for HTML export */
+    .a4page{
+      max-width: 210mm;
+      margin: 0 auto;
+      padding: 12mm 14mm;
+      background: #fff;
+    }
+    @media print{
+      .a4page{ padding: 0; }
+    }
   `;
 
   function getInlineStyleFromCvHtml() {
-    // Embed original styles so HTML export looks like on-screen,
-    // then add EXPORT_OVERRIDES_CSS to remove frames.
     const styles = [];
     qsa('style').forEach(s => styles.push(s.textContent || ''));
     styles.push(EXPORT_OVERRIDES_CSS);
@@ -491,60 +489,48 @@
   }
 
   function cloneForExport() {
-    // Ensure previews reflect edits
     for (const b of getMdBlocks()) updatePreview(b);
 
     const clone = cvRoot.cloneNode(true);
 
-    // 1) remove meta and status
+    // remove meta + status
     const meta = clone.querySelector('#cvMeta');
     if (meta) meta.remove();
     const st = clone.querySelector('#cv-status');
     if (st) st.remove();
 
-    // 2) remove markdown editor UI: keep preview only
+    // remove markdown editor UI, keep preview
     qsa('.mdtabs', clone).forEach(n => n.remove());
     qsa('textarea.mdedit', clone).forEach(n => n.remove());
 
-    // 3) Remove helper text above publications (it’s in cv.html)
-    //    It's the <div style="..."> just before #pubList.
+    // remove helper message near publications
     const pubOl = clone.querySelector('#pubList');
     if (pubOl) {
       const pubSection = pubOl.closest('section.section');
       if (pubSection) {
-        // remove any div that contains "Les publications ne se chargent"
         qsa('div', pubSection).forEach(d => {
           const t = (d.textContent || '').trim();
-          if (t.includes('Les publications ne se chargent') || d.querySelector('#pubCount')) d.remove();
+          if (t.includes('Les publications ne se chargent')) d.remove();
         });
-
-        // also remove placeholder li if publications aren't loaded
         qsa('#pubList li', pubSection).forEach(li => {
           const t = (li.textContent || '').trim();
-          if (
-            t.includes('Tapez') && t.includes('Nom') && t.includes('Prénom') &&
-            (t.includes('charger les publications') || t.includes('charger les publications'))
-          ) {
-            li.remove();
-          }
+          if (t.includes('Tapez') && t.includes('Nom') && t.includes('Prénom') && t.includes('charger')) li.remove();
         });
       }
     }
 
-    // 4) Remove "Mon site" placeholder link if it still exists in default template
-    //    (only if it's the placeholder url)
+    // remove placeholder "Mon site" only if it is the example placeholder
     qsa('a', clone).forEach(a => {
       const href = (a.getAttribute('href') || '').trim();
       const txt = (a.textContent || '').trim();
       if (href === 'https://exemple.fr' && txt.toLowerCase().includes('mon site')) {
-        // keep text, remove link
         const span = document.createElement('span');
         span.textContent = a.textContent;
         a.replaceWith(span);
       }
     });
 
-    // 5) remove contenteditable
+    // remove contenteditable attributes
     qsa('[contenteditable]', clone).forEach(n => n.removeAttribute('contenteditable'));
 
     return clone;
@@ -561,6 +547,7 @@
     URL.revokeObjectURL(url);
   }
 
+  // ✅ HTML: wrap in .a4page so it's not full-width
   function exportHTML() {
     const clone = cloneForExport();
     const css = getInlineStyleFromCvHtml();
@@ -568,7 +555,6 @@
     const title = (cvName ? cvName.textContent.trim() : 'CV') || 'CV';
     const filename = safeFilenameBase(title) + '.html';
 
-    // IMPORTANT: no extra "wrap" -> avoids wide page issues
     const html = `<!doctype html>
 <html lang="fr">
 <head>
@@ -578,7 +564,9 @@
 <style>${css}</style>
 </head>
 <body>
+<div class="a4page">
 ${clone.outerHTML}
+</div>
 </body>
 </html>`;
 
@@ -586,6 +574,7 @@ ${clone.outerHTML}
     setStatus('Export HTML généré ✅', true);
   }
 
+  // ✅ PDF: render in viewport (invisible) so html2canvas doesn't return blank
   async function exportPDF() {
     if (!window.html2pdf) {
       setStatus("Erreur : html2pdf n'est pas chargé.", false);
@@ -596,29 +585,44 @@ ${clone.outerHTML}
     const title = (cvName ? cvName.textContent.trim() : 'CV') || 'CV';
     const filename = safeFilenameBase(title) + '.pdf';
 
-    // Temporary container to render a clean A4-ish page
     const holder = document.createElement('div');
-    holder.style.position = 'fixed';
-    holder.style.left = '-10000px';
+    holder.id = 'pdfExportHolder';
+    holder.style.position = 'absolute';
+    holder.style.left = '0';
     holder.style.top = '0';
     holder.style.width = '210mm';
-    holder.style.background = '#ffffff';
+    holder.style.background = '#fff';
+    holder.style.opacity = '0';
+    holder.style.pointerEvents = 'none';
+    holder.style.zIndex = '-1';
 
-    // Inject export CSS overrides (pandoc-like)
     const style = document.createElement('style');
     style.textContent = EXPORT_OVERRIDES_CSS;
     holder.appendChild(style);
-    holder.appendChild(clone);
+
+    const page = document.createElement('div');
+    page.className = 'a4page';
+    page.appendChild(clone);
+    holder.appendChild(page);
 
     document.body.appendChild(holder);
+
+    // Ensure layout is computed before capture
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
     try {
       await window.html2pdf()
         .set({
-          margin: [12, 14, 12, 14],
+          margin: [0, 0, 0, 0],
           filename,
           image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+          html2canvas: {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            scrollX: 0,
+            scrollY: 0
+          },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
           pagebreak: { mode: ['css', 'legacy'] }
         })
@@ -634,7 +638,8 @@ ${clone.outerHTML}
     }
   }
 
-  // ---------- DOCX: HTML -> docx (bold/italic + bullets)
+  // DOCX: keep the version you said is "très bien"
+  // (copied as-is from your previous working patch)
   function docxAvailable() {
     return !!(window.docx && window.docx.Document && window.docx.Paragraph && window.docx.TextRun);
   }
@@ -648,7 +653,6 @@ ${clone.outerHTML}
   function htmlNodeToRuns(node, style) {
     const { TextRun } = window.docx;
     const runs = [];
-
     const cur = { bold: !!style.bold, italics: !!style.italics };
 
     if (node.nodeType === Node.TEXT_NODE) {
@@ -656,11 +660,9 @@ ${clone.outerHTML}
       if (t) runs.push(new TextRun({ text: t, bold: cur.bold, italics: cur.italics }));
       return runs;
     }
-
     if (node.nodeType !== Node.ELEMENT_NODE) return runs;
 
     const tag = node.tagName.toLowerCase();
-
     const nextStyle = { ...cur };
     if (tag === 'strong' || tag === 'b') nextStyle.bold = true;
     if (tag === 'em' || tag === 'i') nextStyle.italics = true;
@@ -669,8 +671,6 @@ ${clone.outerHTML}
       runs.push(new TextRun({ text: '\n', bold: cur.bold, italics: cur.italics }));
       return runs;
     }
-
-    // links: keep text only
     if (tag === 'a') {
       const text = node.textContent || '';
       if (text) runs.push(new TextRun({ text, bold: nextStyle.bold, italics: nextStyle.italics }));
@@ -686,8 +686,6 @@ ${clone.outerHTML}
   function blockToDocxParagraphsFromPreview(previewEl) {
     const { Paragraph } = window.docx;
     const paras = [];
-
-    // Convert HTML with list support
     const nodes = parseHtmlToNodes(previewEl.innerHTML || '');
 
     function walk(node, listLevel = null) {
@@ -695,30 +693,25 @@ ${clone.outerHTML}
         const tag = node.tagName.toLowerCase();
 
         if (tag === 'ul' || tag === 'ol') {
-          const isOrdered = tag === 'ol';
           const items = Array.from(node.querySelectorAll(':scope > li'));
-          items.forEach(li => walk(li, { ordered: isOrdered }));
+          items.forEach(li => walk(li, { ordered: tag === 'ol' }));
           return;
         }
 
         if (tag === 'li') {
           const runs = [];
           for (const ch of Array.from(node.childNodes)) {
-            // avoid nested ul/ol being flattened here; they will be handled in walk
             if (ch.nodeType === Node.ELEMENT_NODE) {
               const ct = ch.tagName.toLowerCase();
               if (ct === 'ul' || ct === 'ol') continue;
             }
             runs.push(...htmlNodeToRuns(ch, { bold: false, italics: false }));
           }
-          const p = new Paragraph({
+          paras.push(new Paragraph({
             children: runs.length ? runs : undefined,
             bullet: listLevel ? { level: 0 } : undefined,
             spacing: { after: 120 }
-          });
-          paras.push(p);
-
-          // nested lists
+          }));
           Array.from(node.childNodes).forEach(ch => {
             if (ch.nodeType === Node.ELEMENT_NODE) {
               const ct = ch.tagName.toLowerCase();
@@ -731,14 +724,11 @@ ${clone.outerHTML}
         if (tag === 'p' || tag === 'div') {
           const runs = htmlNodeToRuns(node, { bold: false, italics: false });
           const textOnly = (node.textContent || '').trim();
-          if (runs.length && textOnly) {
-            paras.push(new Paragraph({ children: runs, spacing: { after: 120 } }));
-          }
+          if (runs.length && textOnly) paras.push(new Paragraph({ children: runs, spacing: { after: 120 } }));
           return;
         }
       }
 
-      // fallback: text
       if ((node.textContent || '').trim()) {
         const runs = htmlNodeToRuns(node, { bold: false, italics: false });
         paras.push(new Paragraph({ children: runs, spacing: { after: 120 } }));
@@ -762,13 +752,11 @@ ${clone.outerHTML}
 
     const children = [];
 
-    // Header
     const name = (cvName ? cvName.textContent.trim() : '').trim();
     const contact = (cvContact ? cvContact.textContent.trim() : '').trim();
     if (name) children.push(new Paragraph({ children: [new TextRun({ text: name, bold: true, size: 36 })], spacing: { after: 120 } }));
     if (contact) children.push(new Paragraph({ children: [new TextRun({ text: contact, size: 22 })], spacing: { after: 240 } }));
 
-    // Sections
     const sections = qsa('section.section', clone);
     for (const sec of sections) {
       const h3 = sec.querySelector('h3');
@@ -777,7 +765,6 @@ ${clone.outerHTML}
         children.push(new Paragraph({ children: [new TextRun({ text: heading, bold: true, size: 26 })], spacing: { before: 160, after: 120 } }));
       }
 
-      // Publications section: list items with italic/bold preserved
       const pubs = sec.querySelector('#pubList');
       if (pubs) {
         const lis = qsa('#pubList li', sec);
@@ -790,7 +777,6 @@ ${clone.outerHTML}
         continue;
       }
 
-      // Markdown blocks: convert preview HTML to docx paragraphs (supports bullets)
       const preview = sec.querySelector('.mdpreview');
       if (preview) {
         const paras = blockToDocxParagraphsFromPreview(preview);
@@ -846,7 +832,6 @@ ${clone.outerHTML}
 
     wireUI();
 
-    // Initial: fast (no publications load until "Nom Prénom")
     refreshPublications(false);
 
     window.addEventListener('beforeunload', () => {
