@@ -1,17 +1,11 @@
 /* ==========================================================
-   assets/cv.js (PATCHED FOR THIS PROJECT'S cv.html)
-   - Works with cv.html structure:
-       - Markdown blocks: <section data-mdblock="...">
-         with .mdtoggle, .mdedit (textarea), .mdpreview
-       - Save button: #saveTextBtn
-       - Filters: #authorFilter, #yearMin, #yearMax, #onlyPublications, #sortMode
-       - Refresh publications: #refreshBtn
-       - Exports: #exportHtmlBtn, #exportPdfBtn, #exportDocxBtn
-       - CV container: #cvRoot, meta: #cvMeta
-   - Publications load ONLY when Author filter contains at least "Nom Prénom" (2 tokens)
-   - Authors are displayed again + author filter works
-   - conferencePaper is included everywhere as a "publication"
-   - Keeps the existing HTML/PDF/DOCX export UX (and fixes the broken wiring)
+   assets/cv.js (PATCH FINAL EXPORTS + DOCX FORMATTING)
+   - Keeps your cv.html behavior: markdown blocks, save texts,
+     gated publications loading, conferencePaper included.
+   - Fixes exports:
+     ✅ HTML/PDF: removes helper texts + removes "card frames"
+     ✅ PDF: export style closer to pandoc (no borders/rounded)
+     ✅ DOCX: keeps bold/italic + bullet lists
    ========================================================== */
 
 (() => {
@@ -51,7 +45,7 @@
 
   // ---------- Storage keys
   const LS_MD = 'cv.mdblocks.v2';
-  const LS_HDR = 'cv.header.v2';      // name + contact (contenteditable)
+  const LS_HDR = 'cv.header.v2';      // name + contact
   const LS_FILTERS = 'cv.filters.v2'; // author/year/sort options
 
   // ---------- State
@@ -61,7 +55,12 @@
 
   // ---------- utils
   const stripDiacritics = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const norm = (s) => stripDiacritics(String(s || '')).toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').replace(/\s+/g, ' ').trim();
+  const norm = (s) => stripDiacritics(String(s || ''))
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
   const escapeHtml = (s) => String(s || '')
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
@@ -88,6 +87,11 @@
     statusEl.className = 'status ' + (ok ? 'ok' : 'err');
   }
 
+  function safeFilenameBase(name) {
+    const base = norm(name).replace(/\s+/g, '-').replace(/-+/g, '-');
+    return base || 'cv';
+  }
+
   // ---------- Markdown blocks wiring
   function getMdBlocks() {
     return qsa('section[data-mdblock]', cvRoot).map((sec) => {
@@ -103,7 +107,6 @@
     if (window.marked && typeof window.marked.parse === 'function') {
       return window.marked.parse(md || '');
     }
-    // fallback minimal
     return '<pre>' + escapeHtml(md || '') + '</pre>';
   }
 
@@ -150,23 +153,20 @@
   function wireMdBlocks() {
     const blocks = getMdBlocks();
     for (const b of blocks) {
-      // Initial render
       updatePreview(b);
       showEdit(b, false);
 
-      // Toggle edit/preview
       b.toggle.addEventListener('click', () => {
-        const nowEdit = b.edit.hidden; // hidden => will show
+        const nowEdit = b.edit.hidden;
         showEdit(b, nowEdit);
         if (!nowEdit) updatePreview(b);
       });
 
-      // Live preview on input (debounced)
       b.edit.addEventListener('input', debounce(() => updatePreview(b), 180));
     }
   }
 
-  // ---------- Header (name/contact) persistence
+  // ---------- Header persistence
   function loadHeader() {
     try {
       const raw = localStorage.getItem(LS_HDR);
@@ -252,7 +252,6 @@
 
   function isPublicationType(itemType, onlyPub) {
     if (!onlyPub) return true;
-    // ✅ "Publications" includes conferencePaper (as requested)
     return itemType === 'book' || itemType === 'bookSection' || itemType === 'journalArticle' || itemType === 'conferencePaper';
   }
 
@@ -420,10 +419,10 @@
 
     const q = authorFilter ? authorFilter.value : '';
     if (!hasFullNameQuery(q)) {
-      // IMPORTANT: do not load anything
+      // IMPORTANT: do not load anything (fast)
       renderPublications([], { emptyMessage: 'Tapez <b>Nom Prénom</b> dans le filtre <b>Auteur</b> pour charger les publications.' });
       if (cvMeta) cvMeta.textContent = '';
-      setStatus('Pour afficher les productions : tapez “Nom Prénom” (au moins 2 mots) dans le filtre Auteur.', true);
+      setStatus('', true);
       return;
     }
 
@@ -438,13 +437,12 @@
       const filtered = applyFiltersToItems(all);
       renderPublications(filtered);
 
-      // Show meta on screen (but removed in exports)
       if (cvMeta) {
         const ts = PUBS_FETCHED_AT ? PUBS_FETCHED_AT.toLocaleString('fr-FR') : '';
         cvMeta.textContent = ts ? `Maj : ${ts} · source : Zotero` : '';
       }
 
-      setStatus(`OK — ${filtered.length} publication(s)`, true);
+      setStatus('', true);
     } catch (e) {
       console.error(e);
       setStatus('Erreur chargement publications : ' + (e?.message || e), false);
@@ -456,8 +454,8 @@
     try {
       saveHeader();
       saveMdBlocks();
+      saveFilters();
       setStatus('Textes sauvegardés ✅', true);
-      // subtle auto-clear
       setTimeout(() => { if (statusEl && statusEl.textContent.includes('sauvegardés')) setStatus('', true); }, 1200);
     } catch (e) {
       console.error(e);
@@ -465,40 +463,91 @@
     }
   }
 
-  // ---------- Export helpers (build a clean clone of #cvRoot)
+  // ==========================================================
+  // EXPORTS
+  // ==========================================================
+
+  // Style overrides to get closer to "pandoc CV" look (no frames/cards)
+  const EXPORT_OVERRIDES_CSS = `
+    body{ background:#fff !important; color:#111 !important; }
+    /* remove the "card" frame of the CV */
+    .cv{ border:none !important; border-radius:0 !important; background:transparent !important; padding:0 !important; }
+    /* remove md block frames */
+    .mdblock{ border:none !important; background:transparent !important; padding:0 !important; }
+    /* keep clean typography */
+    h2{ margin-top:0 !important; }
+    .section{ border-top:1px solid #ddd !important; }
+    /* hide any status/tooling */
+    #cv-status, #cvMeta, .status, .toolbar, .controls, .left, .sidebar, .toolbox { display:none !important; }
+  `;
+
+  function getInlineStyleFromCvHtml() {
+    // Embed original styles so HTML export looks like on-screen,
+    // then add EXPORT_OVERRIDES_CSS to remove frames.
+    const styles = [];
+    qsa('style').forEach(s => styles.push(s.textContent || ''));
+    styles.push(EXPORT_OVERRIDES_CSS);
+    return styles.join('\n');
+  }
+
   function cloneForExport() {
-    // Make sure previews reflect edits
+    // Ensure previews reflect edits
     for (const b of getMdBlocks()) updatePreview(b);
 
     const clone = cvRoot.cloneNode(true);
 
-    // Remove meta line (user requested)
+    // 1) remove meta and status
     const meta = clone.querySelector('#cvMeta');
     if (meta) meta.remove();
+    const st = clone.querySelector('#cv-status');
+    if (st) st.remove();
 
-    // Remove markdown editor UI: tabs + textarea, keep preview HTML
+    // 2) remove markdown editor UI: keep preview only
     qsa('.mdtabs', clone).forEach(n => n.remove());
     qsa('textarea.mdedit', clone).forEach(n => n.remove());
 
-    // Remove any leftover "editable" contenteditable attributes
-    qsa('[contenteditable]', clone).forEach(n => n.removeAttribute('contenteditable'));
+    // 3) Remove helper text above publications (it’s in cv.html)
+    //    It's the <div style="..."> just before #pubList.
+    const pubOl = clone.querySelector('#pubList');
+    if (pubOl) {
+      const pubSection = pubOl.closest('section.section');
+      if (pubSection) {
+        // remove any div that contains "Les publications ne se chargent"
+        qsa('div', pubSection).forEach(d => {
+          const t = (d.textContent || '').trim();
+          if (t.includes('Les publications ne se chargent') || d.querySelector('#pubCount')) d.remove();
+        });
 
-    // ✅ Remove the box/border around md blocks for PDF/HTML exports
-    qsa('.mdblock', clone).forEach(n => {
-      n.style.border = 'none';
-      n.style.background = 'transparent';
-      n.style.padding = '0';
+        // also remove placeholder li if publications aren't loaded
+        qsa('#pubList li', pubSection).forEach(li => {
+          const t = (li.textContent || '').trim();
+          if (
+            t.includes('Tapez') && t.includes('Nom') && t.includes('Prénom') &&
+            (t.includes('charger les publications') || t.includes('charger les publications'))
+          ) {
+            li.remove();
+          }
+        });
+      }
+    }
+
+    // 4) Remove "Mon site" placeholder link if it still exists in default template
+    //    (only if it's the placeholder url)
+    qsa('a', clone).forEach(a => {
+      const href = (a.getAttribute('href') || '').trim();
+      const txt = (a.textContent || '').trim();
+      if (href === 'https://exemple.fr' && txt.toLowerCase().includes('mon site')) {
+        // keep text, remove link
+        const span = document.createElement('span');
+        span.textContent = a.textContent;
+        a.replaceWith(span);
+      }
     });
 
-    return clone;
-  }
+    // 5) remove contenteditable
+    qsa('[contenteditable]', clone).forEach(n => n.removeAttribute('contenteditable'));
 
-  function getInlineStyleFromCvHtml() {
-    // We embed cv.html's <style> so exports keep your current layout.
-    // (cv.html already has the whole stylesheet.)
-    const styles = [];
-    qsa('style').forEach(s => styles.push(s.textContent || ''));
-    return styles.join('\n');
+    return clone;
   }
 
   function downloadBlob(blob, filename) {
@@ -512,11 +561,6 @@
     URL.revokeObjectURL(url);
   }
 
-  function safeFilenameBase(name) {
-    const base = norm(name).replace(/\s+/g, '-').replace(/-+/g, '-');
-    return base || 'cv';
-  }
-
   function exportHTML() {
     const clone = cloneForExport();
     const css = getInlineStyleFromCvHtml();
@@ -524,6 +568,7 @@
     const title = (cvName ? cvName.textContent.trim() : 'CV') || 'CV';
     const filename = safeFilenameBase(title) + '.html';
 
+    // IMPORTANT: no extra "wrap" -> avoids wide page issues
     const html = `<!doctype html>
 <html lang="fr">
 <head>
@@ -533,10 +578,9 @@
 <style>${css}</style>
 </head>
 <body>
-<div class="wrap">
 ${clone.outerHTML}
-</div>
-</body></html>`;
+</body>
+</html>`;
 
     downloadBlob(new Blob([html], { type: 'text/html;charset=utf-8' }), filename);
     setStatus('Export HTML généré ✅', true);
@@ -547,18 +591,25 @@ ${clone.outerHTML}
       setStatus("Erreur : html2pdf n'est pas chargé.", false);
       return;
     }
+
     const clone = cloneForExport();
     const title = (cvName ? cvName.textContent.trim() : 'CV') || 'CV';
     const filename = safeFilenameBase(title) + '.pdf';
 
-    // Temporary container (avoids layout glitches)
+    // Temporary container to render a clean A4-ish page
     const holder = document.createElement('div');
     holder.style.position = 'fixed';
     holder.style.left = '-10000px';
     holder.style.top = '0';
-    holder.style.width = '900px';
+    holder.style.width = '210mm';
     holder.style.background = '#ffffff';
+
+    // Inject export CSS overrides (pandoc-like)
+    const style = document.createElement('style');
+    style.textContent = EXPORT_OVERRIDES_CSS;
+    holder.appendChild(style);
     holder.appendChild(clone);
+
     document.body.appendChild(holder);
 
     try {
@@ -571,7 +622,7 @@ ${clone.outerHTML}
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
           pagebreak: { mode: ['css', 'legacy'] }
         })
-        .from(clone)
+        .from(holder)
         .save();
 
       setStatus('Export PDF généré ✅', true);
@@ -583,14 +634,123 @@ ${clone.outerHTML}
     }
   }
 
-  function htmlToPlainText(html) {
-    const tmp = document.createElement('div');
-    tmp.innerHTML = html || '';
-    return (tmp.textContent || '').replace(/\r/g, '').replace(/[ \t]+\n/g, '\n').trim();
+  // ---------- DOCX: HTML -> docx (bold/italic + bullets)
+  function docxAvailable() {
+    return !!(window.docx && window.docx.Document && window.docx.Paragraph && window.docx.TextRun);
+  }
+
+  function parseHtmlToNodes(html) {
+    const dp = new DOMParser();
+    const doc = dp.parseFromString(`<div>${html || ''}</div>`, 'text/html');
+    return doc.body.firstChild ? Array.from(doc.body.firstChild.childNodes) : [];
+  }
+
+  function htmlNodeToRuns(node, style) {
+    const { TextRun } = window.docx;
+    const runs = [];
+
+    const cur = { bold: !!style.bold, italics: !!style.italics };
+
+    if (node.nodeType === Node.TEXT_NODE) {
+      const t = node.nodeValue || '';
+      if (t) runs.push(new TextRun({ text: t, bold: cur.bold, italics: cur.italics }));
+      return runs;
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) return runs;
+
+    const tag = node.tagName.toLowerCase();
+
+    const nextStyle = { ...cur };
+    if (tag === 'strong' || tag === 'b') nextStyle.bold = true;
+    if (tag === 'em' || tag === 'i') nextStyle.italics = true;
+
+    if (tag === 'br') {
+      runs.push(new TextRun({ text: '\n', bold: cur.bold, italics: cur.italics }));
+      return runs;
+    }
+
+    // links: keep text only
+    if (tag === 'a') {
+      const text = node.textContent || '';
+      if (text) runs.push(new TextRun({ text, bold: nextStyle.bold, italics: nextStyle.italics }));
+      return runs;
+    }
+
+    for (const child of Array.from(node.childNodes)) {
+      runs.push(...htmlNodeToRuns(child, nextStyle));
+    }
+    return runs;
+  }
+
+  function blockToDocxParagraphsFromPreview(previewEl) {
+    const { Paragraph } = window.docx;
+    const paras = [];
+
+    // Convert HTML with list support
+    const nodes = parseHtmlToNodes(previewEl.innerHTML || '');
+
+    function walk(node, listLevel = null) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const tag = node.tagName.toLowerCase();
+
+        if (tag === 'ul' || tag === 'ol') {
+          const isOrdered = tag === 'ol';
+          const items = Array.from(node.querySelectorAll(':scope > li'));
+          items.forEach(li => walk(li, { ordered: isOrdered }));
+          return;
+        }
+
+        if (tag === 'li') {
+          const runs = [];
+          for (const ch of Array.from(node.childNodes)) {
+            // avoid nested ul/ol being flattened here; they will be handled in walk
+            if (ch.nodeType === Node.ELEMENT_NODE) {
+              const ct = ch.tagName.toLowerCase();
+              if (ct === 'ul' || ct === 'ol') continue;
+            }
+            runs.push(...htmlNodeToRuns(ch, { bold: false, italics: false }));
+          }
+          const p = new Paragraph({
+            children: runs.length ? runs : undefined,
+            bullet: listLevel ? { level: 0 } : undefined,
+            spacing: { after: 120 }
+          });
+          paras.push(p);
+
+          // nested lists
+          Array.from(node.childNodes).forEach(ch => {
+            if (ch.nodeType === Node.ELEMENT_NODE) {
+              const ct = ch.tagName.toLowerCase();
+              if (ct === 'ul' || ct === 'ol') walk(ch, listLevel);
+            }
+          });
+          return;
+        }
+
+        if (tag === 'p' || tag === 'div') {
+          const runs = htmlNodeToRuns(node, { bold: false, italics: false });
+          const textOnly = (node.textContent || '').trim();
+          if (runs.length && textOnly) {
+            paras.push(new Paragraph({ children: runs, spacing: { after: 120 } }));
+          }
+          return;
+        }
+      }
+
+      // fallback: text
+      if ((node.textContent || '').trim()) {
+        const runs = htmlNodeToRuns(node, { bold: false, italics: false });
+        paras.push(new Paragraph({ children: runs, spacing: { after: 120 } }));
+      }
+    }
+
+    nodes.forEach(n => walk(n, null));
+    return paras;
   }
 
   async function exportDOCX() {
-    if (!window.docx) {
+    if (!docxAvailable()) {
       setStatus("Erreur : docx n'est pas chargé.", false);
       return;
     }
@@ -600,7 +760,6 @@ ${clone.outerHTML}
     const title = (cvName ? cvName.textContent.trim() : 'CV') || 'CV';
     const filename = safeFilenameBase(title) + '.docx';
 
-    // Build a simple, robust DOCX (no fancy styling to keep it reliable)
     const children = [];
 
     // Header
@@ -615,29 +774,27 @@ ${clone.outerHTML}
       const h3 = sec.querySelector('h3');
       const heading = h3 ? (h3.textContent || '').trim() : '';
       if (heading) {
-        children.push(new Paragraph({ children: [new TextRun({ text: heading, bold: true, size: 26 })], spacing: { before: 160, after: 100 } }));
+        children.push(new Paragraph({ children: [new TextRun({ text: heading, bold: true, size: 26 })], spacing: { before: 160, after: 120 } }));
       }
 
-      // If publications section: list items
-      if (sec.querySelector('#pubList')) {
+      // Publications section: list items with italic/bold preserved
+      const pubs = sec.querySelector('#pubList');
+      if (pubs) {
         const lis = qsa('#pubList li', sec);
         for (const li of lis) {
-          const t = htmlToPlainText(li.innerHTML);
-          if (!t) continue;
-          children.push(new Paragraph({ children: [new TextRun({ text: t, size: 22 })], spacing: { after: 80 } }));
+          const runs = htmlNodeToRuns(li, { bold: false, italics: false });
+          const txt = (li.textContent || '').trim();
+          if (!txt) continue;
+          children.push(new Paragraph({ children: runs, spacing: { after: 120 }, bullet: { level: 0 } }));
         }
         continue;
       }
 
-      // Markdown blocks: use preview HTML as text
+      // Markdown blocks: convert preview HTML to docx paragraphs (supports bullets)
       const preview = sec.querySelector('.mdpreview');
       if (preview) {
-        const t = htmlToPlainText(preview.innerHTML);
-        if (t) {
-          t.split('\n').filter(Boolean).forEach(line => {
-            children.push(new Paragraph({ children: [new TextRun({ text: line, size: 22 })], spacing: { after: 80 } }));
-          });
-        }
+        const paras = blockToDocxParagraphsFromPreview(preview);
+        children.push(...paras);
       }
     }
 
@@ -645,7 +802,6 @@ ${clone.outerHTML}
 
     try {
       const blob = await Packer.toBlob(doc);
-      // Use built-in save if FileSaver absent
       if (window.saveAs) window.saveAs(blob, filename);
       else downloadBlob(blob, filename);
       setStatus('Export DOCX généré ✅', true);
@@ -657,25 +813,20 @@ ${clone.outerHTML}
 
   // ---------- Wiring
   function wireUI() {
-    // Save texts
     if (saveTextBtn) saveTextBtn.addEventListener('click', (e) => { e.preventDefault(); saveAllTexts(); });
 
-    // Persist header edits (safe)
     const onHeaderEdit = debounce(() => saveHeader(), 300);
     if (cvName) cvName.addEventListener('input', onHeaderEdit);
     if (cvContact) cvContact.addEventListener('input', onHeaderEdit);
 
-    // Publications refresh
     if (refreshBtn) refreshBtn.addEventListener('click', (e) => { e.preventDefault(); refreshPublications(true); });
 
-    // Filters
     const filterChanged = debounce(() => refreshPublications(false), 260);
     [authorFilter, yearMin, yearMax, onlyPublications, sortMode].filter(Boolean).forEach(el => {
       el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', filterChanged);
       el.addEventListener('change', filterChanged);
     });
 
-    // Exports
     if (exportHtmlBtn) exportHtmlBtn.addEventListener('click', (e) => { e.preventDefault(); exportHTML(); });
     if (exportPdfBtn) exportPdfBtn.addEventListener('click', (e) => { e.preventDefault(); exportPDF(); });
     if (exportDocxBtn) exportDocxBtn.addEventListener('click', (e) => { e.preventDefault(); exportDOCX(); });
@@ -683,7 +834,6 @@ ${clone.outerHTML}
 
   // ---------- Init
   function init() {
-    // Markdown renderer options (if present)
     if (window.marked && typeof window.marked.setOptions === 'function') {
       window.marked.setOptions({ breaks: true, gfm: true });
     }
@@ -692,14 +842,13 @@ ${clone.outerHTML}
     loadFilters();
 
     wireMdBlocks();
-    loadMdBlocks(); // after wire (so it renders previews)
+    loadMdBlocks();
 
     wireUI();
 
-    // Initial publications behavior: do NOT load until full name
+    // Initial: fast (no publications load until "Nom Prénom")
     refreshPublications(false);
 
-    // Safety autosave before leaving
     window.addEventListener('beforeunload', () => {
       try {
         saveHeader();
