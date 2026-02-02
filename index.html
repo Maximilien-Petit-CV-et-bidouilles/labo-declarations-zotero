@@ -99,49 +99,47 @@
 <body>
   <div class="page">
     <header>
-  <h1>Déclarations du laboratoire</h1>
-  <p class="subtitle">Les données sont envoyées automatiquement dans Zotero.</p>
+      <h1>Déclarations du laboratoire</h1>
+      <p class="subtitle">Les données sont envoyées automatiquement dans Zotero.</p>
 
-  <p style="margin-top:8px;font-size:.9rem">
-    📊
-    <a href="/suivi.html" target="_blank" rel="noopener noreferrer"
-       style="color:var(--accent);text-decoration:none;font-weight:600">
-      Voir le suivi public des demandes (HAL & communication)
-    </a>
-  </p>
+      <p style="margin-top:8px;font-size:.9rem">
+        📊
+        <a href="/suivi.html" target="_blank" rel="noopener noreferrer"
+           style="color:var(--accent);text-decoration:none;font-weight:600">
+          Voir le suivi public des demandes (HAL & communication)
+        </a>
+      </p>
 
-  <p style="margin-top:6px;font-size:.9rem">
-    🧾
-    <a href="/cv.html" target="_blank" rel="noopener noreferrer"
-       style="color:var(--accent);text-decoration:none;font-weight:600">
-      Générateur de CV (à partir des publications Zotero)
-    </a>
-  </p>
-<p style="margin-top:6px;font-size:.9rem">
-  📥
-  <a href="/import.html"
-     style="color:var(--accent);text-decoration:none;font-weight:600">
-    Import par lot (CSV HAL → Zotero)
-  </a>
-</p>
-  <p style="margin-top:6px;font-size:.9rem">
-    🎤
-    <a href="/conference.html"
-       style="color:var(--accent);text-decoration:none;font-weight:600">
-      Déclarer une communication (Conference Paper)
-    </a>
-  </p>
+      <p style="margin-top:6px;font-size:.9rem">
+        🧾
+        <a href="/cv.html" target="_blank" rel="noopener noreferrer"
+           style="color:var(--accent);text-decoration:none;font-weight:600">
+          Générateur de CV (à partir des publications Zotero)
+        </a>
+      </p>
 
+      <p style="margin-top:6px;font-size:.9rem">
+        📥
+        <a href="/import.html"
+           style="color:var(--accent);text-decoration:none;font-weight:600">
+          Import par lot (CSV HAL → Zotero)
+        </a>
+      </p>
 
-</header>
-
+      <p style="margin-top:6px;font-size:.9rem">
+        🎤
+        <a href="/conference.html"
+           style="color:var(--accent);text-decoration:none;font-weight:600">
+          Déclarer une communication (Conference Paper)
+        </a>
+      </p>
+    </header>
 
     <div class="switcher">
       <button type="button" class="active">Nouvelle publication</button>
     </div>
 
     <form id="publication-form">
-      <!-- Type -->
       <label>
         <span>Type de publication *</span>
         <select id="pubType" name="pubType" required>
@@ -151,7 +149,6 @@
         </select>
       </label>
 
-      <!-- Common -->
       <label>
         <span>Title *</span>
         <input name="title" required>
@@ -168,115 +165,47 @@
         </label>
       </div>
 
-      <!-- Book fields -->
       <div id="book-fields" class="hidden">
         <div class="two-cols">
-          <label>
-            <span>Publisher</span>
-            <input name="publisher">
-          </label>
-          <label>
-            <span>Place</span>
-            <input name="place">
-          </label>
+          <label><span>Publisher</span><input name="publisher"></label>
+          <label><span>Place</span><input name="place"></label>
         </div>
-
         <div class="two-cols">
-          <label>
-            <span>Date</span>
-            <input name="date" placeholder="2024 ou 2024-06-01">
-          </label>
-          <label>
-            <span>ISBN</span>
-            <input name="isbn">
-          </label>
+          <label><span>Date</span><input name="date" placeholder="2024 ou 2024-06-01"></label>
+          <label><span>ISBN</span><input name="isbn"></label>
         </div>
-
-        <label>
-          <span>Language</span>
-          <input name="language">
-        </label>
+        <label><span>Language</span><input name="language"></label>
       </div>
 
-      <!-- Book section fields -->
       <div id="chapter-fields" class="hidden">
-        <label>
-          <span>Book Title *</span>
-          <input name="bookTitle">
-        </label>
-
+        <label><span>Book Title *</span><input name="bookTitle"></label>
         <div class="two-cols">
-          <label>
-            <span>Publisher</span>
-            <input name="publisher_chapter">
-          </label>
-          <label>
-            <span>Place</span>
-            <input name="place_chapter">
-          </label>
+          <label><span>Publisher</span><input name="publisher_chapter"></label>
+          <label><span>Place</span><input name="place_chapter"></label>
         </div>
-
         <div class="two-cols">
-          <label>
-            <span>Date</span>
-            <input name="date_chapter" placeholder="2024 ou 2024-06-01">
-          </label>
-          <label>
-            <span>Pages</span>
-            <input name="pages">
-          </label>
+          <label><span>Date</span><input name="date_chapter" placeholder="2024 ou 2024-06-01"></label>
+          <label><span>Pages</span><input name="pages"></label>
         </div>
-
         <div class="two-cols">
-          <label>
-            <span>ISBN</span>
-            <input name="isbn_chapter">
-          </label>
-          <label>
-            <span>Language</span>
-            <input name="language_chapter">
-          </label>
+          <label><span>ISBN</span><input name="isbn_chapter"></label>
+          <label><span>Language</span><input name="language_chapter"></label>
         </div>
       </div>
 
-      <!-- Article fields -->
       <div id="article-fields" class="hidden">
-        <label>
-          <span>Journal *</span>
-          <input name="publication">
-        </label>
-
+        <label><span>Journal *</span><input name="publication"></label>
         <div class="two-cols">
-          <label>
-            <span>Date</span>
-            <input name="date_article" placeholder="2024 ou 2024-06-01">
-          </label>
-          <label>
-            <span>DOI</span>
-            <input name="doi">
-          </label>
+          <label><span>Date</span><input name="date_article" placeholder="2024 ou 2024-06-01"></label>
+          <label><span>DOI</span><input name="doi"></label>
         </div>
-
         <div class="two-cols">
-          <label>
-            <span>Volume</span>
-            <input name="articleVolume">
-          </label>
-          <label>
-            <span>Issue</span>
-            <input name="articleIssue">
-          </label>
+          <label><span>Volume</span><input name="articleVolume"></label>
+          <label><span>Issue</span><input name="articleIssue"></label>
         </div>
-
         <div class="two-cols">
-          <label>
-            <span>Pages</span>
-            <input name="articlePages">
-          </label>
-          <label>
-            <span>Language</span>
-            <input name="language_article">
-          </label>
+          <label><span>Pages</span><input name="articlePages"></label>
+          <label><span>Language</span><input name="language_article"></label>
         </div>
       </div>
 
