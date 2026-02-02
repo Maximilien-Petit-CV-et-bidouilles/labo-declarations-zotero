@@ -20,9 +20,12 @@
     .bar{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
     .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px}
 
+    .top-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+    .who{font-size:.85rem;color:var(--muted)}
+
     .controls{display:grid;grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr;gap:10px}
     @media (max-width: 1100px){ .controls{grid-template-columns:1fr 1fr 1fr} }
-    @media (max-width: 800px){ .controls{grid-template-columns:1fr 1fr} }
+    @media (max-width: 800px){ .controls{grid-template-columns:1fr 1fr 1fr} }
     @media (max-width: 520px){ .controls{grid-template-columns:1fr} }
 
     input,select,button{
@@ -53,7 +56,6 @@
     .mini{font-size:.82rem}
     .right{white-space:nowrap}
 
-    /* Axes chips */
     .axes{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
     .chip{
       display:inline-flex;align-items:center;padding:3px 8px;border-radius:999px;
@@ -62,7 +64,6 @@
     }
 
     .statusline{margin-top:10px;color:var(--muted);font-size:.9rem;white-space:pre-wrap}
-
     .loading{display:inline-flex;gap:8px;align-items:center}
     .dot{width:8px;height:8px;border-radius:99px;background:var(--accent);display:inline-block;animation:pulse 1s infinite ease-in-out}
     .dot:nth-child(2){animation-delay:.15s}
@@ -76,11 +77,8 @@
       overflow:hidden;
     }
 
-    /* Pagination */
     .pager{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:10px}
     .pagerSide{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    .pager button{padding:8px 10px}
-    .pager select{padding:8px 10px}
   </style>
 </head>
 <body>
@@ -90,7 +88,12 @@
         <h1>Back-office — HAL & Communication</h1>
         <p class="sub">Connexion requise (Netlify Identity). Éditez les demandes (HAL / Com) et leur statut.</p>
       </div>
-      <div class="pill" id="lastUpdate">Chargement…</div>
+      <div class="top-actions">
+        <span class="who" id="who">Non connecté</span>
+        <button class="ghost" id="loginBtn">Se connecter</button>
+        <button class="ghost" id="logoutBtn" style="display:none">Se déconnecter</button>
+        <div class="pill" id="lastUpdate">—</div>
+      </div>
     </header>
 
     <div class="bar">
@@ -130,18 +133,10 @@
         <div class="statusline" id="msg"></div>
 
         <div class="stats" style="margin-top:12px">
-          <div class="stat">
-            <b id="sTotal">—</b><span>items</span>
-          </div>
-          <div class="stat">
-            <b id="sNeed">—</b><span>à traiter</span>
-          </div>
-          <div class="stat">
-            <b id="sHal">—</b><span>HAL demandés</span>
-          </div>
-          <div class="stat">
-            <b id="sComms">—</b><span>Communications demandées</span>
-          </div>
+          <div class="stat"><b id="sTotal">—</b><span>items</span></div>
+          <div class="stat"><b id="sNeed">—</b><span>à traiter</span></div>
+          <div class="stat"><b id="sHal">—</b><span>HAL demandés</span></div>
+          <div class="stat"><b id="sComms">—</b><span>Communications demandées</span></div>
         </div>
 
         <div class="pager">
@@ -186,7 +181,6 @@
     </div>
   </div>
 
-  <!-- Netlify Identity -->
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 
   <script>
@@ -198,11 +192,6 @@
     const $ = (id) => document.getElementById(id);
 
     function setMsg(s){ $('msg').textContent = s || ''; }
-
-    function norm(s){
-      return (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-    }
-
     function escapeHtml(str){
       return String(str || '')
         .replaceAll('&','&amp;')
@@ -211,7 +200,9 @@
         .replaceAll('"','&quot;')
         .replaceAll("'","&#039;");
     }
-
+    function norm(s){
+      return (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    }
     function typeLabel(t){
       if (t === 'book') return 'Livre';
       if (t === 'bookSection') return 'Chapitre';
@@ -219,12 +210,10 @@
       if (t === 'conferencePaper') return 'Communication';
       return t || '';
     }
-
     function yearFromDate(dateStr){
       const m = (dateStr || '').match(/\b(19|20)\d{2}\b/);
       return m ? m[0] : '';
     }
-
     function joinCreators(creators){
       if (!Array.isArray(creators)) return '';
       const names = creators
@@ -237,13 +226,11 @@
         .filter(Boolean);
       return names.join(', ');
     }
-
     function tagYesNo(val){
       if (val === 'yes') return { txt:'Oui', cls:'ok' };
       if (val === 'no') return { txt:'Non', cls:'' };
       return { txt:'—', cls:'' };
     }
-
     function statusFor(item){
       const f = item.flags || {};
       const halWanted = f.hal_create === 'yes';
@@ -259,15 +246,10 @@
       if (needHal || needCom) return { txt:'À traiter', cls:'warn' };
       return { txt:'Traité', cls:'ok' };
     }
-
     function parseAxes(flags){
       const raw = (flags && flags.axes) ? String(flags.axes).trim() : '';
       if (!raw || raw === 'none') return [];
-      return raw
-        .split(/[,;|]/)
-        .map(s => s.trim())
-        .filter(Boolean)
-        .map(s => s.toUpperCase());
+      return raw.split(/[,;|]/).map(s => s.trim()).filter(Boolean).map(s => s.toUpperCase());
     }
 
     function fillYears(items){
@@ -277,6 +259,22 @@
       sel.innerHTML = `<option value="all">Toutes années</option>` + years.map(y => `<option value="${y}">${y}</option>`).join('');
       sel.value = years.includes(cur) ? cur : 'all';
     }
+
+    function showAuthUI(user){
+      if (!user){
+        $('who').textContent = 'Non connecté';
+        $('loginBtn').style.display = '';
+        $('logoutBtn').style.display = 'none';
+        return;
+      }
+      const email = user.email || user.user_metadata?.email || '';
+      $('who').textContent = email ? ('Connecté : ' + email) : 'Connecté';
+      $('loginBtn').style.display = 'none';
+      $('logoutBtn').style.display = '';
+    }
+
+    function openLogin(){ window.netlifyIdentity && window.netlifyIdentity.open(); }
+    function doLogout(){ window.netlifyIdentity && window.netlifyIdentity.logout(); }
 
     async function authedFetch(url, opts={}){
       const user = window.netlifyIdentity && window.netlifyIdentity.currentUser();
@@ -411,27 +409,6 @@
           infoTop = `<div class="mini">Conférence : ${escapeHtml(it.conferenceName)}</div>`;
         }
 
-        if (it.itemType === 'journalArticle') {
-          const parts = [];
-          if (it.volume) parts.push('vol. ' + escapeHtml(it.volume));
-          if (it.issue) parts.push('n° ' + escapeHtml(it.issue));
-          if (it.pages) parts.push('pp. ' + escapeHtml(it.pages));
-          if (it.doi) parts.push('DOI ' + escapeHtml(it.doi));
-          infoBottom = parts.length ? `<div class="mini">${parts.join(' — ')}</div>` : '';
-        } else if (it.itemType === 'conferencePaper') {
-          const parts = [];
-          if (it.publisher) parts.push(escapeHtml(it.publisher));
-          if (it.place) parts.push(escapeHtml(it.place));
-          if (it.pages) parts.push('pp. ' + escapeHtml(it.pages));
-          infoBottom = parts.length ? `<div class="mini">${parts.join(' — ')}</div>` : '';
-        } else {
-          const parts = [];
-          if (it.publisher) parts.push(escapeHtml(it.publisher));
-          if (it.place) parts.push(escapeHtml(it.place));
-          if (it.isbn) parts.push('ISBN ' + escapeHtml(it.isbn));
-          infoBottom = parts.length ? `<div class="mini">${parts.join(' — ')}</div>` : '';
-        }
-
         const axes = parseAxes(flags);
         const axesHtml = axes.length
           ? `<div class="axes">` + axes.map(a => `<span class="chip">${escapeHtml(a)}</span>`).join('') + `</div>`
@@ -449,9 +426,7 @@
             ${infoBottom}
             ${axesHtml}
           </td>
-          <td class="authorsCol">
-            <div class="clamp" title="${escapeHtml(authorsFull)}">${escapeHtml(authorsFull)}</div>
-          </td>
+          <td><div class="clamp" title="${escapeHtml(authorsFull)}">${escapeHtml(authorsFull)}</div></td>
 
           <td>
             <div class="tag ${halWanted ? 'warn' : ''}">
@@ -479,9 +454,7 @@
             ` : ''}
           </td>
 
-          <td>
-            <span class="tag ${st.cls}">${escapeHtml(st.txt)}</span>
-          </td>
+          <td><span class="tag ${st.cls}">${escapeHtml(st.txt)}</span></td>
         `;
 
         tr.querySelectorAll('button[data-act]').forEach(btn => {
@@ -522,12 +495,11 @@
       setMsg('⏳ Chargement…');
       $('rows').innerHTML = `<tr><td colspan="7" class="mini">Chargement…</td></tr>`;
 
-      // 1) Première page rapide (100 max)
       const first = await authedFetch('/.netlify/functions/admin-items?start=0&limit=100');
       const data1 = await first.json().catch(()=>({}));
 
       if (!first.ok){
-        setMsg('❌ Erreur: ' + (data1?.error || 'accès refusé'));
+        setMsg('❌ ' + (data1?.error || 'accès refusé'));
         $('rows').innerHTML = `<tr><td colspan="7" class="mini">Erreur serveur.</td></tr>`;
         return;
       }
@@ -535,14 +507,9 @@
       const items = Array.isArray(data1.items) ? data1.items : [];
       ALL = items.map(it => {
         const y = it.year || yearFromDate(it.date);
-        return {
-          ...it,
-          year: y || '',
-          creatorsText: it.creatorsText || joinCreators(it.creators || []),
-        };
+        return { ...it, year: y || '', creatorsText: it.creatorsText || joinCreators(it.creators || []) };
       });
 
-      // 2) Pages suivantes (si hasMore)
       let start = items.length;
       let hasMore = !!data1.hasMore;
 
@@ -550,20 +517,12 @@
         const r = await authedFetch(`/.netlify/functions/admin-items?start=${start}&limit=200`);
         const d = await r.json().catch(()=>({}));
         if (!r.ok) break;
-
         const page = Array.isArray(d.items) ? d.items : [];
         if (!page.length) break;
-
-        const mapped = page.map(it => {
+        ALL.push(...page.map(it => {
           const y = it.year || yearFromDate(it.date);
-          return {
-            ...it,
-            year: y || '',
-            creatorsText: it.creatorsText || joinCreators(it.creators || []),
-          };
-        });
-
-        ALL.push(...mapped);
+          return { ...it, year: y || '', creatorsText: it.creatorsText || joinCreators(it.creators || []) };
+        }));
         start += page.length;
         hasMore = !!d.hasMore;
       }
@@ -577,52 +536,42 @@
       applyFilters();
     }
 
-    // listeners
+    // UI events
+    $('loginBtn').addEventListener('click', () => openLogin());
+    $('logoutBtn').addEventListener('click', () => doLogout());
+
     $('q').addEventListener('input', applyFilters);
     ['filterType','filterNeeds','filterAxis','filterYear'].forEach(id => $(id).addEventListener('change', applyFilters));
-
     $('reset').addEventListener('click', () => {
-      $('q').value = '';
-      $('filterType').value = 'all';
-      $('filterNeeds').value = 'all';
-      $('filterAxis').value = 'all';
-      $('filterYear').value = 'all';
+      $('q').value=''; $('filterType').value='all'; $('filterNeeds').value='all'; $('filterAxis').value='all'; $('filterYear').value='all';
       applyFilters();
     });
-
     $('refresh').addEventListener('click', load);
 
     $('prev').addEventListener('click', () => setPage(PAGE - 1));
     $('next').addEventListener('click', () => setPage(PAGE + 1));
     $('pageSize').addEventListener('change', () => {
-      const v = parseInt($('pageSize').value, 10);
-      if (Number.isFinite(v) && v > 0 && v <= 500) {
-        PAGE_SIZE = v;
-        setPage(1);
-      }
+      const v = parseInt($('pageSize').value,10);
+      if (Number.isFinite(v) && v>0 && v<=500){ PAGE_SIZE=v; setPage(1); }
     });
 
-    // init identity
+    // Identity init
     if (window.netlifyIdentity){
       window.netlifyIdentity.on('init', user => {
-        if (!user){
-          setMsg('🔒 Connectez-vous pour accéder au back-office.');
-          window.netlifyIdentity.open();
-          return;
-        }
-        load();
+        showAuthUI(user);
+        if (user) load();
+        else setMsg('🔒 Cliquez sur “Se connecter”.');
       });
-
       window.netlifyIdentity.on('login', user => {
+        showAuthUI(user);
         window.netlifyIdentity.close();
         load();
       });
-
       window.netlifyIdentity.on('logout', () => {
+        showAuthUI(null);
         setMsg('🔒 Déconnecté.');
         $('rows').innerHTML = `<tr><td colspan="7" class="mini">Déconnecté.</td></tr>`;
       });
-
       window.netlifyIdentity.init();
     } else {
       setMsg('⚠️ Netlify Identity non disponible.');
