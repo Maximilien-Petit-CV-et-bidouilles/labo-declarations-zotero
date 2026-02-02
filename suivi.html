@@ -84,12 +84,27 @@
       font-size:.78rem;font-weight:650;color:#1d3c76;white-space:nowrap;
     }
 
+    /* Auteurs: on évite de déformer la page */
+    td.auth{
+      max-width: 240px;
+      word-break: break-word;
+    }
+    .authClamp{
+      display:block;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
     .statusline{margin-top:10px;color:var(--muted);font-size:.9rem;white-space:pre-wrap}
     .loading{display:inline-flex;gap:8px;align-items:center}
     .dot{width:8px;height:8px;border-radius:99px;background:var(--accent);display:inline-block;animation:pulse 1s infinite ease-in-out}
     .dot:nth-child(2){animation-delay:.15s}
     .dot:nth-child(3){animation-delay:.3s}
     @keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
+
+    /* Pagination */
+    .pager_allowwrap {display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:10px}
+    .pager_side {display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   </style>
 </head>
 <body>
@@ -170,6 +185,25 @@
             <div class="chartWrap"><canvas id="chartStatus"></canvas></div>
           </div>
         </div>
+
+        <!-- Pagination -->
+        <div class="pager_allowwrap">
+          <div class="pager_side">
+            <button class="ghost" id="prev">←</button>
+            <button class="ghost" id="next">→</button>
+            <span class="muted" id="pageInfo">—</span>
+          </div>
+          <div class="pager_side">
+            <span class="muted">Par page</span>
+            <select id="pageSize">
+              <option value="25">25</option>
+              <option value="50" selected>50</option>
+              <option value="100">100</option>
+              <option value="200">200</option>
+            </select>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -180,7 +214,7 @@
             <th style="width:90px">Date</th>
             <th style="width:120px">Type</th>
             <th>Titre</th>
-            <th style="width:220px">Auteur(s)</th>
+            <th style="width:240px">Auteur(s)</th>
             <th style="width:140px">HAL</th>
             <th style="width:170px">Communication</th>
             <th style="width:140px">Statut</th>
@@ -205,6 +239,10 @@
     let ALL = [];
     let VIEW = [];
     let CHARTS = { year:null, split:null, status:null };
+
+    // pagination
+    let PAGE = 1;
+    let PAGE_SIZE = 50;
 
     const $ = (id) => document.getElementById(id);
 
@@ -236,6 +274,15 @@
         })
         .filter(Boolean);
       return names.join(', ');
+    }
+
+    // ✅ Limite affichage auteurs (sans casser la recherche car on cherche sur creatorsText complet)
+    function clampAuthors(full, maxNames = 6){
+      const s = String(full || '').trim();
+      if (!s) return { short:'', full:'' };
+      const parts = s.split(/\s*,\s*/).filter(Boolean);
+      if (parts.length <= maxNames) return { short:s, full:s };
+      return { short: parts.slice(0,maxNames).join(', ') + `, … (+${parts.length-maxNames})`, full:s };
     }
 
     function tagYesNo(val){
@@ -335,11 +382,28 @@
       });
     }
 
+    function setPage(n){
+      const totalPages = Math.max(1, Math.ceil(VIEW.length / PAGE_SIZE));
+      PAGE = Math.min(Math.max(1, n), totalPages);
+      renderTable();
+      renderPager();
+    }
+
+    function renderPager(){
+      const total = VIEW.length;
+      const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+      const from = total ? ((PAGE - 1) * PAGE_SIZE + 1) : 0;
+      const to = Math.min(total, PAGE * PAGE_SIZE);
+      $('pageInfo').textContent = `${from}-${to} / ${total}`;
+      $('prev').disabled = PAGE <= 1;
+      $('next').disabled = PAGE >= totalPages;
+    }
+
     function render(){
       const q = norm($('q').value);
       const fType = $('filterType').value;
       const fNeeds = $('filterNeeds').value;
-      const fAxis = $('filterAxis').value;   // PICMAP/MOPTIS/OCSO/none/all
+      const fAxis = $('filterAxis').value;
       const fYear = $('filterYear').value;
 
       VIEW = ALL.filter(it => {
@@ -355,7 +419,6 @@
         if (fNeeds === 'halYes' && flags.hal_create !== 'yes') return false;
         if (fNeeds === 'commsYes' && flags.comms_publish !== 'yes') return false;
 
-        // ✅ Filtre Axe (robuste)
         const axes = parseAxes(flags);
         const axisSel = String(fAxis || 'all').toUpperCase();
         if (axisSel !== 'ALL') {
@@ -392,6 +455,17 @@
 
       renderCharts(VIEW);
 
+      VIEW.sort((a,b) => {
+        const ay = parseInt(a.year || '0', 10);
+        const by = parseInt(b.year || '0', 10);
+        if (by !== ay) return by - ay;
+        return (b.date || '').localeCompare(a.date || '');
+      });
+
+      setPage(1);
+    }
+
+    function renderTable(){
       const tbody = $('rows');
       tbody.innerHTML = '';
 
@@ -400,14 +474,10 @@
         return;
       }
 
-      VIEW.sort((a,b) => {
-        const ay = parseInt(a.year || '0', 10);
-        const by = parseInt(b.year || '0', 10);
-        if (by !== ay) return by - ay;
-        return (b.date || '').localeCompare(a.date || '');
-      });
+      const start = (PAGE - 1) * PAGE_SIZE;
+      const slice = VIEW.slice(start, start + PAGE_SIZE);
 
-      for (const it of VIEW){
+      for (const it of slice){
         const st = statusFor(it);
         const hal = tagYesNo(it.flags?.hal_create);
         const comms = tagYesNo(it.flags?.comms_publish);
@@ -438,12 +508,15 @@
           ? `<div class="axes">` + axes.map(a => `<span class="chip">${escapeHtml(a)}</span>`).join('') + `</div>`
           : '';
 
+        const auth = clampAuthors(it.creatorsText || '');
+        const authorsHtml = `<span class="authClamp" title="${escapeHtml(auth.full)}">${escapeHtml(auth.short)}</span>`;
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td class="right">${escapeHtml(it.year || '')}</td>
           <td><span class="tag">${escapeHtml(typeLabel(it.itemType))}</span></td>
           <td class="title">${titleHtml}${extraMini}${axesHtml}</td>
-          <td>${escapeHtml(it.creatorsText || '')}</td>
+          <td class="auth">${authorsHtml}</td>
           <td><span class="tag ${hal.cls}">${escapeHtml(halTxt)}</span></td>
           <td><span class="tag ${comms.cls}">${escapeHtml(commTxt)}</span></td>
           <td><span class="tag ${st.cls}">${escapeHtml(st.txt)}</span></td>
@@ -519,6 +592,16 @@
     });
 
     $('refresh').addEventListener('click', load);
+
+    $('prev').addEventListener('click', () => setPage(PAGE - 1));
+    $('next').addEventListener('click', () => setPage(PAGE + 1));
+    $('pageSize').addEventListener('change', () => {
+      const v = parseInt($('pageSize').value, 10);
+      if (Number.isFinite(v) && v > 0 && v <= 500) {
+        PAGE_SIZE = v;
+        setPage(1);
+      }
+    });
 
     load();
   </script>
