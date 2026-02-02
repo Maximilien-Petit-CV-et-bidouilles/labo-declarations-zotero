@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Back-office — Suivi HAL / Communication</title>
+  <title>Admin — Suivi HAL / Communication</title>
   <style>
     :root{
       --bg:#f5f5f8;--card:#fff;--text:#222;--muted:#666;--border:#ddd;
@@ -12,7 +12,7 @@
     }
     *{box-sizing:border-box}
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--text)}
-    .wrap{max-width:1200px;margin:28px auto;padding:0 16px}
+    .wrap{max-width:1250px;margin:28px auto;padding:0 16px}
     header{display:flex;gap:14px;align-items:flex-end;justify-content:space-between;flex-wrap:wrap}
     h1{margin:0;font-size:1.45rem}
     .sub{margin:6px 0 0;color:var(--muted);font-size:.92rem}
@@ -31,6 +31,10 @@
     button{cursor:pointer}
     button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:650}
     button.ghost{background:#fff}
+    button:disabled{opacity:.55;cursor:not-allowed}
+
+    .top-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+    .who{font-size:.85rem;color:var(--muted)}
 
     .stats{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
     .stat{min-width:160px}
@@ -55,12 +59,17 @@
     .mini{font-size:.82rem;color:var(--muted)}
     .right{white-space:nowrap}
 
+    /* Axes chips */
     .axes{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
     .chip{
       display:inline-flex;align-items:center;padding:3px 8px;border-radius:999px;
       border:1px solid var(--chip-border);background:var(--chip);
       font-size:.78rem;font-weight:650;color:#1d3c76;white-space:nowrap;
     }
+
+    /* Auteurs: clamp + tooltip */
+    td.auth{max-width:260px;word-break:break-word}
+    .authClamp{display:block;overflow:hidden;text-overflow:ellipsis}
 
     .statusline{margin-top:10px;color:var(--muted);font-size:.9rem;white-space:pre-wrap}
     .loading{display:inline-flex;gap:8px;align-items:center}
@@ -70,21 +79,44 @@
     @keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
 
     /* Pagination */
-    .pager{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:10px}
-    .pager .left,.pager .right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .pager_allowwrap {display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:10px}
+    .pager_side {display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+    /* Login box */
+    .loginBox{
+      margin-top:14px;
+      padding:14px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:#fff;
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
     <header>
       <div>
-        <h1>Back-office — Suivi HAL & Communication</h1>
-        <p class="sub">Gestion interne (inclut livres, chapitres, articles et communications).</p>
+        <h1>Admin — Suivi HAL & Communication</h1>
+        <p class="sub">Accès réservé (Netlify Identity) — gestion interne du traitement.</p>
       </div>
-      <div class="pill" id="lastUpdate">Chargement…</div>
+      <div class="top-actions">
+        <span class="who" id="who">Non connecté</span>
+        <button class="ghost" id="loginBtn">Se connecter</button>
+        <button class="ghost" id="logoutBtn" style="display:none">Se déconnecter</button>
+        <div class="pill" id="lastUpdate">—</div>
+      </div>
     </header>
 
-    <div class="bar">
+    <div class="card loginBox" id="loginBox" style="display:none">
+      <div style="font-weight:700;margin-bottom:6px">Connexion requise</div>
+      <div class="muted" style="margin-bottom:10px">
+        Cliquez sur “Se connecter” (en haut à droite) pour accéder à la liste.
+      </div>
+      <button class="primary" id="loginBtn2">Se connecter</button>
+      <div class="statusline" id="loginMsg"></div>
+    </div>
+
+    <div class="bar" id="adminUI" style="display:none">
       <div class="card" style="flex:1;min-width:260px">
         <div class="controls">
           <input id="q" type="search" placeholder="Rechercher (titre, auteur, revue, conférence, axes, éditeur, ISBN, DOI…)" />
@@ -121,27 +153,19 @@
         <div class="statusline" id="msg"></div>
 
         <div class="stats">
-          <div class="stat">
-            <b id="sTotal">—</b><span>items</span>
-          </div>
-          <div class="stat">
-            <b id="sNeed">—</b><span>à traiter</span>
-          </div>
-          <div class="stat">
-            <b id="sHal">—</b><span>HAL demandés</span>
-          </div>
-          <div class="stat">
-            <b id="sComms">—</b><span>Communications demandées</span>
-          </div>
+          <div class="stat"><b id="sTotal">—</b><span>items</span></div>
+          <div class="stat"><b id="sNeed">—</b><span>à traiter</span></div>
+          <div class="stat"><b id="sHal">—</b><span>HAL demandés</span></div>
+          <div class="stat"><b id="sComms">—</b><span>Communications demandées</span></div>
         </div>
 
-        <div class="pager">
-          <div class="left">
+        <div class="pager_allowwrap">
+          <div class="pager_side">
             <button class="ghost" id="prev">←</button>
             <button class="ghost" id="next">→</button>
             <span class="muted" id="pageInfo">—</span>
           </div>
-          <div class="right">
+          <div class="pager_side">
             <span class="muted">Par page</span>
             <select id="pageSize">
               <option value="25">25</option>
@@ -151,19 +175,20 @@
             </select>
           </div>
         </div>
+
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="tableCard" style="display:none">
       <table>
         <thead>
           <tr>
             <th style="width:90px">Année</th>
             <th style="width:120px">Type</th>
             <th>Titre</th>
-            <th style="width:240px">Auteur(s)</th>
-            <th style="width:140px">HAL</th>
-            <th style="width:170px">Communication</th>
+            <th style="width:260px">Auteur(s)</th>
+            <th style="width:150px">HAL</th>
+            <th style="width:180px">Communication</th>
             <th style="width:140px">Statut</th>
           </tr>
         </thead>
@@ -174,16 +199,54 @@
         </tbody>
       </table>
     </div>
+
   </div>
 
+  <!-- Netlify Identity (indispensable pour login) -->
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+
   <script>
+    // ------------------------------------------------------------
+    // Identity helpers
+    // ------------------------------------------------------------
+    const $ = (id) => document.getElementById(id);
+
+    function showLoggedOut(){
+      $('who').textContent = 'Non connecté';
+      $('loginBtn').style.display = '';
+      $('logoutBtn').style.display = 'none';
+      $('loginBox').style.display = '';
+      $('adminUI').style.display = 'none';
+      $('tableCard').style.display = 'none';
+    }
+
+    function showLoggedIn(user){
+      const email = user?.email || user?.user_metadata?.email || '';
+      $('who').textContent = email ? `Connecté : ${email}` : 'Connecté';
+      $('loginBtn').style.display = 'none';
+      $('logoutBtn').style.display = '';
+      $('loginBox').style.display = 'none';
+      $('adminUI').style.display = '';
+      $('tableCard').style.display = '';
+    }
+
+    function openLogin(){
+      if (!window.netlifyIdentity) return;
+      window.netlifyIdentity.open();
+    }
+
+    function logout(){
+      if (!window.netlifyIdentity) return;
+      window.netlifyIdentity.logout();
+    }
+
+    // ------------------------------------------------------------
+    // Admin table logic (pagination + clamp + conferencePaper)
+    // ------------------------------------------------------------
     let ALL = [];
     let VIEW = [];
-
     let PAGE = 1;
     let PAGE_SIZE = 50;
-
-    const $ = (id) => document.getElementById(id);
 
     function norm(s){
       return (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -224,8 +287,8 @@
       return names.join(', ');
     }
 
-    function truncateAuthors(text, maxNames = 6){
-      const s = String(text || '').trim();
+    function clampAuthors(full, maxNames = 6){
+      const s = String(full || '').trim();
       if (!s) return { short:'', full:'' };
       const parts = s.split(/\s*,\s*/).filter(Boolean);
       if (parts.length <= maxNames) return { short:s, full:s };
@@ -238,21 +301,12 @@
       return { txt:'—', cls:'' };
     }
 
-    function parseAxes(flags){
-      const raw = (flags && flags.axes) ? String(flags.axes).trim() : '';
-      if (!raw || raw === 'none') return [];
-      return raw
-        .split(/[,;|]/)
-        .map(s => s.trim())
-        .filter(Boolean)
-        .map(s => s.toUpperCase());
-    }
-
-    function statusFor(flags){
-      const halWanted = flags.hal_create === 'yes';
-      const commWanted = flags.comms_publish === 'yes';
-      const halDone = flags.hal_done === 'yes';
-      const commDone = flags.comms_done === 'yes';
+    function statusFor(item){
+      const f = item.flags || {};
+      const halWanted = f.hal_create === 'yes';
+      const commWanted = f.comms_publish === 'yes';
+      const halDone = f.hal_done === 'yes';
+      const commDone = f.comms_done === 'yes';
 
       if (!halWanted && !commWanted) return { txt:'Non demandé', cls:'' };
 
@@ -263,6 +317,16 @@
       return { txt:'Traité', cls:'ok' };
     }
 
+    function parseAxes(flags){
+      const raw = (flags && flags.axes) ? String(flags.axes).trim() : '';
+      if (!raw || raw === 'none') return [];
+      return raw
+        .split(/[,;|]/)
+        .map(s => s.trim())
+        .filter(Boolean)
+        .map(s => s.toUpperCase());
+    }
+
     function fillYears(items){
       const years = [...new Set(items.map(i => i.year).filter(Boolean))].sort((a,b)=>b.localeCompare(a));
       const sel = $('filterYear');
@@ -270,8 +334,6 @@
       sel.innerHTML = `<option value="all">Toutes années</option>` + years.map(y => `<option value="${y}">${y}</option>`).join('');
       sel.value = years.includes(cur) ? cur : 'all';
     }
-
-    function setMsg(s){ $('msg').textContent = s || ''; }
 
     function setPage(n){
       const totalPages = Math.max(1, Math.ceil(VIEW.length / PAGE_SIZE));
@@ -293,7 +355,7 @@
     function applyFilters(){
       const q = norm($('q').value);
       const fType = $('filterType').value;
-      const fNeed = $('filterNeeds').value;
+      const fNeeds = $('filterNeeds').value;
       const fAxis = $('filterAxis').value;
       const fYear = $('filterYear').value;
 
@@ -304,11 +366,11 @@
         if (fYear !== 'all' && y !== fYear) return false;
 
         const flags = it.flags || {};
-        const st = statusFor(flags);
+        const st = statusFor(it);
 
-        if (fNeed === 'needsAction' && st.txt !== 'À traiter') return false;
-        if (fNeed === 'halYes' && flags.hal_create !== 'yes') return false;
-        if (fNeed === 'commsYes' && flags.comms_publish !== 'yes') return false;
+        if (fNeeds === 'needsAction' && st.txt !== 'À traiter') return false;
+        if (fNeeds === 'halYes' && flags.hal_create !== 'yes') return false;
+        if (fNeeds === 'commsYes' && flags.comms_publish !== 'yes') return false;
 
         const axes = parseAxes(flags);
         const axisSel = String(fAxis || 'all').toUpperCase();
@@ -340,13 +402,13 @@
       });
 
       $('sTotal').textContent = VIEW.length;
-      $('sNeed').textContent = VIEW.filter(it => statusFor(it.flags || {}).txt === 'À traiter').length;
+      $('sNeed').textContent = VIEW.filter(it => statusFor(it).txt === 'À traiter').length;
       $('sHal').textContent = VIEW.filter(it => it.flags?.hal_create === 'yes').length;
       $('sComms').textContent = VIEW.filter(it => it.flags?.comms_publish === 'yes').length;
 
       VIEW.sort((a,b) => {
-        const ay = parseInt(a.year || '0',10);
-        const by = parseInt(b.year || '0',10);
+        const ay = parseInt(a.year || '0', 10);
+        const by = parseInt(b.year || '0', 10);
         if (by !== ay) return by - ay;
         return (b.date || '').localeCompare(a.date || '');
       });
@@ -367,63 +429,45 @@
       const slice = VIEW.slice(start, start + PAGE_SIZE);
 
       for (const it of slice){
-        const flags = it.flags || {};
-        const st = statusFor(flags);
+        const st = statusFor(it);
+        const hal = tagYesNo(it.flags?.hal_create);
+        const comms = tagYesNo(it.flags?.comms_publish);
 
-        const hal = tagYesNo(flags.hal_create);
-        const comms = tagYesNo(flags.comms_publish);
-
-        const halDone = flags.hal_done === 'yes';
-        const commDone = flags.comms_done === 'yes';
+        const halDone = it.flags?.hal_done === 'yes';
+        const commDone = it.flags?.comms_done === 'yes';
 
         const halTxt = halDone ? 'Demandé (traité)' : (hal.txt === 'Oui' ? 'Demandé' : hal.txt);
         const commTxt = commDone ? 'Demandé (traité)' : (comms.txt === 'Oui' ? 'Demandé' : comms.txt);
-
-        let infoTop = '';
-        let infoBottom = '';
-
-        if (it.itemType === 'bookSection' && it.bookTitle) {
-          infoTop = `<div class="mini">Dans : ${escapeHtml(it.bookTitle)}</div>`;
-        } else if (it.itemType === 'journalArticle' && it.publicationTitle) {
-          infoTop = `<div class="mini">Revue : ${escapeHtml(it.publicationTitle)}</div>`;
-        } else if (it.itemType === 'conferencePaper' && it.conferenceName) {
-          infoTop = `<div class="mini">Conférence : ${escapeHtml(it.conferenceName)}</div>`;
-        }
-
-        if (it.itemType === 'journalArticle') {
-          const parts = [];
-          if (it.volume) parts.push('vol. ' + escapeHtml(it.volume));
-          if (it.issue) parts.push('n° ' + escapeHtml(it.issue));
-          if (it.pages) parts.push('pp. ' + escapeHtml(it.pages));
-          if (it.doi) parts.push('DOI ' + escapeHtml(it.doi));
-          infoBottom = parts.length ? `<div class="mini">${parts.join(' — ')}</div>` : '';
-        } else {
-          const parts = [];
-          if (it.publisher) parts.push(escapeHtml(it.publisher));
-          if (it.place) parts.push(escapeHtml(it.place));
-          if (it.isbn) parts.push('ISBN ' + escapeHtml(it.isbn));
-          infoBottom = parts.length ? `<div class="mini">${parts.join(' — ')}</div>` : '';
-        }
 
         const title = it.title || '(sans titre)';
         const titleHtml = it.zoteroUrl
           ? `<a href="${it.zoteroUrl}" target="_blank" rel="noopener noreferrer">${escapeHtml(title)}</a>`
           : escapeHtml(title);
 
-        const axes = parseAxes(flags);
+        let extraMini = '';
+        if (it.itemType === 'bookSection' && it.bookTitle) {
+          extraMini += `<div class="mini">Dans : ${escapeHtml(it.bookTitle)}</div>`;
+        } else if (it.itemType === 'journalArticle' && it.publicationTitle) {
+          extraMini += `<div class="mini">Revue : ${escapeHtml(it.publicationTitle)}</div>`;
+        } else if (it.itemType === 'conferencePaper' && it.conferenceName) {
+          extraMini += `<div class="mini">Conférence : ${escapeHtml(it.conferenceName)}</div>`;
+        }
+        if (it.doi) extraMini += `<div class="mini">DOI : ${escapeHtml(it.doi)}</div>`;
+
+        const axes = parseAxes(it.flags || {});
         const axesHtml = axes.length
           ? `<div class="axes">` + axes.map(a => `<span class="chip">${escapeHtml(a)}</span>`).join('') + `</div>`
           : '';
 
-        const creators = truncateAuthors(it.creatorsText || '');
-        const authorsHtml = `<span title="${escapeHtml(creators.full)}">${escapeHtml(creators.short)}</span>`;
+        const auth = clampAuthors(it.creatorsText || '');
+        const authorsHtml = `<span class="authClamp" title="${escapeHtml(auth.full)}">${escapeHtml(auth.short)}</span>`;
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td class="right">${escapeHtml(it.year || '')}</td>
           <td><span class="tag">${escapeHtml(typeLabel(it.itemType))}</span></td>
-          <td class="title">${titleHtml}${infoTop}${infoBottom}${axesHtml}</td>
-          <td>${authorsHtml}</td>
+          <td class="title">${titleHtml}${extraMini}${axesHtml}</td>
+          <td class="auth">${authorsHtml}</td>
           <td><span class="tag ${hal.cls}">${escapeHtml(halTxt)}</span></td>
           <td><span class="tag ${comms.cls}">${escapeHtml(commTxt)}</span></td>
           <td><span class="tag ${st.cls}">${escapeHtml(st.txt)}</span></td>
@@ -432,16 +476,27 @@
       }
     }
 
-    async function load(){
-      setMsg('');
-      $('rows').innerHTML = `<tr><td colspan="7"><span class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span> Chargement des données…</span></td></tr>`;
+    async function loadAdminItems(){
+      $('msg').textContent = '';
+      $('rows').innerHTML = `<tr><td colspan="7"><span class="loading"><span class="dot"></span><span class="dot"></span><span class="dot"></span> Chargement…</span></td></tr>`;
+
+      // IMPORTANT: on envoie le token Identity pour éviter 401 et “login cassé”
+      const user = window.netlifyIdentity && window.netlifyIdentity.currentUser();
+      if (!user) {
+        showLoggedOut();
+        return;
+      }
+      const token = await user.jwt();
 
       try{
-        const r = await fetch('/.netlify/functions/admin-items', { cache: 'no-store' });
+        const r = await fetch('/.netlify/functions/admin-items', {
+          cache: 'no-store',
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
         const data = await r.json();
 
         if (!r.ok) {
-          setMsg('Erreur côté serveur.');
+          $('msg').textContent = (data && data.error) ? String(data.error) : 'Erreur côté serveur.';
           $('rows').innerHTML = `<tr><td colspan="7" class="muted">Erreur.</td></tr>`;
           return;
         }
@@ -458,41 +513,80 @@
         fillYears(ALL);
 
         const ts = data.fetchedAt ? new Date(data.fetchedAt) : new Date();
-        $('lastUpdate').textContent = `Dernière mise à jour : ${ts.toLocaleString('fr-FR')}`;
+        $('lastUpdate').textContent = `Maj : ${ts.toLocaleString('fr-FR')}`;
 
         applyFilters();
       } catch(err){
         console.error(err);
-        setMsg('Erreur réseau.');
+        $('msg').textContent = 'Erreur réseau.';
         $('rows').innerHTML = `<tr><td colspan="7" class="muted">Impossible de charger les données.</td></tr>`;
       }
     }
 
-    $('q').addEventListener('input', applyFilters);
-    ['filterType','filterNeeds','filterAxis','filterYear'].forEach(id => $(id).addEventListener('change', applyFilters));
+    // ------------------------------------------------------------
+    // Init identity + listeners
+    // ------------------------------------------------------------
+    function wireUI(){
+      $('loginBtn').addEventListener('click', openLogin);
+      $('loginBtn2').addEventListener('click', openLogin);
+      $('logoutBtn').addEventListener('click', logout);
 
-    $('reset').addEventListener('click', () => {
-      $('q').value = '';
-      $('filterType').value = 'all';
-      $('filterNeeds').value = 'all';
-      $('filterAxis').value = 'all';
-      $('filterYear').value = 'all';
-      applyFilters();
-    });
+      $('q').addEventListener('input', applyFilters);
+      ['filterType','filterNeeds','filterAxis','filterYear'].forEach(id => $(id).addEventListener('change', applyFilters));
 
-    $('refresh').addEventListener('click', load);
+      $('reset').addEventListener('click', () => {
+        $('q').value = '';
+        $('filterType').value = 'all';
+        $('filterNeeds').value = 'all';
+        $('filterAxis').value = 'all';
+        $('filterYear').value = 'all';
+        applyFilters();
+      });
 
-    $('prev').addEventListener('click', () => setPage(PAGE - 1));
-    $('next').addEventListener('click', () => setPage(PAGE + 1));
-    $('pageSize').addEventListener('change', () => {
-      const v = parseInt($('pageSize').value, 10);
-      if (Number.isFinite(v) && v > 0 && v <= 500) {
-        PAGE_SIZE = v;
-        setPage(1);
+      $('refresh').addEventListener('click', loadAdminItems);
+
+      $('prev').addEventListener('click', () => setPage(PAGE - 1));
+      $('next').addEventListener('click', () => setPage(PAGE + 1));
+      $('pageSize').addEventListener('change', () => {
+        const v = parseInt($('pageSize').value, 10);
+        if (Number.isFinite(v) && v > 0 && v <= 500) {
+          PAGE_SIZE = v;
+          setPage(1);
+        }
+      });
+    }
+
+    function initIdentity(){
+      if (!window.netlifyIdentity) {
+        $('loginMsg').textContent = 'Netlify Identity non chargé.';
+        showLoggedOut();
+        return;
       }
-    });
 
-    load();
+      window.netlifyIdentity.on('init', user => {
+        if (!user) {
+          showLoggedOut();
+        } else {
+          showLoggedIn(user);
+          loadAdminItems();
+        }
+      });
+
+      window.netlifyIdentity.on('login', user => {
+        showLoggedIn(user);
+        window.netlifyIdentity.close();
+        loadAdminItems();
+      });
+
+      window.netlifyIdentity.on('logout', () => {
+        showLoggedOut();
+      });
+
+      window.netlifyIdentity.init();
+    }
+
+    wireUI();
+    initIdentity();
   </script>
 </body>
 </html>
