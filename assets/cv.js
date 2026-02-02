@@ -573,76 +573,62 @@ ${clone.outerHTML}
     downloadBlob(new Blob([html], { type: 'text/html;charset=utf-8' }), filename);
     setStatus('Export HTML généré ✅', true);
   }
-// ✅ PDF: html2pdf robuste (évite page blanche)
-// Remplace uniquement ta fonction exportPDF() par celle-ci.
-async function exportPDF() {
+async function exportPdf() {
   if (!window.html2pdf) {
-    setStatus("Erreur : html2pdf n'est pas chargé.", false);
+    setStatus("Erreur : html2pdf n'est pas chargé (cv.html).", false);
     return;
   }
 
-  const clone = cloneForExport();
-  const title = (cvName ? cvName.textContent.trim() : 'CV') || 'CV';
-  const filename = safeFilenameBase(title) + '.pdf';
+  // cvName dans ton HTML est un <h2 contenteditable>, pas un <input>
+  const name = (document.getElementById('cvName')?.textContent || 'CV').trim() || 'CV';
+  const base = safeFilenameBase(name);
 
-  // Holder hors écran, MAIS rendu (pas display:none, pas opacity:0)
+  const clone = getExportClone();
+
+  // ✅ Holder dans le viewport (sinon html2canvas peut rendre blanc)
   const holder = document.createElement('div');
-  holder.id = 'pdfExportHolder';
+  holder.id = 'pdf-export-holder';
   holder.style.position = 'fixed';
   holder.style.left = '0';
   holder.style.top = '0';
-  holder.style.transform = 'translateX(-12000px)'; // hors viewport
+  holder.style.width = '210mm';          // A4 width
   holder.style.background = '#fff';
   holder.style.color = '#111';
-  holder.style.width = '210mm';   // A4
-  holder.style.maxWidth = '210mm';
+  holder.style.opacity = '0.01';         // IMPORTANT: pas 0, pas display:none
+  holder.style.pointerEvents = 'none';
+  holder.style.zIndex = '999999';
 
-  // Inject CSS export (suppression des cadres, look "pandoc-like")
-  const style = document.createElement('style');
-  style.textContent = EXPORT_OVERRIDES_CSS;
-  holder.appendChild(style);
+  // éviter que des styles de page “écran” perturbent le rendu
+  holder.style.boxSizing = 'border-box';
+  holder.style.padding = '12mm 14mm';
 
-  // IMPORTANT : capturer une page "simple", pas le holder
-  const page = document.createElement('div');
-  page.className = 'a4page';
-  page.style.width = '210mm';
-  page.style.boxSizing = 'border-box';
-  page.style.padding = '12mm 14mm';
-  page.style.background = '#ffffff';
-  page.appendChild(clone);
-  holder.appendChild(page);
-
+  holder.appendChild(clone);
   document.body.appendChild(holder);
 
   try {
-    // Attendre fonts + layout (sinon canvas parfois vide)
-    if (document.fonts && document.fonts.ready) {
-      await document.fonts.ready;
-    }
+    // fonts + layout stables
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
     await window.html2pdf()
       .set({
-        filename,
         margin: [0, 0, 0, 0],
+        filename: `${base}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: {
           scale: 2,
           useCORS: true,
           backgroundColor: '#ffffff',
+          // ✅ important quand la page est scrollée
           scrollX: 0,
-          scrollY: 0,
-          // ces 2 lignes aident beaucoup contre les "blancs" selon navigateur
-          windowWidth: page.scrollWidth || 1200,
-          windowHeight: page.scrollHeight || 1600
+          scrollY: -window.scrollY
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['css', 'legacy'] }
       })
-      .from(page) // ✅ capte la page, pas le wrapper
+      .from(holder)     // ✅ capturer le holder visible
       .save();
 
-    setStatus('Export PDF généré ✅', true);
   } catch (e) {
     console.error(e);
     setStatus('Erreur export PDF : ' + (e?.message || e), false);
@@ -650,6 +636,7 @@ async function exportPDF() {
     holder.remove();
   }
 }
+
 
 
   // DOCX: keep the version you said is "très bien"
