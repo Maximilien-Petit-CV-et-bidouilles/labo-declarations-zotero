@@ -19,8 +19,12 @@ exports.handler = async (event) => {
     const key = (body.key || '').trim();
     if (!key) return json(400, { error: 'Missing item key' });
 
-    const hal_done = normalizeBool((body.hal_done || '').trim());
-    const comms_done = normalizeBool((body.comms_done || '').trim());
+    // Le front peut envoyer soit { hal_done, comms_done } soit { patch: { hal_done, comms_done } }
+const patch = (body.patch && typeof body.patch === 'object') ? body.patch : {};
+
+const hal_done = normalizeBool(String((patch.hal_done ?? body.hal_done) || '').trim());
+const comms_done = normalizeBool(String((patch.comms_done ?? body.comms_done) || '').trim());
+
 
     const itemUrl = `https://api.zotero.org/${libraryType}/${libraryId}/items/${key}`;
 
