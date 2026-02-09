@@ -378,6 +378,32 @@
     // Clone the CV root
     const root = $('#cvRoot');
     const clone = root.cloneNode(true);
+     // --- Remove "publications load only with Nom + Prénom" helper texts from exports
+clone.querySelectorAll('.hint').forEach(p => {
+  const t = (p.textContent || '').trim();
+  if (t.includes('les publications ne se chargent') || t.includes('Nom Prénom')) p.remove();
+});
+
+// Remove the helper line above the publications list (and the count pill)
+clone.querySelectorAll('section.section').forEach(sec => {
+  const h3 = sec.querySelector('h3');
+  if (!h3) return;
+  if ((h3.textContent || '').trim() !== 'Productions principales en recherche') return;
+
+  // remove the small helper line (the div right under the h3)
+  const helperDiv = sec.querySelector('div');
+  if (helperDiv && (helperDiv.textContent || '').includes('Les publications ne se chargent')) helperDiv.remove();
+
+  // remove the placeholder LI if present
+  sec.querySelectorAll('#pubList li').forEach(li => {
+    const txt = (li.textContent || '').trim();
+    if (txt.includes('Tapez') && txt.includes('Nom') && txt.includes('Prénom')) li.remove();
+  });
+
+  // remove the count pill if it still exists
+  sec.querySelector('#pubCount')?.remove();
+});
+
 
     // Remove status/meta/toolbars
     clone.querySelector('#cvMeta')?.remove();
