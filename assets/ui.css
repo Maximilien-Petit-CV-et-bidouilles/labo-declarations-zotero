@@ -1,62 +1,131 @@
-/* UI index uniquement — ne touche PAS aux formulaires / boutons / icônes */
-.page-index .hub {
-  border: 1px solid rgba(0,0,0,.10);
-  border-radius: 14px;
+/* =========================================================
+   UI LAYER – INDEX ONLY (SAFE)
+   - Ne touche pas aux formulaires, boutons, tables, icônes…
+   - S'applique uniquement si <body class="page-index">
+   ========================================================= */
+
+/* Variables neutres (sans reset global) */
+body.page-index {
+  --ui-border: rgba(0, 0, 0, 0.10);
+  --ui-radius: 14px;
+  --ui-card-radius: 16px;
+  --ui-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+  --ui-focus: rgba(37, 99, 235, 0.35);
+}
+
+/* ===== Header "hub" ===== */
+body.page-index .hub {
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
   padding: 24px 20px;
 }
 
-.page-index .hub-title {
-  margin: 0;
-  font-size: 1.8rem;
-  line-height: 1.2;
+/* Bloc branding (titre + logo) */
+body.page-index .hub-brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
 }
 
-.page-index .hub-cards {
+body.page-index .hub-brand-text {
+  min-width: 0; /* évite débordements */
+}
+
+body.page-index .hub-title {
+  margin: 0;
+  line-height: 1.15;
+}
+
+/* Le sous-titre existe déjà côté page (classe .subtitle), on n’impose rien globalement */
+body.page-index .hub .subtitle {
+  margin-top: 6px;
+}
+
+/* Logo */
+body.page-index .hub-logo {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 260px;   /* ajuste si tu veux plus petit */
+  object-fit: contain;
+}
+
+/* ===== Cartes de navigation ===== */
+body.page-index .hub-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 28px;
+  gap: 28px;          /* <-- plus d’air entre les cartes */
   margin-top: 22px;
 }
 
-.page-index .hub-card {
+body.page-index .hub-card {
   display: block;
-  border: 1px solid rgba(0,0,0,.10);
-  border-radius: 16px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-card-radius);
   padding: 22px 18px;
-  text-decoration: none;
+  text-decoration: none; /* évite soulignement */
+  color: inherit;        /* garde ton thème */
+  background: transparent;
+  transition: transform .15s ease, box-shadow .15s ease;
 }
 
-.page-index .hub-card:hover {
-  box-shadow: 0 10px 25px rgba(0,0,0,.08);
-  transform: translateY(-2px);
-}
-
-.page-index .hub-card:focus-visible {
-  outline: 3px solid rgba(37, 99, 235, .35);
-  outline-offset: 3px;
-}
-
-.page-index .hub-card h2 {
+/* Textes internes */
+body.page-index .hub-card h2 {
   margin: 0 0 6px 0;
   font-size: 1.15rem;
   line-height: 1.25;
 }
 
-.page-index .hub-card p {
+body.page-index .hub-card p {
   margin: 0;
-  opacity: .75;
+  opacity: .78;
 }
 
-.page-index .site-footer {
+/* Hover / focus */
+body.page-index .hub-card:hover {
+  box-shadow: var(--ui-shadow);
+  transform: translateY(-2px);
+  text-decoration: none;
+}
+
+body.page-index .hub-card:focus-visible {
+  outline: 3px solid var(--ui-focus);
+  outline-offset: 3px;
+}
+
+/* ===== Footer bas de page ===== */
+body.page-index .site-footer {
   margin-top: 42px;
   padding: 18px 10px;
-  border-top: 1px solid rgba(0,0,0,.10);
+  border-top: 1px solid var(--ui-border);
   text-align: center;
-  opacity: .85;
+  opacity: .9;
 }
 
+body.page-index .site-footer a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+/* ===== Responsive ===== */
 @media (max-width: 700px) {
-  .page-index .hub { padding: 18px 16px; }
-  .page-index .hub-title { font-size: 1.5rem; }
-  .page-index .hub-cards { gap: 18px; margin-top: 16px; }
+  body.page-index .hub {
+    padding: 18px 16px;
+  }
+
+  /* Logo sous le titre */
+  body.page-index .hub-brand {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  body.page-index .hub-logo {
+    max-width: 100%;
+  }
+
+  body.page-index .hub-cards {
+    gap: 18px;
+    margin-top: 16px;
+  }
 }
