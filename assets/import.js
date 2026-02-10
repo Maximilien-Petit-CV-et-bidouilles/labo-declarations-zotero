@@ -25,8 +25,9 @@
   const HAL_IMPORTABLE = new Set(["ART", "OUV", "COUV"]);
 
   // ✅ IMPORTANT : taille des paquets pour éviter les 504
- const CHUNK_SIZE = 20; // au lieu de 50
-const PAUSE_MS = 300;  // au lieu de 150
+ const CHUNK_SIZE = 10;
+const PAUSE_MS = 400;
+
 
   function setBusy(v) {
     busy = v;
