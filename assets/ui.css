@@ -1,86 +1,62 @@
-/* =========================================================
-   UI LAYER – SAFE (index only)
-   Ne touche PAS aux formulaires, boutons, tables, icônes…
-   ========================================================= */
-
-/* Variables neutres (n’écrasent rien si inutilisées) */
-:root {
-  --ui-border: rgba(0,0,0,.10);
-  --ui-radius: 14px;
-  --ui-shadow: 0 10px 25px rgba(0,0,0,.08);
-}
-
-/* -------- Index: bloc "hub" -------- */
-.hub {
-  /* On ne touche pas au fond global du site : uniquement le bloc */
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius);
+/* UI index uniquement — ne touche PAS aux formulaires / boutons / icônes */
+.page-index .hub {
+  border: 1px solid rgba(0,0,0,.10);
+  border-radius: 14px;
   padding: 24px 20px;
 }
 
-.hub-title {
+.page-index .hub-title {
   margin: 0;
   font-size: 1.8rem;
   line-height: 1.2;
 }
 
-.hub-cards {
+.page-index .hub-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 28px;            /* <- plus d’air entre les cartes */
+  gap: 28px;
   margin-top: 22px;
 }
 
-/* Carte cliquable */
-.hub-card {
+.page-index .hub-card {
   display: block;
-  border: 1px solid var(--ui-border);
+  border: 1px solid rgba(0,0,0,.10);
   border-radius: 16px;
-  padding: 22px 18px;   /* <- plus respirant */
-  text-decoration: none; /* évite les soulignements */
+  padding: 22px 18px;
+  text-decoration: none;
 }
 
-.hub-card h2 {
+.page-index .hub-card:hover {
+  box-shadow: 0 10px 25px rgba(0,0,0,.08);
+  transform: translateY(-2px);
+}
+
+.page-index .hub-card:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, .35);
+  outline-offset: 3px;
+}
+
+.page-index .hub-card h2 {
   margin: 0 0 6px 0;
   font-size: 1.15rem;
   line-height: 1.25;
 }
 
-.hub-card p {
+.page-index .hub-card p {
   margin: 0;
   opacity: .75;
 }
 
-/* Effets hover/focus accessibles */
-.hub-card:hover {
-  box-shadow: var(--ui-shadow);
-  transform: translateY(-2px);
-}
-
-.hub-card:focus-visible {
-  outline: 3px solid rgba(37, 99, 235, .35);
-  outline-offset: 3px;
-}
-
-/* -------- Footer bas de page -------- */
-.site-footer {
+.page-index .site-footer {
   margin-top: 42px;
   padding: 18px 10px;
-  border-top: 1px solid var(--ui-border);
+  border-top: 1px solid rgba(0,0,0,.10);
   text-align: center;
   opacity: .85;
 }
 
-/* Mobile tweaks */
 @media (max-width: 700px) {
-  .hub {
-    padding: 18px 16px;
-  }
-  .hub-title {
-    font-size: 1.5rem;
-  }
-  .hub-cards {
-    gap: 18px;
-    margin-top: 16px;
-  }
+  .page-index .hub { padding: 18px 16px; }
+  .page-index .hub-title { font-size: 1.5rem; }
+  .page-index .hub-cards { gap: 18px; margin-top: 16px; }
 }
