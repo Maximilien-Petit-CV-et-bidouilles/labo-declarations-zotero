@@ -1,226 +1,86 @@
 /* =========================================================
-   UI LAYER – Moulinette LAREQUOI
-   Couche visuelle uniquement (safe)
+   UI LAYER – SAFE (index only)
+   Ne touche PAS aux formulaires, boutons, tables, icônes…
    ========================================================= */
 
-/* ---------- Variables ---------- */
+/* Variables neutres (n’écrasent rien si inutilisées) */
 :root {
-  --bg-page: #f6f7fb;
-  --bg-card: #ffffff;
-  --text-main: #1f2937;
-  --text-muted: #6b7280;
-
-  --accent: #2563eb;
-  --accent-soft: #e0e7ff;
-
-  --border: #e5e7eb;
-  --radius: 14px;
-
-  --space-xs: .25rem;
-  --space-sm: .5rem;
-  --space-md: 1rem;
-  --space-lg: 1.75rem;
-  --space-xl: 2.5rem;
+  --ui-border: rgba(0,0,0,.10);
+  --ui-radius: 14px;
+  --ui-shadow: 0 10px 25px rgba(0,0,0,.08);
 }
 
-/* ---------- Base ---------- */
-body {
-  background: var(--bg-page);
-  color: var(--text-main);
-}
-
-h1, h2, h3 {
-  line-height: 1.25;
-}
-
-p {
-  line-height: 1.6;
-}
-
-a {
-  color: var(--accent);
-  text-decoration: none;
-}
-a:hover {
-  text-decoration: underline;
-}
-
-/* ---------- Containers ---------- */
-.page,
-.container {
-  max-width: 1100px;
-  margin: 0 auto;
-}
-
-/* ---------- Cards génériques ---------- */
-.card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--space-lg);
-}
-
-/* ---------- Boutons ---------- */
-button,
-.btn {
-  border-radius: 10px;
-  padding: .6rem 1rem;
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-}
-
-button {
-  background: var(--accent);
-  color: white;
-}
-
-button:disabled {
-  opacity: .6;
-  cursor: not-allowed;
-}
-
-/* ---------- Formulaires ---------- */
-label {
-  font-weight: 600;
-  margin-top: var(--space-md);
-  display: block;
-}
-
-input,
-select,
-textarea {
-  width: 100%;
-  margin-top: .25rem;
-  padding: .6rem .65rem;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  font: inherit;
-  background: #fff;
-}
-
-input:focus,
-select:focus,
-textarea:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-soft);
-}
-
-/* ---------- Index : hub ---------- */
+/* -------- Index: bloc "hub" -------- */
 .hub {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: var(--space-xl) var(--space-lg);
+  /* On ne touche pas au fond global du site : uniquement le bloc */
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  padding: 24px 20px;
 }
 
 .hub-title {
   margin: 0;
   font-size: 1.8rem;
+  line-height: 1.2;
 }
 
 .hub-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 2rem;                 /* <-- espacement augmenté */
-  margin-top: 2rem;
+  gap: 28px;            /* <- plus d’air entre les cartes */
+  margin-top: 22px;
 }
 
+/* Carte cliquable */
 .hub-card {
   display: block;
-  background: #fff;
-  border: 1px solid var(--border);
+  border: 1px solid var(--ui-border);
   border-radius: 16px;
-  padding: 1.75rem 1.5rem;   /* <-- plus respirant */
-  transition: transform .15s ease, box-shadow .15s ease;
-  color: inherit;
+  padding: 22px 18px;   /* <- plus respirant */
+  text-decoration: none; /* évite les soulignements */
 }
 
 .hub-card h2 {
-  margin: 0 0 .4rem 0;
+  margin: 0 0 6px 0;
   font-size: 1.15rem;
+  line-height: 1.25;
 }
 
 .hub-card p {
   margin: 0;
-  color: var(--text-muted);
-  font-size: .95rem;
+  opacity: .75;
 }
 
+/* Effets hover/focus accessibles */
 .hub-card:hover {
+  box-shadow: var(--ui-shadow);
   transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(0,0,0,.08);
-  text-decoration: none;
 }
 
-/* ---------- Tables (admin / suivi) ---------- */
-.table-wrap {
-  overflow-x: auto;
+.hub-card:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, .35);
+  outline-offset: 3px;
 }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: .95rem;
-}
-
-th,
-td {
-  padding: .6rem .75rem;
-  border-bottom: 1px solid var(--border);
-  vertical-align: top;
-}
-
-th {
-  text-align: left;
-  font-weight: 700;
-  background: #f9fafb;
-}
-
-/* ---------- Messages ---------- */
-.notice {
-  background: #f0f9ff;
-  border: 1px solid #bae6fd;
-  color: #075985;
-  padding: .75rem 1rem;
-  border-radius: 10px;
-}
-
-.error {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #7f1d1d;
-  padding: .75rem 1rem;
-  border-radius: 10px;
-}
-
-/* ---------- Footer ---------- */
+/* -------- Footer bas de page -------- */
 .site-footer {
-  margin-top: 4rem;
-  padding: 2rem 1rem;
+  margin-top: 42px;
+  padding: 18px 10px;
+  border-top: 1px solid var(--ui-border);
   text-align: center;
-  font-size: .95rem;
-  color: var(--text-muted);
-  border-top: 1px solid var(--border);
+  opacity: .85;
 }
 
-.site-footer a {
-  color: inherit;
-  text-decoration: underline;
-}
-
-/* ---------- Responsive tweaks ---------- */
+/* Mobile tweaks */
 @media (max-width: 700px) {
   .hub {
-    padding: var(--space-lg);
+    padding: 18px 16px;
   }
-
   .hub-title {
     font-size: 1.5rem;
   }
-
   .hub-cards {
-    gap: 1.5rem;
+    gap: 18px;
+    margin-top: 16px;
   }
 }
