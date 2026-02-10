@@ -1,15 +1,17 @@
 // netlify/functions/zotero-import-hal-batch.js
 //
 // Import CSV HAL (halId) -> HAL API -> Zotero batch
-// FINAL: dédoublonnage HALID robuste + compatible gros volumes (chunking côté front)
+// FINAL: dédoublonnage HALID robuste + plus résilient aux timeouts
 //
 // Dédoublonnage:
 // - on taggue chaque item créé avec `HALID:<halId>`
-// - avant import, on cherche dans Zotero les items qui ont ces tags (requête unique par paquet)
+// - avant import, on cherche dans Zotero les items qui ont ces tags
+//   IMPORTANT: on utilise le paramètre `tag=` (et pas `q=`) car `q=` ne filtre pas fiablement sur les tags.
 //
-// Optimisations:
-// - HAL fetch en parallèle (concurrency limitée)
+// Optimisations / robustesse:
+// - HAL fetch en parallèle (concurrency limitée pour éviter 502 Netlify)
 // - Zotero POST par batch de 25
+// - retries + backoff pour HAL/Zotero (429/5xx + Backoff/Retry-After)
 //
 // Vars d'env attendues :
 // - ZOTERO_API_KEY
@@ -71,6 +73,11 @@ const HAL_FL = [
   "language_s",
 ].join(",");
 
+// Réglages (anti-502)
+const CONCURRENCY = 3;       // <= important pour ne pas dépasser le temps de réponse Netlify
+const FETCH_TIMEOUT_MS = 9000; // garder une marge (Netlify peut couper tôt)
+const RETRIES = 2;
+
 function jsonResponse(statusCode, obj) {
   return {
     statusCode,
@@ -98,6 +105,78 @@ function normalizeDoi(raw) {
     .replace(/^https?:\/\/doi\.org\//i, "")
     .replace(/^doi:\s*/i, "")
     .trim();
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function parseRetryAfterSeconds(headers) {
+  const ra = headers?.get?.("retry-after");
+  if (!ra) return 0;
+  const n = Number(ra);
+  if (Number.isFinite(n) && n > 0) return n;
+  // Retry-After peut être une date HTTP ; on ignore pour rester simple.
+  return 0;
+}
+
+function parseBackoffSeconds(headers) {
+  const b = headers?.get?.("backoff");
+  if (!b) return 0;
+  const n = Number(b);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+async function fetchWithRetry(url, options = {}, cfg = {}) {
+  const retries = Number.isFinite(cfg.retries) ? cfg.retries : RETRIES;
+  const timeoutMs = Number.isFinite(cfg.timeoutMs) ? cfg.timeoutMs : FETCH_TIMEOUT_MS;
+  const baseDelay = Number.isFinite(cfg.baseDelay) ? cfg.baseDelay : 350;
+
+  let lastErr = null;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetchWithTimeout(url, options, timeoutMs);
+
+      // Backoff Zotero / Retry-After générique
+      const backoff = parseBackoffSeconds(res.headers);
+      const retryAfter = parseRetryAfterSeconds(res.headers);
+      const waitSeconds = Math.max(backoff, retryAfter);
+
+      if (res.status === 429 || res.status === 503 || res.status === 502) {
+        if (attempt < retries) {
+          const jitter = Math.floor(Math.random() * 150);
+          const waitMs = (waitSeconds > 0 ? waitSeconds * 1000 : baseDelay * (attempt + 1)) + jitter;
+          await sleep(waitMs);
+          continue;
+        }
+      }
+
+      return res;
+    } catch (e) {
+      lastErr = e;
+      // AbortError / réseau -> retry
+      if (attempt < retries) {
+        const jitter = Math.floor(Math.random() * 150);
+        await sleep(baseDelay * (attempt + 1) + jitter);
+        continue;
+      }
+      throw e;
+    }
+  }
+
+  // Normalement jamais atteint
+  throw lastErr || new Error("fetchWithRetry failed");
 }
 
 function parseCreatorsFromHAL(doc) {
@@ -293,7 +372,7 @@ async function fetchHALById(halId) {
     `${HAL_SEARCH}?q=${encodeURIComponent(q)}` +
     `&wt=json&rows=1&fl=${encodeURIComponent(HAL_FL)}`;
 
-  const r = await fetch(url, { headers: { Accept: "application/json" } });
+  const r = await fetchWithRetry(url, { headers: { Accept: "application/json" } }, { timeoutMs: FETCH_TIMEOUT_MS });
   if (!r.ok) throw new Error(`HAL ${halId}: HTTP ${r.status}`);
   const j = await r.json();
   return j?.response?.docs?.[0] || null;
@@ -328,14 +407,13 @@ async function mapWithConcurrency(items, concurrency, fn) {
   return results;
 }
 
-// ✅ Dédoublonnage: requête unique Zotero pour le paquet
-// Stratégie: qmode=everything avec requête OR sur "tag:HALID:xxx"
-// Ex: tag:"HALID:hal-xxx" OR tag:"HALID:hal-yyy"
+// ✅ Dédoublonnage: requête unique Zotero pour le paquet via param `tag=`
+// Syntaxe Zotero: tag=foo || bar || baz (OR) -> on l'utilise avec HALID:<id>
 async function fetchExistingHalIdsForChunk(halIds) {
   const { apiKey, libType, libId } = zoteroEnv();
 
-  // OR entre tags: "tag1 || tag2 || tag3"
-  // (voir syntaxe Zotero: tag=foo || bar) :contentReference[oaicite:1]{index=1}
+  // OR entre tags: "HALID:id1 || HALID:id2 || HALID:id3"
+  // (espaces autour de ||)
   const tagQuery = halIds.map((id) => `HALID:${id}`).join(" || ");
 
   const url =
@@ -343,7 +421,7 @@ async function fetchExistingHalIdsForChunk(halIds) {
     `tag=${encodeURIComponent(tagQuery)}` +
     `&limit=100&format=json`;
 
-  const r = await fetch(url, {
+  const r = await fetchWithRetry(url, {
     headers: {
       "Zotero-API-Key": apiKey,
       "Zotero-API-Version": "3",
@@ -352,29 +430,8 @@ async function fetchExistingHalIdsForChunk(halIds) {
   });
 
   if (!r.ok) {
-    throw new Error(`Zotero tag-dedupe lookup failed (HTTP ${r.status})`);
-  }
-
-  const items = await r.json();
-  const existing = new Set();
-
-  if (Array.isArray(items)) {
-    for (const it of items) {
-      const tags = it?.data?.tags || [];
-      for (const t of tags) {
-        const tag = (t?.tag || "").trim();
-        if (tag.startsWith("HALID:")) {
-          existing.add(tag.slice("HALID:".length).trim());
-        }
-      }
-    }
-  }
-  return existing;
-}
-
-
-  if (!r.ok) {
-    throw new Error(`Zotero chunk-dedupe lookup failed (HTTP ${r.status})`);
+    const txt = await r.text().catch(() => "");
+    throw new Error(`Zotero tag-dedupe lookup failed (HTTP ${r.status}) ${txt ? `: ${txt}` : ""}`);
   }
 
   const items = await r.json();
@@ -399,7 +456,7 @@ async function fetchExistingHalIdsForChunk(halIds) {
 async function postZoteroItems(items) {
   const { apiKey, libType, libId } = zoteroEnv();
 
-  const r = await fetch(`${ZOTERO_API}/${libType}/${libId}/items`, {
+  const r = await fetchWithRetry(`${ZOTERO_API}/${libType}/${libId}/items`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -462,8 +519,7 @@ exports.handler = async (event) => {
       }
     }
 
-    // ✅ 2) Fetch HAL en parallèle (concurrency)
-    const CONCURRENCY = 4; // au lieu de 8
+    // ✅ 2) Fetch HAL en parallèle (concurrency limitée)
     const results = await mapWithConcurrency(toProcess, CONCURRENCY, async (halId) => {
       try {
         const doc = await fetchHALById(halId);
@@ -514,8 +570,7 @@ exports.handler = async (event) => {
 
     return jsonResponse(200, {
       requested: uniqueHalIds.length,
-      // fetched = nombre de payloads OK (HAL trouvés + mappables)
-      fetched,
+      fetched,              // nombre de payloads OK (HAL trouvés + mappables)
       importable: zoteroItems.length,
       imported,
       zoteroFailures,
@@ -525,7 +580,7 @@ exports.handler = async (event) => {
       skipped,
       errors,
       note:
-        "Final: dédoublonnage HALID via requête Zotero unique par paquet + HAL fetch parallèle. Utiliser chunking côté front (40–60).",
+        "Dédoublonnage HALID via param Zotero `tag=` + HAL fetch concurrence limitée. Côté front, privilégier des paquets de 10–20 si tu vois des 502.",
     });
   } catch (e) {
     return jsonResponse(500, { error: e.message || String(e) });
