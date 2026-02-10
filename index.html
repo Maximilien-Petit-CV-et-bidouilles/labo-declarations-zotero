@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <title>Déclarations – Laboratoire</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/assets/ui.css">
 
   <style>
     :root {
@@ -96,51 +97,52 @@
 
     footer{margin-top:18px;color:var(--muted);font-size:.8rem}
   </style>
-
-  <link rel="stylesheet" href="/assets/ui.css">
 </head>
 
 <body>
   <div class="page">
-    <header>
+    <header class="stack">
+  <a class="skip-link" href="#main">Aller au contenu</a>
+
   <h1>Déclarations du laboratoire</h1>
   <p class="subtitle">Les données sont envoyées automatiquement dans Zotero.</p>
 
-  <p style="margin-top:8px;font-size:.9rem">
-    📊
-    <a href="/suivi.html" target="_blank" rel="noopener noreferrer"
-       style="color:var(--accent);text-decoration:none;font-weight:600">
-      Voir le suivi public des demandes (HAL & communication)
+  <nav class="hub" aria-label="Accès rapides">
+    <a class="hub-card" href="/suivi.html" target="_blank" rel="noopener noreferrer">
+      <span class="hub-ico" aria-hidden="true">📊</span>
+      <span class="hub-text">
+        <strong>Suivi public</strong>
+        <span class="hub-desc">HAL &amp; communication — état des demandes</span>
+      </span>
     </a>
-  </p>
 
-  <p style="margin-top:6px;font-size:.9rem">
-    🧾
-    <a href="/cv.html" target="_blank" rel="noopener noreferrer"
-       style="color:var(--accent);text-decoration:none;font-weight:600">
-      Générateur de CV (à partir des publications Zotero)
+    <a class="hub-card" href="/cv.html" target="_blank" rel="noopener noreferrer">
+      <span class="hub-ico" aria-hidden="true">🧾</span>
+      <span class="hub-text">
+        <strong>Générateur de CV</strong>
+        <span class="hub-desc">À partir des publications Zotero</span>
+      </span>
     </a>
-  </p>
 
-  <p style="margin-top:6px;font-size:.9rem">
-    📥
-    <a href="/import.html"
-       style="color:var(--accent);text-decoration:none;font-weight:600">
-      Import par lot (CSV HAL → Zotero)
+    <a class="hub-card" href="/import.html">
+      <span class="hub-ico" aria-hidden="true">📥</span>
+      <span class="hub-text">
+        <strong>Import par lot</strong>
+        <span class="hub-desc">CSV HAL → Zotero</span>
+      </span>
     </a>
-  </p>
 
-  <!-- ✅ AJOUT: page dédiée Conference Paper -->
-  <p style="margin-top:6px;font-size:.9rem">
-    🎤
-    <a href="/conference.html"
-       style="color:var(--accent);text-decoration:none;font-weight:600">
-      Déclarer une communication (Conference Paper)
+    <a class="hub-card" href="/conference.html">
+      <span class="hub-ico" aria-hidden="true">🎤</span>
+      <span class="hub-text">
+        <strong>Déclarer une communication</strong>
+        <span class="hub-desc">Conference Paper</span>
+      </span>
     </a>
-  </p>
-
+  </nav>
 </header>
 
+    <main id="main">
 
     <div class="switcher">
       <button type="button" class="active">Nouvelle publication</button>
@@ -291,6 +293,8 @@
 
       <footer>Les champs marqués d’un * sont obligatoires.</footer>
     </form>
+
+    </main>
   </div>
 
   <script src="assets/app.js"></script>
