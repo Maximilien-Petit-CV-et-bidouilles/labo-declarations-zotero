@@ -334,14 +334,14 @@ async function mapWithConcurrency(items, concurrency, fn) {
 async function fetchExistingHalIdsForChunk(halIds) {
   const { apiKey, libType, libId } = zoteroEnv();
 
-  // Protéger la longueur d'URL: cette méthode est prévue pour un chunk (40–60)
-  // On quote pour les tags avec caractères spéciaux.
-  const clauses = halIds.map((id) => `tag:"HALID:${id}"`);
-  const q = clauses.join(" OR ");
+  // OR entre tags: "tag1 || tag2 || tag3"
+  // (voir syntaxe Zotero: tag=foo || bar) :contentReference[oaicite:1]{index=1}
+  const tagQuery = halIds.map((id) => `HALID:${id}`).join(" || ");
 
   const url =
     `${ZOTERO_API}/${libType}/${libId}/items?` +
-    `q=${encodeURIComponent(q)}&qmode=everything&limit=100`;
+    `tag=${encodeURIComponent(tagQuery)}` +
+    `&limit=100&format=json`;
 
   const r = await fetch(url, {
     headers: {
@@ -350,6 +350,28 @@ async function fetchExistingHalIdsForChunk(halIds) {
       Accept: "application/json",
     },
   });
+
+  if (!r.ok) {
+    throw new Error(`Zotero tag-dedupe lookup failed (HTTP ${r.status})`);
+  }
+
+  const items = await r.json();
+  const existing = new Set();
+
+  if (Array.isArray(items)) {
+    for (const it of items) {
+      const tags = it?.data?.tags || [];
+      for (const t of tags) {
+        const tag = (t?.tag || "").trim();
+        if (tag.startsWith("HALID:")) {
+          existing.add(tag.slice("HALID:".length).trim());
+        }
+      }
+    }
+  }
+  return existing;
+}
+
 
   if (!r.ok) {
     throw new Error(`Zotero chunk-dedupe lookup failed (HTTP ${r.status})`);
@@ -441,7 +463,7 @@ exports.handler = async (event) => {
     }
 
     // ✅ 2) Fetch HAL en parallèle (concurrency)
-    const CONCURRENCY = 8; // 6–10 recommandé
+    const CONCURRENCY = 4; // au lieu de 8
     const results = await mapWithConcurrency(toProcess, CONCURRENCY, async (halId) => {
       try {
         const doc = await fetchHALById(halId);
