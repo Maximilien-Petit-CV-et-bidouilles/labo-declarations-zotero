@@ -97,15 +97,25 @@
     footer{margin-top:18px;color:var(--muted);font-size:.8rem}
   </style>
 
-  <!-- UI layer (doit être scoppé via .page-index pour ne rien casser ailleurs) -->
   <link rel="stylesheet" href="/assets/ui.css">
 </head>
 
 <body class="page-index">
   <div class="page">
     <header class="hub">
-      <h1 class="hub-title">Moulinette LAREQUOI</h1>
-      <p class="subtitle">Les données sont envoyées automatiquement dans Zotero.</p>
+      <div class="hub-brand">
+        <div class="hub-brand-text">
+          <h1 class="hub-title">Moulinette LAREQUOI</h1>
+          <p class="subtitle">Les données sont envoyées automatiquement dans Zotero.</p>
+        </div>
+
+        <img
+          class="hub-logo"
+          src="/logo-larequoi-2020.jpg"
+          alt="LAREQUOI – UVSQ – Université Paris-Saclay"
+          loading="lazy"
+          decoding="async">
+      </div>
 
       <div class="hub-cards">
         <a class="hub-card" href="/suivi.html" target="_blank" rel="noopener noreferrer">
