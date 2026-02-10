@@ -1,0 +1,220 @@
+/* assets/ui.css
+   UI layer (design/ergonomie) — surcharge légère, sans toucher au JS.
+   Mobile-first, responsive, accessible.
+*/
+
+:root{
+  --bg:#f6f7fb;
+  --card:#ffffff;
+  --text:#111827;
+  --muted:#6b7280;
+  --border:rgba(17,24,39,.12);
+  --accent:#2563eb;
+  --accent-soft:rgba(37,99,235,.12);
+  --danger:#dc2626;
+  --success:#16a34a;
+
+  --radius:14px;
+  --radius-sm:10px;
+
+  --shadow:0 10px 30px rgba(17,24,39,.08);
+  --shadow-sm:0 6px 18px rgba(17,24,39,.08);
+
+  --space-1:6px;
+  --space-2:10px;
+  --space-3:14px;
+  --space-4:18px;
+  --space-5:24px;
+
+  --font: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family:var(--font);
+  color:var(--text);
+  background:var(--bg);
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+
+/* Layout */
+.page{
+  max-width: 1080px;
+  margin: 18px auto;
+  padding: 0 14px 28px;
+}
+@media (min-width: 768px){
+  .page{ margin: 26px auto; padding: 0 22px 36px; }
+}
+
+header{ margin-bottom: var(--space-4); }
+h1{
+  margin:0 0 6px;
+  font-size: clamp(1.35rem, 1.1rem + 1vw, 1.9rem);
+  line-height: 1.15;
+  letter-spacing: -.01em;
+}
+.subtitle{
+  margin:0;
+  color:var(--muted);
+  font-size: .98rem;
+  line-height: 1.35;
+}
+
+/* Cards */
+.card{
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden; /* utile pour tables */
+}
+
+/* Spacing helpers (non-invasif : n’écrase pas tes classes existantes) */
+.stack > * + *{ margin-top: var(--space-3); }
+
+/* Buttons: cible les <button> existants + liens stylés */
+button,
+a.btn,
+input[type="button"],
+input[type="submit"]{
+  font: inherit;
+  cursor: pointer;
+}
+
+button{
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  padding: 10px 14px;
+  line-height: 1;
+  transition: transform .05s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+button:hover{ border-color: rgba(17,24,39,.22); box-shadow: 0 6px 16px rgba(17,24,39,.08); }
+button:active{ transform: translateY(1px); }
+button:disabled{ opacity:.55; cursor:not-allowed; box-shadow:none; }
+
+button.primary,
+button.btn-primary{
+  background: var(--accent);
+  border-color: var(--accent);
+  color:#fff;
+}
+button.primary:hover,
+button.btn-primary:hover{ filter: brightness(.97); }
+
+button.ghost,
+button.btn-ghost{
+  background: transparent;
+}
+
+/* Focus visible (clavier) */
+:where(a,button,input,select,textarea,[tabindex]):focus-visible{
+  outline: 3px solid rgba(37,99,235,.28);
+  outline-offset: 2px;
+}
+
+/* Form controls */
+input[type="text"],
+input[type="search"],
+input[type="email"],
+input[type="url"],
+input[type="number"],
+input[type="date"],
+textarea,
+select{
+  width: 100%;
+  font: inherit;
+  color: var(--text);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  line-height: 1.25;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+textarea{ min-height: 120px; resize: vertical; }
+select{ padding-right: 34px; }
+:where(input,select,textarea):focus{
+  border-color: rgba(37,99,235,.55);
+  box-shadow: 0 0 0 4px rgba(37,99,235,.12);
+  outline: none;
+}
+label{ color: var(--muted); font-size: .92rem; }
+
+/* Chips / pills (si utilisées) */
+.badge{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid var(--border);
+  background: rgba(255,255,255,.7);
+  color: var(--text);
+  font-size:.9rem;
+}
+
+/* Tables: rendent l’admin/suivi utilisables sur mobile */
+table{
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .95rem;
+}
+thead th{
+  text-align: left;
+  color: var(--muted);
+  font-weight: 650;
+  border-bottom: 1px solid var(--border);
+  padding: 12px 12px;
+  background: rgba(255,255,255,.6);
+  backdrop-filter: blur(6px);
+}
+tbody td{
+  border-bottom: 1px solid rgba(17,24,39,.08);
+  padding: 12px 12px;
+  vertical-align: top;
+}
+tbody tr:hover td{
+  background: rgba(37,99,235,.04);
+}
+.card table{
+  min-width: 720px; /* permet le scroll horizontal sur mobile */
+}
+.card{ overflow-x: auto; }
+
+/* Small screens: rendre les switchers et barres d’actions plus confortables */
+.switcher{
+  gap: 10px !important;
+  flex-wrap: wrap;
+}
+.switcher button{
+  min-height: 40px;
+}
+@media (max-width: 480px){
+  .switcher button{ flex: 1 1 100%; }
+}
+
+/* Notices/alerts (si présentes) */
+.notice, .alert{
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.7);
+  border-radius: var(--radius-sm);
+  padding: 12px 12px;
+}
+.notice.error, .alert.error{ border-color: rgba(220,38,38,.25); background: rgba(220,38,38,.06); }
+.notice.success, .alert.success{ border-color: rgba(22,163,74,.25); background: rgba(22,163,74,.06); }
+
+/* Links */
+a{ color: var(--accent); text-decoration: none; }
+a:hover{ text-decoration: underline; }
+
+/* Reduce motion */
+@media (prefers-reduced-motion: reduce){
+  *{ transition: none !important; scroll-behavior: auto !important; }
+}
+
