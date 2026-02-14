@@ -144,7 +144,8 @@
       <button type="button" class="active">Nouvelle publication</button>
     </div>
 
-    <p class="hint">Choisissez le type (Livre / Chapitre / Article), puis remplissez les champs requis.</p>
+    <p class="hint">Choisissez le type de publication (Livre, chapitre d'ouvrage, article), puis remplissez les champs requis.
+</p>
 
     <form id="pub-form">
       <label>
@@ -157,11 +158,11 @@
       </label>
 
       <label>
-        <span>Title *</span>
+        <span>Titre/Title *</span>
         <input name="title" required>
       </label>
 
-      <div class="authors-title">Author(s) *</div>
+      <div class="authors-title">Auteur(s)/Author(s) *</div>
       <div id="authors-list"></div>
       <div style="display:flex;align-items:center;gap:8px;margin:8px 0 12px">
         <button type="button" id="add-author-btn" class="btn-secondary">+ Ajouter un auteur</button>
@@ -172,16 +173,16 @@
       <div id="book-fields">
         <div class="two-cols">
           <label><span>Date *</span><input name="date" placeholder="2024 ou 2024-06-15"></label>
-          <label><span>Language</span><input name="language" placeholder="fr / en"></label>
+          <label><span>Langue/Language</span><input name="language" placeholder="fr / en"></label>
         </div>
 
         <div class="two-cols">
-          <label><span>Publisher *</span><input name="publisher"></label>
-          <label><span>Place *</span><input name="place"></label>
+          <label><span>Maison d'édition/Publisher *</span><input name="publisher"></label>
+          <label><span>Lieu/Place *</span><input name="place"></label>
         </div>
 
         <label><span>ISBN</span><input name="isbn" placeholder="978-..."></label>
-        <label><span>Abstract</span><textarea name="abstract" rows="4"></textarea></label>
+        <label><span>Résumé/Abstract</span><textarea name="abstract" rows="4"></textarea></label>
       </div>
 
       <!-- ====== CHAMPS CHAPITRE ====== -->
