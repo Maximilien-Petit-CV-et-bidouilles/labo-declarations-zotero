@@ -1,131 +1,327 @@
-/* =========================================================
-   UI LAYER – INDEX ONLY (SAFE)
-   - Ne touche pas aux formulaires, boutons, tables, icônes…
-   - S'applique uniquement si <body class="page-index">
-   ========================================================= */
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Moulinette LAREQUOI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-/* Variables neutres (sans reset global) */
-body.page-index {
-  --ui-border: rgba(0, 0, 0, 0.10);
-  --ui-radius: 14px;
-  --ui-card-radius: 16px;
-  --ui-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
-  --ui-focus: rgba(37, 99, 235, 0.35);
-}
+  <style>
+    :root {
+      --bg:#f5f5f8; --card:#fff; --accent:#2c7be5;
+      --accent-soft:#e1ecff; --text:#222; --muted:#666; --border:#ddd;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text)}
+    .page{max-width:900px;margin:32px auto;padding:0 16px}
+    header{margin-bottom:18px}
+    h1{margin:0 0 6px;font-size:1.7rem;font-weight:650}
+    .subtitle{margin:0;color:var(--muted);font-size:.95rem}
 
-/* ===== Header "hub" ===== */
-body.page-index .hub {
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius);
-  padding: 24px 20px;
-}
+    .switcher{display:flex;gap:8px;margin:18px 0 14px}
+    .switcher button{
+      flex:1;border-radius:999px;border:1px solid var(--border);
+      background:#fff;padding:10px 16px;font-size:.95rem;cursor:pointer;
+      display:inline-flex;justify-content:center;align-items:center;gap:8px;
+    }
+    .switcher button.active{background:var(--accent-soft);border-color:var(--accent)}
+    .hint{color:var(--muted);font-size:.9rem;margin:0 0 14px}
 
-/* Bloc branding (titre + logo) */
-body.page-index .hub-brand {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-}
+    form{background:var(--card);padding:18px;border-radius:10px;border:1px solid var(--border)}
+    label{display:block;margin:0 0 10px;font-weight:600;font-size:.9rem}
+    label span{display:block;margin:0 0 3px}
+    input,select,textarea{
+      width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);
+      font:inherit;background:#fff
+    }
+    textarea{resize:vertical}
 
-body.page-index .hub-brand-text {
-  min-width: 0; /* évite débordements */
-}
+    .two-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px 16px}
 
-body.page-index .hub-title {
-  margin: 0;
-  line-height: 1.15;
-}
+    button[type="submit"]{
+      margin-top:8px;padding:8px 16px;border-radius:999px;border:none;
+      background:var(--accent);color:#fff;font-weight:700;cursor:pointer
+    }
+    button[disabled]{opacity:.7;cursor:default}
 
-/* Le sous-titre existe déjà côté page (classe .subtitle), on n’impose rien globalement */
-body.page-index .hub .subtitle {
-  margin-top: 6px;
-}
+    .status{margin-top:8px;font-size:.9rem;white-space:pre-wrap}
+    .status.ok{color:#1b7c3a}
+    .status.err{color:#b32020}
 
-/* Logo */
-body.page-index .hub-logo {
-  display: block;
-  width: 100%;
-  height: auto;
-  max-width: 260px;   /* ajuste si tu veux plus petit */
-  object-fit: contain;
-}
+    .authors-title{font-weight:700;margin:10px 0 6px}
+    .author-row{border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px}
+    .btn-secondary{border-radius:999px;border:1px solid var(--border);background:#fff;padding:6px 12px;cursor:pointer}
+    .small-muted{color:var(--muted);font-size:.85rem;margin-left:8px}
 
-/* ===== Cartes de navigation ===== */
-body.page-index .hub-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 28px;          /* <-- plus d’air entre les cartes */
-  margin-top: 22px;
-}
+    .opts {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin: 12px 0;
+      background: #fff;
+    }
+    .opts h3 {
+      margin: 0 0 8px;
+      font-size: .95rem;
+    }
+    .opts p {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: .85rem;
+    }
 
-body.page-index .hub-card {
-  display: block;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-card-radius);
-  padding: 22px 18px;
-  text-decoration: none; /* évite soulignement */
-  color: inherit;        /* garde ton thème */
-  background: transparent;
-  transition: transform .15s ease, box-shadow .15s ease;
-}
+    /* ✅ AXES */
+    .checks{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px 14px;
+      margin-top:6px;
+    }
+    .check{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:6px 10px;
+      border:1px solid var(--border);
+      border-radius:999px;
+      background:#fff;
+      font-weight:600;
+      font-size:.85rem;
+      cursor:pointer;
+      user-select:none;
+    }
+    .check input{
+      width:16px;height:16px;
+      margin:0;
+    }
 
-/* Textes internes */
-body.page-index .hub-card h2 {
-  margin: 0 0 6px 0;
-  font-size: 1.15rem;
-  line-height: 1.25;
-}
+    footer{margin-top:18px;color:var(--muted);font-size:.8rem}
+  </style>
 
-body.page-index .hub-card p {
-  margin: 0;
-  opacity: .78;
-}
+  <link rel="stylesheet" href="/assets/ui.css">
+</head>
 
-/* Hover / focus */
-body.page-index .hub-card:hover {
-  box-shadow: var(--ui-shadow);
-  transform: translateY(-2px);
-  text-decoration: none;
-}
+<body class="page-index">
+  <div class="page">
+    <header class="hub">
+      <div class="hub-brand">
+        <div class="hub-brand-text">
+          <h1 class="hub-title">Moulinette LAREQUOI</h1>
+          <p class="subtitle">Déclarez vos publications (articles, chapitres, ouvrages) et vos communications dans la moulinette qui se charge de générer des CV, de créer des notices sur HAL, de communiquer sur votre travail.</p>
+        </div>
 
-body.page-index .hub-card:focus-visible {
-  outline: 3px solid var(--ui-focus);
-  outline-offset: 3px;
-}
+        <img
+          class="hub-logo"
+          src="/logo-larequoi-2020.jpg"
+          alt="LAREQUOI – UVSQ – Université Paris-Saclay"
+          loading="lazy"
+          decoding="async">
+      </div>
 
-/* ===== Footer bas de page ===== */
-body.page-index .site-footer {
-  margin-top: 42px;
-  padding: 18px 10px;
-  border-top: 1px solid var(--ui-border);
-  text-align: center;
-  opacity: .9;
-}
+      <div class="hub-cards">
+        <a class="hub-card" href="/suivi.html" target="_blank" rel="noopener noreferrer">
+          <h2>📊 Suivi public HAL &amp; communication</h2>
+          <p>État des demandes de création de notices et de communications sur les réseaux</p>
+        </a>
 
-body.page-index .site-footer a {
-  color: inherit;
-  text-decoration: underline;
-}
+        <a class="hub-card" href="/cv.html" target="_blank" rel="noopener noreferrer">
+          <h2>🧾 Générateur de CV</h2>
+          <p>À partir des publications déposées dans la moulinette</p>
+        </a>
 
-/* ===== Responsive ===== */
-@media (max-width: 700px) {
-  body.page-index .hub {
-    padding: 18px 16px;
+        <a class="hub-card" href="/import.html">
+          <h2>📥 Import par lot CSV</h2>
+          <p>Importez vos publications et communications par lot</p>
+        </a>
+
+        <a class="hub-card" href="/conference.html">
+          <h2>🎤 Déclarer une communication</h2>
+          <p>Vos communications de congrès, colloques, journées d'études</p>
+        </a>
+      </div>
+    </header>
+
+    <div class="switcher">
+      <button type="button" class="active">Nouvelle publication</button>
+    </div>
+
+    <p class="hint">Choisissez le type de publication (Livre, chapitre d'ouvrage, article), puis remplissez les champs requis.
+</p>
+
+    <form id="pub-form">
+      <label>
+        <span>Type de publication *</span>
+        <select name="pubType" id="pubType">
+          <option value="book">Livre</option>
+          <option value="bookSection">Chapitre d’ouvrage</option>
+          <option value="journalArticle">Article (revue)</option>
+        </select>
+      </label>
+
+      <label>
+        <span>Titre/Title *</span>
+        <input name="title" required>
+      </label>
+
+      <div class="authors-title">Auteur(s)/Author(s) *</div>
+      <div id="authors-list"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin:8px 0 12px">
+        <button type="button" id="add-author-btn" class="btn-secondary">+ Ajouter un auteur</button>
+        <span class="small-muted">Prénom/Nom (minimum : un auteur)</span>
+      </div>
+
+      <!-- ====== CHAMPS LIVRE ====== -->
+      <div id="book-fields">
+        <div class="two-cols">
+          <label><span>Date/Date *</span><input name="date" placeholder="2024 ou 2024-06-15"></label>
+          <label><span>Langue/Language</span><input name="language" placeholder="fr / en"></label>
+        </div>
+
+        <div class="two-cols">
+          <label><span>Maison d'édition/Publisher *</span><input name="publisher"></label>
+          <label><span>Lieu/Place *</span><input name="place"></label>
+        </div>
+
+        <label><span>ISBN</span><input name="isbn" placeholder="978-..."></label>
+        <label><span>Résumé/Abstract</span><textarea name="abstract" rows="4"></textarea></label>
+      </div>
+
+      <!-- ====== CHAMPS CHAPITRE ====== -->
+      <div id="section-fields" style="display:none">
+        <label><span>Titre de l’ouvrage/Book Title *</span><input name="bookTitle"></label>
+
+        <div class="two-cols">
+          <label><span>Pages/Pages</span><input name="pages" placeholder="123-145"></label>
+          <label><span>Édition/Edition</span><input name="edition"></label>
+        </div>
+
+        <div class="two-cols">
+          <label><span>Collection/Series</span><input name="series"></label>
+          <label><span>Numéro de collection/Series Number</span><input name="seriesNumber"></label>
+        </div>
+
+        <div class="two-cols">
+          <label><span>Volume</span><input name="volume"></label>
+          <label><span>Date/Date *</span><input name="sectionDate" placeholder="2024 ou 2024-06-15"></label>
+        </div>
+
+        <div class="two-cols">
+          <label><span>Maison d'édition/Publisher *</span><input name="sectionPublisher"></label>
+          <label><span>Lieu/Place *</span><input name="sectionPlace"></label>
+        </div>
+
+        <label><span>ISBN</span><input name="sectionIsbn" placeholder="978-..."></label>
+      </div>
+
+      <!-- ====== CHAMPS ARTICLE ====== -->
+      <div id="article-fields" style="display:none">
+        <div class="two-cols">
+          <label><span>Revue/Journal *</span><input name="articlePublication" placeholder="Nom de la revue"></label>
+          <label><span>Date/Date *</span><input name="articleDate" placeholder="2024 ou 2024-06-15"></label>
+        </div>
+
+        <div class="two-cols">
+          <label><span>Volume</span><input name="articleVolume"></label>
+          <label><span>Numéro/Issue</span><input name="articleIssue"></label>
+        </div>
+
+        <div class="two-cols">
+          <label><span>Pages/Pages</span><input name="articlePages" placeholder="123-145"></label>
+          <label><span>DOI/DOI</span>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input name="articleDoi" id="articleDoi" placeholder="10.xxxx/xxxxx" style="flex:1">
+              <button type="button" id="doi-prefill" class="btn-secondary" title="Préremplir à partir du DOI">⚡ DOI</button>
+            </div>
+            <span class="small-muted">Collez un DOI (ou une URL doi.org), puis cliquez sur ⚡</span>
+          </label>
+        </div>
+
+        <div class="two-cols">
+          <label><span>Maison d'édition/Publisher</span><input name="articlePublisher"></label>
+          <label><span>Lieu/Place</span><input name="articlePlace"></label>
+        </div>
+      </div>
+
+      <!-- ====== OPTIONS (HAL / COMMS / AXES) ====== -->
+      <div class="opts">
+        <h3>Options</h3>
+        <p>Ces choix seront enregistrés dans Zotero (champ “Extra”).</p>
+
+        <div class="two-cols">
+          <label>
+            <span>Souhaitez-vous la création d’une notice sur HAL ? *</span>
+            <select name="optHal" required>
+              <option value="">— Choisir —</option>
+              <option value="yes">Oui</option>
+              <option value="no">Non</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Souhaitez-vous une communication (newsletter + réseaux sociaux) ? *</span>
+            <select name="optComms" required>
+              <option value="">— Choisir —</option>
+              <option value="yes">Oui</option>
+              <option value="no">Non</option>
+            </select>
+          </label>
+        </div>
+
+        <!-- ✅ Nouvelle option AXES -->
+        <div style="margin-top:10px">
+          <div style="font-weight:700;font-size:.9rem;margin:0 0 6px">
+            Est-ce que votre publication/événement est rattachée à un axe thématique de recherche ?
+          </div>
+          <div class="checks">
+            <label class="check"><input type="checkbox" name="axisPICMAP" value="PICMAP"> PICMAP</label>
+            <label class="check"><input type="checkbox" name="axisMOPTIS" value="MOPTIS"> MOPTIS</label>
+            <label class="check"><input type="checkbox" name="axisOCSO" value="OCSO"> OCSO</label>
+          </div>
+          <div class="small-muted" style="margin-top:6px">Vous pouvez cocher plusieurs axes.</div>
+        </div>
+      </div>
+
+      <label>
+        <span>Extra</span>
+        <textarea name="extra" rows="4" placeholder="Infos internes, HAL, projet, axe, etc."></textarea>
+      </label>
+
+      <button type="submit">Envoyer vers Zotero</button>
+      <p id="pub-status" class="status"></p>
+
+      <footer>Les champs marqués d’un * sont obligatoires.</footer>
+    </form>
+
+    <footer class="site-footer">
+      <p>En cas de problème, n’hésite pas à contacter <a href="mailto:maximilien.petit@uvsq.fr">maximilien.petit@uvsq.fr</a></p>
+    </footer>
+  </div>
+
+  <script src="assets/app.js"></script>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+<script>
+  // Initialise le widget
+  if (window.netlifyIdentity) {
+    window.netlifyIdentity.on("init", (user) => {
+      // Si on arrive via un lien d'invitation / confirmation, Netlify met souvent un hash dans l’URL
+      // On ouvre le widget automatiquement pour permettre la création/validation.
+      if (!user) {
+        const h = window.location.hash || "";
+        if (h.includes("invite_token") || h.includes("confirmation_token") || h.includes("recovery_token")) {
+          window.netlifyIdentity.open();
+        }
+      }
+    });
+    window.netlifyIdentity.init();
   }
+</script>
+<script>
+  (function(){
+    var h = window.location.hash || "";
+    if (h.includes("invite_token=") || h.includes("confirmation_token=") || h.includes("recovery_token=") || h.includes("email_change_token=")) {
+      window.location.replace("/auth.html" + h);
+    }
+  })();
+</script>
 
-  /* Logo sous le titre */
-  body.page-index .hub-brand {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  body.page-index .hub-logo {
-    max-width: 100%;
-  }
-
-  body.page-index .hub-cards {
-    gap: 18px;
-    margin-top: 16px;
-  }
-}
+</body>
+</html>
