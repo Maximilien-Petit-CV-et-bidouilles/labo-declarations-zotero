@@ -2,246 +2,741 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <title>Déclarations – Conference Paper</title>
+  <title>LAREQUOI — Conference Paper</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
   <style>
     :root {
-      --bg:#f5f5f8; --card:#fff; --accent:#2c7be5;
-      --accent-soft:#e1ecff; --text:#222; --muted:#666; --border:#ddd;
-      --ok:#1b7c3a; --bad:#b32020;
-    }
-    *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text)}
-    .page{max-width:900px;margin:32px auto;padding:0 16px}
-    header{margin-bottom:18px}
-    h1{margin:0 0 6px;font-size:1.7rem;font-weight:650}
-    .subtitle{margin:0;color:var(--muted);font-size:.95rem}
-
-    .toplinks{margin-top:10px;font-size:.9rem;display:flex;flex-wrap:wrap;gap:10px}
-    .toplinks a{color:var(--accent);text-decoration:none;font-weight:600}
-    .toplinks a:hover{text-decoration:underline}
-
-    form{background:var(--card);padding:18px;border-radius:10px;border:1px solid var(--border)}
-    label{display:block;margin:0 0 10px;font-weight:600;font-size:.9rem}
-    label span{display:block;margin:0 0 3px}
-    input,select,textarea{
-      width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);
-      font:inherit;background:#fff
-    }
-    textarea{resize:vertical}
-
-    .two-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px 16px}
-
-    .authors{margin-top:6px}
-    .author-row{margin-bottom:10px}
-    .author-actions{display:flex;gap:10px;align-items:center;margin:8px 0 14px}
-    .btn{
-      border-radius:8px;border:1px solid var(--border);background:#fff;
-      padding:8px 12px;cursor:pointer;font-weight:650
-    }
-    .btn:hover{background:#fafafa}
-    .btn.primary{background:var(--accent-soft);border-color:var(--accent)}
-    .small-muted{color:var(--muted);font-size:.85rem;font-weight:500}
-
-    .checks{display:flex;gap:10px;flex-wrap:wrap}
-    .check{
-      display:inline-flex;gap:8px;align-items:center;
-      border:1px solid var(--border);background:#fff;border-radius:999px;
-      padding:7px 10px;font-weight:600;font-size:.88rem
-    }
-    .check input{width:auto}
-
-    button[type="submit"]{
-      margin-top:10px;background:var(--accent);border:1px solid var(--accent);
-      color:#fff;padding:10px 14px;border-radius:8px;cursor:pointer;font-weight:650
+      --bg:           #f7f5f1;
+      --page:         #ffffff;
+      --rule:         #d9d2c8;
+      --rule-dark:    #b8ae9e;
+      --text:         #1a1814;
+      --muted:        #6b6457;
+      --faint:        #a09890;
+      --accent:       #8b1a2a;
+      --accent-light: #f5e8eb;
+      --accent-mid:   #c94057;
+      --ink:          #2c2620;
+      --field-bg:     #faf9f7;
+      --ok:           #1a6b3c;
+      --bad:          #8b1a2a;
+      --shadow:       0 2px 12px rgba(26,24,20,.07);
+      --shadow-lg:    0 8px 32px rgba(26,24,20,.1);
     }
 
-    .status{margin-top:12px;font-size:.92rem;white-space:pre-wrap;color:var(--muted)}
-    .status.ok{color:var(--ok)}
-    .status.err{color:var(--bad)}
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    .section-title{margin:14px 0 8px;font-weight:750}
-    hr{border:0;border-top:1px solid var(--border);margin:14px 0}
+    body {
+      font-family: 'Source Sans 3', Georgia, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 15px;
+      line-height: 1.55;
+    }
+
+    /* ══ BANDEAU ══ */
+    .institution-bar {
+      background: var(--accent);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 40px;
+      height: 44px;
+      font-size: .73rem;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .institution-bar .labo-name {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: .78rem;
+      font-weight: 700;
+    }
+
+    .institution-bar .labo-name::before {
+      content: '';
+      display: block;
+      width: 22px;
+      height: 22px;
+      border: 2px solid rgba(255,255,255,.6);
+      border-radius: 3px;
+      background: rgba(255,255,255,.12);
+      flex-shrink: 0;
+    }
+
+    .institution-bar .tagline {
+      color: rgba(255,255,255,.65);
+      font-weight: 400;
+      font-size: .7rem;
+    }
+
+    /* ══ TOPNAV ══ */
+    .topnav {
+      background: var(--page);
+      border-bottom: 1px solid var(--rule);
+      display: flex;
+      align-items: stretch;
+      padding: 0 40px;
+      box-shadow: var(--shadow);
+    }
+
+    .topnav a {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 16px;
+      height: 46px;
+      font-size: .78rem;
+      font-weight: 600;
+      letter-spacing: .04em;
+      color: var(--muted);
+      text-decoration: none;
+      border-bottom: 2px solid transparent;
+      transition: color .15s, border-color .15s;
+      white-space: nowrap;
+    }
+
+    .topnav a:hover { color: var(--ink); border-bottom-color: var(--rule-dark); }
+    .topnav a.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .topnav a .icon { font-size: .9rem; opacity: .8; }
+
+    /* ══ LAYOUT ══ */
+    .wrap {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 48px 32px 80px;
+    }
+
+    /* ══ EN-TÊTE ══ */
+    .page-head {
+      margin-bottom: 36px;
+    }
+
+    .breadcrumb {
+      font-size: .72rem;
+      font-weight: 600;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--faint);
+      margin-bottom: 10px;
+    }
+
+    .breadcrumb span { color: var(--accent); }
+
+    h1 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 2.2rem;
+      font-weight: 400;
+      line-height: 1.15;
+      color: var(--ink);
+    }
+
+    h1 em { font-style: italic; color: var(--accent); }
+
+    .subtitle {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: .88rem;
+      font-weight: 300;
+      max-width: 600px;
+      line-height: 1.6;
+    }
+
+    .subtitle code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+      font-size: .85em;
+      padding: .1em .35em;
+      background: var(--field-bg);
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      color: var(--ink);
+    }
+
+    .page-rule {
+      margin-top: 20px;
+      height: 1px;
+      background: linear-gradient(90deg, var(--accent) 60px, var(--rule) 60px);
+    }
+
+    /* ══ FORMULAIRE ══ */
+    form {
+      background: var(--page);
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      box-shadow: var(--shadow-lg);
+    }
+
+    /* ══ SECTIONS DU FORM ══ */
+    .f-section {
+      padding: 26px 32px;
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .f-section:last-of-type { border-bottom: none; }
+
+    .f-section-head {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .f-section-num {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.5rem;
+      font-weight: 400;
+      color: var(--rule-dark);
+      line-height: 1;
+      min-width: 26px;
+    }
+
+    .f-section-title {
+      font-size: .68rem;
+      font-weight: 700;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* ══ LABELS & INPUTS ══ */
+    label {
+      display: block;
+      margin-bottom: 14px;
+      font-size: .84rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    label span {
+      display: block;
+      margin-bottom: 5px;
+      letter-spacing: .01em;
+      color: #374151;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 9px 12px;
+      background: var(--field-bg);
+      border: 1.5px solid var(--rule);
+      border-radius: 2px;
+      color: var(--text);
+      font-family: 'Source Sans 3', sans-serif;
+      font-size: .9rem;
+      transition: border-color .15s, box-shadow .15s, background .15s;
+      appearance: none;
+    }
+
+    input::placeholder, textarea::placeholder {
+      color: var(--faint);
+      font-weight: 300;
+      font-style: italic;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      background: #fff;
+      border-color: var(--accent-mid);
+      box-shadow: 0 0 0 3px rgba(139,26,42,.08);
+    }
+
+    textarea { resize: vertical; }
+
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23a09890' d='M5 6L0 0h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 34px;
+      cursor: pointer;
+    }
+
+    .two-cols {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0 20px;
+    }
+
+    /* ══ AUTEURS ══ */
+    .authors-label {
+      font-size: .68rem;
+      font-weight: 700;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    /* Généré par conference.js */
+    .author-row {
+      background: var(--field-bg);
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      padding: 12px;
+      margin-bottom: 8px;
+      transition: border-color .15s;
+    }
+
+    .author-row:hover { border-color: var(--rule-dark); }
+
+    .author-actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin: 6px 0 4px;
+    }
+
+    /* Bouton "Ajouter un auteur" — id="add-author", class="btn primary" */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border: 1px solid var(--rule-dark);
+      border-radius: 2px;
+      background: var(--page);
+      color: var(--muted);
+      font-family: 'Source Sans 3', sans-serif;
+      font-size: .78rem;
+      font-weight: 600;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all .15s;
+    }
+
+    .btn:hover {
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    .btn.primary {
+      border-color: var(--accent-mid);
+      background: var(--accent-light);
+      color: var(--accent);
+    }
+
+    .btn.primary:hover {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .small-muted {
+      color: var(--faint);
+      font-size: .78rem;
+      font-style: italic;
+    }
+
+    /* ══ OPTIONS BLOCK ══ */
+    .opts-wrap {
+      background: var(--bg);
+      border: 1px solid var(--rule);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 2px 2px 0;
+      padding: 20px 24px;
+      margin: 4px 0;
+    }
+
+    .opts-wrap-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 1rem;
+      font-weight: 400;
+      color: var(--ink);
+      margin-bottom: 4px;
+    }
+
+    .opts-wrap-sub {
+      font-size: .8rem;
+      color: var(--faint);
+      font-style: italic;
+      margin-bottom: 18px;
+    }
+
+    /* ══ AXES ══ */
+    .checks {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .check {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 14px;
+      border: 1px solid var(--rule-dark);
+      border-radius: 2px;
+      background: var(--page);
+      font-family: 'Source Sans 3', sans-serif;
+      font-weight: 700;
+      font-size: .76rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      user-select: none;
+      color: var(--muted);
+      transition: all .15s;
+    }
+
+    .check:hover {
+      border-color: var(--accent);
+      background: var(--accent-light);
+      color: var(--accent);
+    }
+
+    .check input {
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      padding: 0;
+      accent-color: var(--accent);
+      background: none;
+      border: none;
+      box-shadow: none;
+    }
+
+    .check input:focus { border-color: transparent; box-shadow: none; }
+
+    /* ══ TEX SECTION ══ */
+    .tex-label {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+      font-size: .8rem;
+      color: var(--muted);
+      font-weight: 400;
+      letter-spacing: .01em;
+      text-transform: none;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+      font-size: .85em;
+      padding: .1em .35em;
+      background: var(--field-bg);
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      color: var(--ink);
+    }
+
+    /* ══ SUBMIT ══ */
+    .submit-section {
+      padding: 22px 32px;
+      background: var(--bg);
+      border-top: 1px solid var(--rule);
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+
+    button[type="submit"] {
+      padding: 11px 28px;
+      background: var(--accent);
+      border: none;
+      border-radius: 2px;
+      color: #fff;
+      font-family: 'Source Sans 3', sans-serif;
+      font-size: .82rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background .15s, box-shadow .15s;
+    }
+
+    button[type="submit"]:hover {
+      background: #6d1421;
+      box-shadow: 0 4px 14px rgba(139,26,42,.3);
+    }
+
+    button[type="submit"]:active { opacity: .88; }
+    button[type="submit"]:disabled { opacity: .45; cursor: default; }
+
+    /* ══ STATUS ══ */
+    .status {
+      font-size: .85rem;
+      font-style: italic;
+      white-space: pre-wrap;
+      min-height: 1.3em;
+      color: var(--muted);
+    }
+
+    .status.ok  { color: var(--ok); font-style: normal; font-weight: 600; }
+    .status.err { color: var(--bad); font-style: normal; font-weight: 600; }
+
+    /* ══ ANIMATIONS ══ */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .institution-bar { animation: fadeIn .3s ease both; }
+    .topnav          { animation: fadeIn .3s ease .05s both; }
+    .page-head       { animation: fadeIn .35s ease .1s both; }
+    form             { animation: fadeIn .35s ease .15s both; }
+
+    /* ══ RESPONSIVE ══ */
+    @media (max-width: 680px) {
+      .institution-bar { padding: 0 16px; }
+      .institution-bar .tagline { display: none; }
+      .topnav { padding: 0 12px; overflow-x: auto; }
+      .wrap { padding: 24px 14px 60px; }
+      h1 { font-size: 1.8rem; }
+      .f-section { padding: 18px 16px; }
+      .submit-section { padding: 16px; }
+    }
   </style>
-
-  <link rel="stylesheet" href="/assets/ui.css">
 </head>
 
 <body>
-  <div class="page">
-    <header>
-      <h1>Déclaration — Conference Paper</h1>
-      <p class="subtitle">Ce formulaire crée une notice <b>Conference Paper</b> dans Zotero (+ options HAL/communication + axes + champs <code>tex.*</code> dans Extra).</p>
 
-      <div class="toplinks">
-        <span>↩️ <a href="/index.html">Nouvelle publication</a></span>
-        <span>📥 <a href="/import.html">Import par lot</a></span>
-        <span>📊 <a href="/suivi.html" target="_blank" rel="noopener noreferrer">Suivi</a></span>
-        <span>🧾 <a href="/cv.html" target="_blank" rel="noopener noreferrer">CV</a></span>
-        <span>🔐 <a href="/admin.html" target="_blank" rel="noopener noreferrer">Admin</a></span>
-      </div>
-    </header>
-
-    <form id="conference-form">
-      <label>
-        <span>Title *</span>
-        <input name="title" required>
-      </label>
-
-      <div class="section-title">Author(s) *</div>
-      <div class="authors" id="authors-list"></div>
-      <div class="author-actions">
-        <button type="button" class="btn primary" id="add-author">+ Ajouter un auteur</button>
-        <div class="small-muted">Au moins un auteur (Nom requis).</div>
-      </div>
-
-      <div class="two-cols">
-        <label>
-          <span>Conference Name *</span>
-          <input name="conferenceName" required>
-        </label>
-        <label>
-          <span>Date *</span>
-          <input name="date" placeholder="2015 ou 2015-06-15" required>
-        </label>
-      </div>
-
-      <div class="two-cols">
-        <label>
-          <span>Publisher</span>
-          <input name="publisher">
-        </label>
-        <label>
-          <span>Place</span>
-          <input name="place">
-        </label>
-      </div>
-
-      <label>
-        <span>Language</span>
-        <input name="language" placeholder="fr / en">
-      </label>
-
-      <hr>
-
-      <div class="section-title">Options *</div>
-      <div class="two-cols">
-        <label>
-          <span>Souhaitez-vous la création d’une notice sur HAL ? *</span>
-          <select name="optHal" required>
-            <option value="">—</option>
-            <option value="yes">Oui</option>
-            <option value="no">Non</option>
-          </select>
-        </label>
-
-        <label>
-          <span>Souhaitez-vous une communication (newsletter + réseaux sociaux) ? *</span>
-          <select name="optComms" required>
-            <option value="">—</option>
-            <option value="yes">Oui</option>
-            <option value="no">Non</option>
-          </select>
-        </label>
-      </div>
-
-      <div style="margin-top:10px">
-        <div style="font-weight:700;font-size:.9rem;margin:0 0 6px">
-          Est-ce que votre publication/événement est rattachée à un axe thématique de recherche ?
-        </div>
-        <div class="checks">
-          <label class="check"><input type="checkbox" name="axisPICMAP" value="PICMAP"> PICMAP</label>
-          <label class="check"><input type="checkbox" name="axisMOPTIS" value="MOPTIS"> MOPTIS</label>
-          <label class="check"><input type="checkbox" name="axisOCSO" value="OCSO"> OCSO</label>
-        </div>
-        <div class="small-muted" style="margin-top:6px">Vous pouvez cocher plusieurs axes.</div>
-      </div>
-
-      <hr>
-
-      <div class="section-title">Champs <code>tex.*</code> (stockés dans “Extra”)</div>
-
-      <div class="two-cols">
-        <label>
-          <span>tex.conferencestartdate</span>
-          <input name="tex_conferencestartdate" placeholder="2015-06-01">
-        </label>
-        <label>
-          <span>tex.conferenceenddate</span>
-          <input name="tex_conferenceenddate" placeholder="2015-06-03">
-        </label>
-      </div>
-
-      <label>
-        <span>tex.conferenceorganizer</span>
-        <input name="tex_conferenceorganizer">
-      </label>
-
-      <div class="two-cols">
-        <label>
-          <span>tex.x-audience</span>
-          <input name="tex_x_audience" value="Not set">
-        </label>
-        <label>
-          <span>tex.x-language</span>
-          <input name="tex_x_language" placeholder="fr / en">
-        </label>
-      </div>
-
-      <div class="two-cols">
-        <label>
-          <span>tex.x-invitedcommunication</span>
-          <select name="tex_x_invitedcommunication">
-            <option value="">—</option>
-            <option value="Yes">Yes</option>
-            <option value="No">No</option>
-          </select>
-        </label>
-
-        <label>
-          <span>tex.x-peerreviewing</span>
-          <select name="tex_x_peerreviewing">
-            <option value="">—</option>
-            <option value="Yes">Yes</option>
-            <option value="No">No</option>
-          </select>
-        </label>
-      </div>
-
-      <div class="two-cols">
-        <label>
-          <span>tex.x-popularlevel</span>
-          <select name="tex_x_popularlevel">
-            <option value="">—</option>
-            <option value="Yes">Yes</option>
-            <option value="No">No</option>
-          </select>
-        </label>
-
-        <label>
-          <span>tex.x-proceedings</span>
-          <select name="tex_x_proceedings">
-            <option value="">—</option>
-            <option value="Yes">Yes</option>
-            <option value="No">No</option>
-          </select>
-        </label>
-      </div>
-
-      <hr>
-
-      <label>
-        <span>Extra (texte libre)</span>
-        <textarea name="extra" rows="4" placeholder="Infos internes… (sera conservé puis complété automatiquement)"></textarea>
-      </label>
-
-      <button type="submit" id="submitBtn">Envoyer vers Zotero</button>
-      <div class="status" id="status"></div>
-    </form>
+  <!-- BANDEAU INSTITUTIONNEL -->
+  <div class="institution-bar">
+    <div class="labo-name">
+      LAREQUOI
+      <span style="font-weight:300;opacity:.7">·</span>
+      <span style="font-weight:400;opacity:.8;letter-spacing:.03em">Laboratoire de Recherche en Management</span>
+    </div>
+    <span class="tagline">Université Paris-Saclay · UVSQ</span>
   </div>
 
+  <!-- NAVIGATION -->
+  <nav class="topnav">
+    <a href="/index.html"><span class="icon">📄</span> Publication</a>
+    <a href="/conference.html" class="active"><span class="icon">🎤</span> Conférence</a>
+    <a href="/import.html"><span class="icon">📥</span> Import CSV</a>
+    <a href="/cv.html" target="_blank" rel="noopener noreferrer"><span class="icon">🧾</span> CV</a>
+    <a href="/suivi.html" target="_blank" rel="noopener noreferrer"><span class="icon">📊</span> Suivi</a>
+  </nav>
+
+  <div class="wrap">
+
+    <!-- EN-TÊTE -->
+    <div class="page-head">
+      <p class="breadcrumb">LAREQUOI · Zotero · <span>Conference Paper</span></p>
+      <h1>Déclarer une <em>communication</em></h1>
+      <p class="subtitle">
+        Ce formulaire crée une notice <code>Conference Paper</code> dans Zotero,
+        avec les options HAL / communication, les axes thématiques
+        et les champs <code>tex.*</code> stockés dans le champ Extra.
+      </p>
+      <div class="page-rule"></div>
+    </div>
+
+    <!-- FORMULAIRE -->
+    <form id="conference-form">
+
+      <!-- § I — Titre -->
+      <div class="f-section">
+        <div class="f-section-head">
+          <span class="f-section-num">I.</span>
+          <span class="f-section-title">Identification</span>
+        </div>
+
+        <label>
+          <span>Title *</span>
+          <input name="title" required placeholder="Titre de la communication">
+        </label>
+      </div>
+
+      <!-- § II — Auteurs -->
+      <div class="f-section">
+        <div class="f-section-head">
+          <span class="f-section-num">II.</span>
+          <span class="f-section-title">Auteur(s) *</span>
+        </div>
+
+        <div class="authors-label">Liste des auteurs</div>
+        <div class="authors" id="authors-list"></div>
+        <div class="author-actions">
+          <button type="button" class="btn primary" id="add-author">+ Ajouter un auteur</button>
+          <div class="small-muted">Au moins un auteur — Nom requis.</div>
+        </div>
+      </div>
+
+      <!-- § III — Informations bibliographiques -->
+      <div class="f-section">
+        <div class="f-section-head">
+          <span class="f-section-num">III.</span>
+          <span class="f-section-title">Informations bibliographiques</span>
+        </div>
+
+        <div class="two-cols">
+          <label>
+            <span>Conference Name *</span>
+            <input name="conferenceName" required placeholder="Nom de la conférence">
+          </label>
+          <label>
+            <span>Date *</span>
+            <input name="date" placeholder="2015 ou 2015-06-15" required>
+          </label>
+        </div>
+
+        <div class="two-cols">
+          <label>
+            <span>Publisher</span>
+            <input name="publisher">
+          </label>
+          <label>
+            <span>Place</span>
+            <input name="place">
+          </label>
+        </div>
+
+        <label>
+          <span>Language</span>
+          <input name="language" placeholder="fr / en">
+        </label>
+      </div>
+
+      <!-- § IV — Options HAL / Communication / Axes -->
+      <div class="f-section">
+        <div class="f-section-head">
+          <span class="f-section-num">IV.</span>
+          <span class="f-section-title">Options de traitement *</span>
+        </div>
+
+        <div class="opts-wrap">
+          <div class="opts-wrap-title">Dépôt HAL &amp; Communication</div>
+          <p class="opts-wrap-sub">Ces réponses seront enregistrées dans le champ "Extra" de la notice Zotero.</p>
+
+          <div class="two-cols">
+            <label>
+              <span>Souhaitez-vous la création d'une notice sur HAL ? *</span>
+              <select name="optHal" required>
+                <option value="">— Choisir —</option>
+                <option value="yes">Oui</option>
+                <option value="no">Non</option>
+              </select>
+            </label>
+            <label>
+              <span>Souhaitez-vous une communication (newsletter + réseaux sociaux) ? *</span>
+              <select name="optComms" required>
+                <option value="">— Choisir —</option>
+                <option value="yes">Oui</option>
+                <option value="no">Non</option>
+              </select>
+            </label>
+          </div>
+
+          <div style="margin-top:20px">
+            <div style="font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">
+              Rattachement aux axes thématiques
+            </div>
+            <div class="checks">
+              <label class="check"><input type="checkbox" name="axisPICMAP" value="PICMAP"> PICMAP</label>
+              <label class="check"><input type="checkbox" name="axisMOPTIS" value="MOPTIS"> MOPTIS</label>
+              <label class="check"><input type="checkbox" name="axisOCSO" value="OCSO"> OCSO</label>
+            </div>
+            <div class="small-muted" style="margin-top:8px">Plusieurs axes peuvent être cochés simultanément.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- § V — Champs tex.* -->
+      <div class="f-section">
+        <div class="f-section-head">
+          <span class="f-section-num">V.</span>
+          <span class="f-section-title">Champs <code style="font-size:.75rem;text-transform:none;letter-spacing:0">tex.*</code> — stockés dans Extra</span>
+        </div>
+
+        <div class="two-cols">
+          <label>
+            <span class="tex-label">tex.conferencestartdate</span>
+            <input name="tex_conferencestartdate" placeholder="2015-06-01">
+          </label>
+          <label>
+            <span class="tex-label">tex.conferenceenddate</span>
+            <input name="tex_conferenceenddate" placeholder="2015-06-03">
+          </label>
+        </div>
+
+        <label>
+          <span class="tex-label">tex.conferenceorganizer</span>
+          <input name="tex_conferenceorganizer">
+        </label>
+
+        <div class="two-cols">
+          <label>
+            <span class="tex-label">tex.x-audience</span>
+            <input name="tex_x_audience" value="Not set">
+          </label>
+          <label>
+            <span class="tex-label">tex.x-language</span>
+            <input name="tex_x_language" placeholder="fr / en">
+          </label>
+        </div>
+
+        <div class="two-cols">
+          <label>
+            <span class="tex-label">tex.x-invitedcommunication</span>
+            <select name="tex_x_invitedcommunication">
+              <option value="">—</option>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </label>
+          <label>
+            <span class="tex-label">tex.x-peerreviewing</span>
+            <select name="tex_x_peerreviewing">
+              <option value="">—</option>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="two-cols">
+          <label>
+            <span class="tex-label">tex.x-popularlevel</span>
+            <select name="tex_x_popularlevel">
+              <option value="">—</option>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </label>
+          <label>
+            <span class="tex-label">tex.x-proceedings</span>
+            <select name="tex_x_proceedings">
+              <option value="">—</option>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <!-- § VI — Extra -->
+      <div class="f-section">
+        <div class="f-section-head">
+          <span class="f-section-num">VI.</span>
+          <span class="f-section-title">Informations complémentaires</span>
+        </div>
+
+        <label>
+          <textarea name="extra" rows="4" placeholder="Informations internes… (sera conservé puis complété automatiquement)"></textarea>
+        </label>
+      </div>
+
+      <!-- SUBMIT -->
+      <div class="submit-section">
+        <button type="submit" id="submitBtn">Envoyer vers Zotero</button>
+        <div class="status" id="status"></div>
+      </div>
+
+    </form>
+
+  </div><!-- /wrap -->
+
   <script src="/assets/conference.js"></script>
+
 </body>
 </html>
-
