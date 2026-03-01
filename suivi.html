@@ -3,128 +3,555 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Suivi des demandes (HAL / Communication)</title>
+  <title>LAREQUOI — Suivi des demandes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
   <style>
-    :root{
-      --bg:#f5f5f8; --card:#fff; --text:#222; --muted:#666; --border:#ddd;
-      --accent:#2c7be5; --ok:#1b7c3a; --warn:#b26a00; --bad:#b32020;
-      --chip:#f2f6ff; --chip-border:#cfe0ff;
+    :root {
+      --bg:           #f7f5f1;
+      --page:         #ffffff;
+      --rule:         #d9d2c8;
+      --rule-dark:    #b8ae9e;
+      --text:         #1a1814;
+      --muted:        #6b6457;
+      --faint:        #a09890;
+      --accent:       #8b1a2a;
+      --accent-light: #f5e8eb;
+      --accent-mid:   #c94057;
+      --ink:          #2c2620;
+      --field-bg:     #faf9f7;
+      --ok:           #1a6b3c;
+      --ok-bg:        rgba(26,107,60,.08);
+      --ok-border:    rgba(26,107,60,.3);
+      --warn:         #7a4f00;
+      --warn-bg:      rgba(122,79,0,.08);
+      --warn-border:  rgba(122,79,0,.3);
+      --bad:          #8b1a2a;
+      --bad-bg:       rgba(139,26,42,.08);
+      --bad-border:   rgba(139,26,42,.3);
+      --chip-bg:      #eef2fb;
+      --chip-border:  #c5d1f0;
+      --chip-text:    #1d3c76;
+      --shadow:       0 2px 12px rgba(26,24,20,.07);
+      --shadow-lg:    0 8px 32px rgba(26,24,20,.1);
     }
-    *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--text)}
-    .wrap{max-width:1100px;margin:28px auto;padding:0 16px}
-    header{display:flex;gap:14px;align-items:flex-end;justify-content:space-between;flex-wrap:wrap}
-    h1{margin:0;font-size:1.45rem}
-    .sub{margin:6px 0 0;color:var(--muted);font-size:.92rem}
-    .pill{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#fff;font-size:.85rem;color:var(--muted)}
-    .bar{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px}
 
-    /* 5 colonnes de filtres */
-    .controls{display:grid;grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr;gap:10px}
-    @media (max-width: 1100px){ .controls{grid-template-columns:1fr 1fr 1fr} }
-    @media (max-width: 800px){ .controls{grid-template-columns:1fr 1fr} }
-    @media (max-width: 520px){ .controls{grid-template-columns:1fr} }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    input,select,button{
-      font:inherit;padding:9px 10px;border-radius:10px;border:1px solid var(--border);background:#fff
+    body {
+      font-family: 'Source Sans 3', Georgia, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 15px;
+      line-height: 1.5;
     }
-    button{cursor:pointer}
-    button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:650}
-    button.ghost{background:#fff}
-    .stats{display:flex;gap:10px;flex-wrap:wrap}
-    .stat{min-width:160px}
-    .stat b{display:block;font-size:1.05rem}
-    .stat span{color:var(--muted);font-size:.85rem}
 
-    .charts{
-      display:grid;
+    /* ══ BANDEAU ══ */
+    .institution-bar {
+      background: var(--accent);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 40px;
+      height: 44px;
+      font-size: .73rem;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .institution-bar .labo-name {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: .78rem;
+      font-weight: 700;
+    }
+
+    .institution-bar .labo-name::before {
+      content: '';
+      display: block;
+      width: 22px;
+      height: 22px;
+      border: 2px solid rgba(255,255,255,.6);
+      border-radius: 3px;
+      background: rgba(255,255,255,.12);
+      flex-shrink: 0;
+    }
+
+    .institution-bar .tagline {
+      color: rgba(255,255,255,.65);
+      font-weight: 400;
+      font-size: .7rem;
+    }
+
+    /* ══ TOPNAV ══ */
+    .topnav {
+      background: var(--page);
+      border-bottom: 1px solid var(--rule);
+      display: flex;
+      align-items: stretch;
+      padding: 0 40px;
+      box-shadow: var(--shadow);
+    }
+
+    .topnav a {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 16px;
+      height: 46px;
+      font-size: .78rem;
+      font-weight: 600;
+      letter-spacing: .04em;
+      color: var(--muted);
+      text-decoration: none;
+      border-bottom: 2px solid transparent;
+      transition: color .15s, border-color .15s;
+      white-space: nowrap;
+    }
+
+    .topnav a:hover { color: var(--ink); border-bottom-color: var(--rule-dark); }
+    .topnav a.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .topnav a .icon { font-size: .9rem; opacity: .8; }
+
+    /* ══ LAYOUT ══ */
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 48px 32px 80px;
+    }
+
+    /* ══ EN-TÊTE ══ */
+    .page-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-bottom: 36px;
+    }
+
+    .page-head-left .breadcrumb {
+      font-size: .72rem;
+      font-weight: 600;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--faint);
+      margin-bottom: 10px;
+    }
+
+    .page-head-left .breadcrumb span { color: var(--accent); }
+
+    h1 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 2.2rem;
+      font-weight: 400;
+      line-height: 1.15;
+      color: var(--ink);
+    }
+
+    h1 em { font-style: italic; color: var(--accent); }
+
+    .sub {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: .88rem;
+      font-weight: 300;
+      max-width: 580px;
+    }
+
+    .page-rule {
+      margin-top: 20px;
+      height: 1px;
+      background: linear-gradient(90deg, var(--accent) 60px, var(--rule) 60px);
+    }
+
+    /* Pill "dernière mise à jour" */
+    #lastUpdate {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      background: var(--page);
+      font-size: .78rem;
+      color: var(--muted);
+      font-weight: 500;
+      white-space: nowrap;
+      box-shadow: var(--shadow);
+      align-self: flex-start;
+    }
+
+    /* ══ BLOC CONTROLES ══ */
+    .controls-block {
+      background: var(--page);
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      box-shadow: var(--shadow-lg);
+      margin-bottom: 20px;
+    }
+
+    .controls-block-head {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--rule);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .controls-block-title {
+      font-size: .68rem;
+      font-weight: 700;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--faint);
+    }
+
+    .controls-block-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .controls-inner {
+      padding: 16px 24px;
+    }
+
+    /* filtres en grille */
+    .controls {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+      gap: 10px;
+      align-items: end;
+    }
+
+    @media (max-width: 1100px) { .controls { grid-template-columns: 1fr 1fr 1fr; } }
+    @media (max-width: 740px)  { .controls { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 480px)  { .controls { grid-template-columns: 1fr; } }
+
+    /* ══ INPUTS ══ */
+    input, select, button {
+      font-family: 'Source Sans 3', sans-serif;
+      font-size: .88rem;
+      padding: 9px 12px;
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      background: var(--field-bg);
+      color: var(--text);
+      transition: border-color .15s, box-shadow .15s;
+      appearance: none;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent-mid);
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(139,26,42,.08);
+    }
+
+    input::placeholder { color: var(--faint); font-style: italic; font-weight: 300; }
+
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23a09890' d='M5 6L0 0h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 11px center;
+      padding-right: 32px;
+      cursor: pointer;
+    }
+
+    button { cursor: pointer; font-weight: 600; }
+
+    button.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+      letter-spacing: .04em;
+      transition: background .15s, box-shadow .15s;
+    }
+
+    button.primary:hover {
+      background: #6d1421;
+      box-shadow: 0 4px 14px rgba(139,26,42,.25);
+    }
+
+    button.ghost {
+      background: var(--page);
+      color: var(--muted);
+      border-color: var(--rule-dark);
+    }
+
+    button.ghost:hover { background: var(--bg); color: var(--ink); }
+    button:disabled { opacity: .4; cursor: default; }
+
+    /* ══ STATUS LINE ══ */
+    .statusline {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: .84rem;
+      font-style: italic;
+      white-space: pre-wrap;
+      min-height: 1.3em;
+    }
+
+    /* ══ STATS ══ */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 0;
+      border-top: 1px solid var(--rule);
+      border-left: 1px solid var(--rule);
+    }
+
+    .stat {
+      padding: 18px 20px;
+      border-right: 1px solid var(--rule);
+      border-bottom: 1px solid var(--rule);
+      background: var(--page);
+    }
+
+    .stat b {
+      display: block;
+      font-family: 'Playfair Display', serif;
+      font-size: 1.9rem;
+      font-weight: 400;
+      color: var(--ink);
+      line-height: 1.1;
+      margin-bottom: 4px;
+    }
+
+    .stat span {
+      font-size: .76rem;
+      color: var(--faint);
+      font-weight: 500;
+      letter-spacing: .02em;
+      line-height: 1.3;
+    }
+
+    /* ══ GRAPHIQUES ══ */
+    .charts {
+      display: grid;
       grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap:10px;
-      margin-top:12px;
-    }
-    .chartCard{
-      background:#fff;
-      border:1px solid var(--border);
-      border-radius:12px;
-      padding:10px;
-    }
-    .chartTitle{
-      margin:0 0 8px;
-      font-size:.9rem;
-      color:var(--muted);
-      font-weight:650;
-    }
-    .chartWrap{position:relative; height:210px;}
-    @media (max-width: 520px){ .chartWrap{height:190px;} }
-
-    table{width:100%;border-collapse:separate;border-spacing:0;margin-top:12px}
-    th,td{padding:10px 10px;border-bottom:1px solid var(--border);vertical-align:top}
-    th{font-size:.82rem;color:var(--muted);text-align:left;white-space:nowrap}
-    td{font-size:.92rem}
-    .title a{color:inherit;text-decoration:none}
-    .title a:hover{text-decoration:underline}
-    .muted{color:var(--muted)}
-    .tag{
-      display:inline-flex;align-items:center;gap:6px;
-      padding:4px 8px;border-radius:999px;border:1px solid var(--border);
-      font-size:.82rem;background:#fff;white-space:nowrap
-    }
-    .tag.ok{border-color:rgba(27,124,58,.35);background:rgba(27,124,58,.08);color:var(--ok)}
-    .tag.warn{border-color:rgba(178,106,0,.35);background:rgba(178,106,0,.08);color:var(--warn)}
-    .tag.bad{border-color:rgba(179,32,32,.35);background:rgba(179,32,32,.08);color:var(--bad)}
-    .mini{font-size:.82rem}
-    .right{white-space:nowrap}
-
-    /* Axes chips */
-    .axes{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-    .chip{
-      display:inline-flex;align-items:center;padding:3px 8px;border-radius:999px;
-      border:1px solid var(--chip-border);background:var(--chip);
-      font-size:.78rem;font-weight:650;color:#1d3c76;white-space:nowrap;
+      gap: 0;
+      border-top: 1px solid var(--rule);
     }
 
-    /* Auteurs: on évite de déformer la page */
-    td.auth{
-      max-width: 240px;
-      word-break: break-word;
-    }
-    .authClamp{
-      display:block;
-      overflow:hidden;
-      text-overflow:ellipsis;
+    .chartCard {
+      background: var(--page);
+      border-right: 1px solid var(--rule);
+      border-bottom: 1px solid var(--rule);
+      padding: 18px 20px;
     }
 
-    .statusline{margin-top:10px;color:var(--muted);font-size:.9rem;white-space:pre-wrap}
-    .loading{display:inline-flex;gap:8px;align-items:center}
-    .dot{width:8px;height:8px;border-radius:99px;background:var(--accent);display:inline-block;animation:pulse 1s infinite ease-in-out}
-    .dot:nth-child(2){animation-delay:.15s}
-    .dot:nth-child(3){animation-delay:.3s}
-    @keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
+    .chartCard:last-child { border-right: none; }
 
-    /* Pagination */
-    .pager_allowwrap {display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:10px}
-    .pager_side {display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .chartTitle {
+      font-size: .68rem;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--faint);
+      margin-bottom: 12px;
+    }
+
+    .chartWrap { position: relative; height: 200px; }
+
+    @media (max-width: 520px) { .chartWrap { height: 170px; } }
+
+    /* ══ PAGINATION ══ */
+    .pager-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 14px 24px;
+      border-top: 1px solid var(--rule);
+      background: var(--bg);
+    }
+
+    .pager_allowwrap { display: contents; }
+    .pager_side { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+    /* ══ TABLE ══ */
+    .table-wrap {
+      background: var(--page);
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      box-shadow: var(--shadow-lg);
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+
+    thead {
+      background: var(--bg);
+      border-bottom: 2px solid var(--rule);
+    }
+
+    th {
+      padding: 11px 14px;
+      font-size: .67rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--faint);
+      text-align: left;
+      white-space: nowrap;
+      border-bottom: 1px solid var(--rule);
+    }
+
+    th:first-child { border-left: 3px solid var(--accent); }
+
+    td {
+      padding: 12px 14px;
+      font-size: .88rem;
+      border-bottom: 1px solid var(--rule);
+      vertical-align: top;
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+
+    tbody tr:hover td { background: #faf8f5; }
+
+    .title a { color: inherit; text-decoration: none; }
+    .title a:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+
+    .muted { color: var(--muted); }
+    .right { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+    /* ══ TAGS ══ */
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 9px;
+      border-radius: 2px;
+      border: 1px solid var(--rule);
+      font-size: .76rem;
+      font-weight: 600;
+      background: var(--page);
+      white-space: nowrap;
+      letter-spacing: .02em;
+    }
+
+    .tag.ok   { border-color: var(--ok-border);   background: var(--ok-bg);   color: var(--ok); }
+    .tag.warn { border-color: var(--warn-border);  background: var(--warn-bg); color: var(--warn); }
+    .tag.bad  { border-color: var(--bad-border);   background: var(--bad-bg);  color: var(--bad); }
+
+    /* ══ AXES CHIPS ══ */
+    .axes { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 2px;
+      border: 1px solid var(--chip-border);
+      background: var(--chip-bg);
+      font-size: .72rem;
+      font-weight: 700;
+      color: var(--chip-text);
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    /* ══ AUTEURS ══ */
+    td.auth { max-width: 220px; word-break: break-word; }
+    .authClamp { display: block; overflow: hidden; text-overflow: ellipsis; }
+
+    /* ══ MINI ══ */
+    .mini { font-size: .8rem; color: var(--muted); margin-top: 3px; }
+
+    /* ══ LOADING ══ */
+    .loading { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-style: italic; }
+    .dot { width: 7px; height: 7px; border-radius: 99px; background: var(--accent); display: inline-block; animation: pulse 1s infinite ease-in-out; }
+    .dot:nth-child(2) { animation-delay: .15s; }
+    .dot:nth-child(3) { animation-delay: .3s; }
+
+    @keyframes pulse { 0%,100%{opacity:.2} 50%{opacity:1} }
+
+    /* ══ ANIMATIONS ══ */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .institution-bar { animation: fadeIn .3s ease both; }
+    .topnav          { animation: fadeIn .3s ease .05s both; }
+    .page-head       { animation: fadeIn .35s ease .1s both; }
+    .controls-block  { animation: fadeIn .35s ease .15s both; }
+    .table-wrap      { animation: fadeIn .35s ease .2s both; }
+
+    /* ══ RESPONSIVE ══ */
+    @media (max-width: 680px) {
+      .institution-bar { padding: 0 16px; }
+      .institution-bar .tagline { display: none; }
+      .topnav { padding: 0 12px; overflow-x: auto; }
+      .wrap { padding: 24px 14px 60px; }
+      h1 { font-size: 1.8rem; }
+    }
   </style>
-
-  <link rel="stylesheet" href="/assets/ui.css">
 </head>
-<body>
-  <div class="wrap">
-    <header>
-      <div>
-        <h1>Suivi public — HAL & Communication</h1>
-        <p class="sub">
-          Ce tableau montre les demandes issues des déclarations (Zotero) et l’état de traitement par le laboratoire.
-        </p>
-      </div>
-      <div class="pill" id="lastUpdate">Chargement…</div>
-    </header>
 
-    <div class="bar">
-      <div class="card" style="flex:1;min-width:260px">
+<body>
+
+  <!-- BANDEAU INSTITUTIONNEL -->
+  <div class="institution-bar">
+    <div class="labo-name">
+      LAREQUOI
+      <span style="font-weight:300;opacity:.7">·</span>
+      <span style="font-weight:400;opacity:.8;letter-spacing:.03em">Laboratoire de Recherche en Management</span>
+    </div>
+    <span class="tagline">Université Paris-Saclay · UVSQ</span>
+  </div>
+
+  <!-- NAVIGATION -->
+  <nav class="topnav">
+    <a href="/index.html"><span class="icon">📄</span> Publication</a>
+    <a href="/conference.html"><span class="icon">🎤</span> Conférence</a>
+    <a href="/import.html"><span class="icon">📥</span> Import CSV</a>
+    <a href="/cv.html" target="_blank" rel="noopener noreferrer"><span class="icon">🧾</span> CV</a>
+    <a href="/suivi.html" class="active"><span class="icon">📊</span> Suivi</a>
+  </nav>
+
+  <div class="wrap">
+
+    <!-- EN-TÊTE -->
+    <div class="page-head">
+      <div class="page-head-left">
+        <p class="breadcrumb">LAREQUOI · Zotero · <span>Suivi public</span></p>
+        <h1>Suivi — HAL &amp; <em>Communication</em></h1>
+        <p class="sub">Ce tableau présente les demandes issues des déclarations et l'état de traitement par le laboratoire.</p>
+        <div class="page-rule"></div>
+      </div>
+      <div id="lastUpdate">Chargement…</div>
+    </div>
+
+    <!-- CONTRÔLES -->
+    <div class="controls-block">
+
+      <div class="controls-block-head">
+        <span class="controls-block-title">Filtres &amp; Recherche</span>
+        <div class="controls-block-actions">
+          <button class="ghost" id="reset">Réinitialiser</button>
+          <button class="primary" id="refresh">Rafraîchir</button>
+        </div>
+      </div>
+
+      <div class="controls-inner">
         <div class="controls">
-          <input id="q" type="search" placeholder="Rechercher (titre, auteur, revue, conférence, axes, éditeur, ISBN, DOI…)" />
+          <input id="q" type="search" placeholder="Rechercher (titre, auteur, revue, axes, DOI…)" />
           <select id="filterType">
             <option value="all">Tous types</option>
             <option value="book">Livres</option>
@@ -138,8 +565,6 @@
             <option value="halYes">HAL demandé</option>
             <option value="commsYes">Com demandé</option>
           </select>
-
-          <!-- Filtre Axe -->
           <select id="filterAxis">
             <option value="all">Tous axes</option>
             <option value="PICMAP">PICMAP</option>
@@ -147,56 +572,60 @@
             <option value="OCSO">OCSO</option>
             <option value="none">Sans axe</option>
           </select>
-
           <select id="filterYear">
             <option value="all">Toutes années</option>
           </select>
-
-          <button class="ghost" id="reset">Réinitialiser</button>
-          <button class="primary" id="refresh">Rafraîchir</button>
         </div>
 
         <div class="statusline" id="msg"></div>
+      </div>
 
-        <div class="stats" style="margin-top:12px">
-          <div class="stat">
-            <b id="sTotal">—</b><span>items (livres + chapitres + articles + communications)</span>
-          </div>
-          <div class="stat">
-            <b id="sNeed">—</b><span>à traiter (HAL ou com demandés)</span>
-          </div>
-          <div class="stat">
-            <b id="sHal">—</b><span>HAL demandés</span>
-          </div>
-          <div class="stat">
-            <b id="sComms">—</b><span>Communications demandées</span>
-          </div>
+      <!-- STATS -->
+      <div class="stats-grid">
+        <div class="stat">
+          <b id="sTotal">—</b>
+          <span>publications déclarées</span>
         </div>
-
-        <div class="charts">
-          <div class="chartCard">
-            <p class="chartTitle">Déclarations par année</p>
-            <div class="chartWrap"><canvas id="chartYear"></canvas></div>
-          </div>
-          <div class="chartCard">
-            <p class="chartTitle">Répartition des demandes</p>
-            <div class="chartWrap"><canvas id="chartSplit"></canvas></div>
-          </div>
-          <div class="chartCard">
-            <p class="chartTitle">Statut de traitement</p>
-            <div class="chartWrap"><canvas id="chartStatus"></canvas></div>
-          </div>
+        <div class="stat">
+          <b id="sNeed">—</b>
+          <span>à traiter</span>
         </div>
+        <div class="stat">
+          <b id="sHal">—</b>
+          <span>dépôts HAL demandés</span>
+        </div>
+        <div class="stat">
+          <b id="sComms">—</b>
+          <span>communications demandées</span>
+        </div>
+      </div>
 
-        <!-- Pagination -->
+      <!-- GRAPHIQUES -->
+      <div class="charts">
+        <div class="chartCard">
+          <p class="chartTitle">Déclarations par année</p>
+          <div class="chartWrap"><canvas id="chartYear"></canvas></div>
+        </div>
+        <div class="chartCard">
+          <p class="chartTitle">Répartition des demandes</p>
+          <div class="chartWrap"><canvas id="chartSplit"></canvas></div>
+        </div>
+        <div class="chartCard" style="border-right:none">
+          <p class="chartTitle">Statut de traitement</p>
+          <div class="chartWrap"><canvas id="chartStatus"></canvas></div>
+        </div>
+      </div>
+
+      <!-- PAGINATION -->
+      <div class="pager-bar">
         <div class="pager_allowwrap">
           <div class="pager_side">
             <button class="ghost" id="prev">←</button>
             <button class="ghost" id="next">→</button>
-            <span class="muted" id="pageInfo">—</span>
+            <span class="muted" id="pageInfo" style="font-size:.83rem">—</span>
           </div>
           <div class="pager_side">
-            <span class="muted">Par page</span>
+            <span class="muted" style="font-size:.83rem">Par page</span>
             <select id="pageSize">
               <option value="25">25</option>
               <option value="50" selected>50</option>
@@ -205,21 +634,22 @@
             </select>
           </div>
         </div>
-
       </div>
-    </div>
 
-    <div class="card">
+    </div><!-- /controls-block -->
+
+    <!-- TABLE -->
+    <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th style="width:90px">Date</th>
-            <th style="width:120px">Type</th>
+            <th style="width:80px">Année</th>
+            <th style="width:110px">Type</th>
             <th>Titre</th>
-            <th style="width:240px">Auteur(s)</th>
-            <th style="width:140px">HAL</th>
-            <th style="width:170px">Communication</th>
-            <th style="width:140px">Statut</th>
+            <th style="width:220px">Auteur(s)</th>
+            <th style="width:130px">HAL</th>
+            <th style="width:150px">Communication</th>
+            <th style="width:130px">Statut</th>
           </tr>
         </thead>
         <tbody id="rows">
@@ -230,10 +660,11 @@
       </table>
     </div>
 
-    <p class="sub" style="margin-top:12px">
-      Astuce : si vous voyez “HAL demandé” ou “Communication demandée”, le labo traite les demandes dans l’ordre (priorité aux échéances).
+    <p class="sub" style="margin-top:16px;font-style:italic">
+      Les demandes HAL et communication sont traitées dans l'ordre de réception, par priorité aux échéances.
     </p>
-  </div>
+
+  </div><!-- /wrap -->
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -242,7 +673,6 @@
     let VIEW = [];
     let CHARTS = { year:null, split:null, status:null };
 
-    // pagination
     let PAGE = 1;
     let PAGE_SIZE = 50;
 
@@ -278,7 +708,6 @@
       return names.join(', ');
     }
 
-    // ✅ Limite affichage auteurs (sans casser la recherche car on cherche sur creatorsText complet)
     function clampAuthors(full, maxNames = 6){
       const s = String(full || '').trim();
       if (!s) return { short:'', full:'' };
@@ -309,7 +738,6 @@
       return { txt:'Traité', cls:'ok' };
     }
 
-    // ✅ Robust parse: accepte , ; | et normalise en MAJ
     function parseAxes(flags){
       const raw = (flags && flags.axes) ? String(flags.axes).trim() : '';
       if (!raw || raw === 'none') return [];
@@ -321,13 +749,16 @@
     }
 
     function destroyCharts(){
-      if (CHARTS.year) { CHARTS.year.destroy(); CHARTS.year = null; }
-      if (CHARTS.split) { CHARTS.split.destroy(); CHARTS.split = null; }
+      if (CHARTS.year)   { CHARTS.year.destroy();   CHARTS.year   = null; }
+      if (CHARTS.split)  { CHARTS.split.destroy();  CHARTS.split  = null; }
       if (CHARTS.status) { CHARTS.status.destroy(); CHARTS.status = null; }
     }
 
     function renderCharts(items){
       destroyCharts();
+
+      // Palette cohérente avec le thème LAREQUOI
+      const palette = ['#8b1a2a','#b8ae9e','#1a6b3c','#7a4f00','#1d3c76','#6b6457'];
 
       const byYear = new Map();
       for (const it of items){
@@ -362,24 +793,42 @@
       const commonOpts = {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom' } }
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { font: { family: "'Source Sans 3', sans-serif", size: 11 }, color: '#6b6457', boxWidth: 12, padding: 12 }
+          }
+        }
       };
 
       CHARTS.year = new Chart($('chartYear'), {
         type: 'bar',
-        data: { labels: years, datasets: [{ label: 'Déclarations', data: yearCounts }] },
-        options: { ...commonOpts, plugins: { legend: { display:false } }, scales: { y: { beginAtZero:true, ticks:{ precision:0 } } } }
+        data: { labels: years, datasets: [{ label: 'Déclarations', data: yearCounts, backgroundColor: '#8b1a2a', borderRadius: 2 }] },
+        options: {
+          ...commonOpts,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, ticks: { precision: 0, color: '#a09890', font: { size: 11 } }, grid: { color: '#d9d2c8' } },
+            x: { ticks: { color: '#a09890', font: { size: 11 } }, grid: { display: false } }
+          }
+        }
       });
 
       CHARTS.split = new Chart($('chartSplit'), {
         type: 'doughnut',
-        data: { labels: ['HAL seul', 'Com seule', 'HAL + Com', 'Aucune demande'], datasets: [{ data: [halOnly, commOnly, both, none] }] },
+        data: {
+          labels: ['HAL seul', 'Com seule', 'HAL + Com', 'Aucune demande'],
+          datasets: [{ data: [halOnly, commOnly, both, none], backgroundColor: ['#8b1a2a','#1d3c76','#1a6b3c','#d9d2c8'], borderWidth: 0 }]
+        },
         options: commonOpts
       });
 
       CHARTS.status = new Chart($('chartStatus'), {
         type: 'doughnut',
-        data: { labels: ['À traiter', 'Traité', 'Non demandé'], datasets: [{ data: [statusCounts['À traiter'], statusCounts['Traité'], statusCounts['Non demandé']] }] },
+        data: {
+          labels: ['À traiter', 'Traité', 'Non demandé'],
+          datasets: [{ data: [statusCounts['À traiter'], statusCounts['Traité'], statusCounts['Non demandé']], backgroundColor: ['#7a4f00','#1a6b3c','#d9d2c8'], borderWidth: 0 }]
+        },
         options: commonOpts
       });
     }
@@ -396,7 +845,7 @@
       const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
       const from = total ? ((PAGE - 1) * PAGE_SIZE + 1) : 0;
       const to = Math.min(total, PAGE * PAGE_SIZE);
-      $('pageInfo').textContent = `${from}-${to} / ${total}`;
+      $('pageInfo').textContent = `${from}–${to} / ${total}`;
       $('prev').disabled = PAGE <= 1;
       $('next').disabled = PAGE >= totalPages;
     }
@@ -432,19 +881,9 @@
 
         const axesStr = (flags.axes && flags.axes !== 'none') ? String(flags.axes) : '';
         const hay = norm([
-          it.title,
-          it.bookTitle,
-          it.publicationTitle,
-          it.conferenceName,
-          it.publisher,
-          it.place,
-          it.isbn,
-          it.doi,
-          it.volume,
-          it.issue,
-          it.pages,
-          axesStr,
-          it.creatorsText
+          it.title, it.bookTitle, it.publicationTitle, it.conferenceName,
+          it.publisher, it.place, it.isbn, it.doi, it.volume, it.issue,
+          it.pages, axesStr, it.creatorsText
         ].filter(Boolean).join(' | '));
         return hay.includes(q);
       });
@@ -472,7 +911,7 @@
       tbody.innerHTML = '';
 
       if (!VIEW.length){
-        tbody.innerHTML = `<tr><td colspan="7" class="muted">Aucun résultat avec ces filtres.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="muted" style="font-style:italic;padding:20px 14px">Aucun résultat avec ces filtres.</td></tr>`;
         return;
       }
 
@@ -497,13 +936,13 @@
 
         let extraMini = '';
         if (it.itemType === 'bookSection' && it.bookTitle) {
-          extraMini += `<div class="mini muted">Dans : ${escapeHtml(it.bookTitle)}</div>`;
+          extraMini += `<div class="mini">Dans : ${escapeHtml(it.bookTitle)}</div>`;
         } else if (it.itemType === 'journalArticle' && it.publicationTitle) {
-          extraMini += `<div class="mini muted">Revue : ${escapeHtml(it.publicationTitle)}</div>`;
+          extraMini += `<div class="mini">Revue : ${escapeHtml(it.publicationTitle)}</div>`;
         } else if (it.itemType === 'conferencePaper' && it.conferenceName) {
-          extraMini += `<div class="mini muted">Conférence : ${escapeHtml(it.conferenceName)}</div>`;
+          extraMini += `<div class="mini">Conférence : ${escapeHtml(it.conferenceName)}</div>`;
         }
-        if (it.doi) extraMini += `<div class="mini muted">DOI : ${escapeHtml(it.doi)}</div>`;
+        if (it.doi) extraMini += `<div class="mini">DOI : ${escapeHtml(it.doi)}</div>`;
 
         const axes = parseAxes(it.flags || {});
         const axesHtml = axes.length
@@ -570,7 +1009,7 @@
         fillYears(ALL);
 
         const ts = data.fetchedAt ? new Date(data.fetchedAt) : new Date();
-        $('lastUpdate').textContent = `Dernière mise à jour : ${ts.toLocaleString('fr-FR')}`;
+        $('lastUpdate').textContent = `Mise à jour : ${ts.toLocaleString('fr-FR')}`;
 
         render();
       } catch(err){
@@ -580,7 +1019,6 @@
       }
     }
 
-    // listeners
     $('q').addEventListener('input', render);
     ['filterType','filterNeeds','filterAxis','filterYear'].forEach(id => $(id).addEventListener('change', render));
 
@@ -594,7 +1032,6 @@
     });
 
     $('refresh').addEventListener('click', load);
-
     $('prev').addEventListener('click', () => setPage(PAGE - 1));
     $('next').addEventListener('click', () => setPage(PAGE + 1));
     $('pageSize').addEventListener('change', () => {
@@ -607,6 +1044,6 @@
 
     load();
   </script>
+
 </body>
 </html>
-
