@@ -2,326 +2,766 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <title>Moulinette LAREQUOI</title>
+  <title>LAREQUOI — Déclarations</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
   <style>
     :root {
-      --bg:#f5f5f8; --card:#fff; --accent:#2c7be5;
-      --accent-soft:#e1ecff; --text:#222; --muted:#666; --border:#ddd;
+      --bg:           #f7f5f1;        /* papier ivoire */
+      --page:         #ffffff;
+      --rule:         #d9d2c8;        /* trait sable */
+      --rule-dark:    #b8ae9e;
+      --text:         #1a1814;
+      --muted:        #6b6457;
+      --faint:        #a09890;
+      --accent:       #8b1a2a;        /* rouge bordeaux LAREQUOI */
+      --accent-light: #f5e8eb;
+      --accent-mid:   #c94057;
+      --ink:          #2c2620;
+      --field-bg:     #faf9f7;
+      --field-focus:  #fff;
+      --shadow:       0 2px 12px rgba(26,24,20,.07);
+      --shadow-lg:    0 8px 32px rgba(26,24,20,.1);
     }
-    *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui;background:var(--bg);color:var(--text)}
-    .page{max-width:900px;margin:32px auto;padding:0 16px}
-    header{margin-bottom:18px}
-    h1{margin:0 0 6px;font-size:1.7rem;font-weight:650}
-    .subtitle{margin:0;color:var(--muted);font-size:.95rem}
 
-    .switcher{display:flex;gap:8px;margin:18px 0 14px}
-    .switcher button{
-      flex:1;border-radius:999px;border:1px solid var(--border);
-      background:#fff;padding:10px 16px;font-size:.95rem;cursor:pointer;
-      display:inline-flex;justify-content:center;align-items:center;gap:8px;
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Source Sans 3', Georgia, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 15px;
+      line-height: 1.55;
     }
-    .switcher button.active{background:var(--accent-soft);border-color:var(--accent)}
-    .hint{color:var(--muted);font-size:.9rem;margin:0 0 14px}
 
-    form{background:var(--card);padding:18px;border-radius:10px;border:1px solid var(--border)}
-    label{display:block;margin:0 0 10px;font-weight:600;font-size:.9rem}
-    label span{display:block;margin:0 0 3px}
-    input,select,textarea{
-      width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);
-      font:inherit;background:#fff
+    /* ══════════════════════════════
+       BANDEAU INSTITUTIONNEL
+    ══════════════════════════════ */
+    .institution-bar {
+      background: var(--accent);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 40px;
+      height: 44px;
+      font-size: .73rem;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
     }
-    textarea{resize:vertical}
 
-    .two-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px 16px}
-
-    button[type="submit"]{
-      margin-top:8px;padding:8px 16px;border-radius:999px;border:none;
-      background:var(--accent);color:#fff;font-weight:700;cursor:pointer
+    .institution-bar .labo-name {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: .78rem;
+      font-weight: 700;
     }
-    button[disabled]{opacity:.7;cursor:default}
 
-    .status{margin-top:8px;font-size:.9rem;white-space:pre-wrap}
-    .status.ok{color:#1b7c3a}
-    .status.err{color:#b32020}
-
-    .authors-title{font-weight:700;margin:10px 0 6px}
-    .author-row{border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px}
-    .btn-secondary{border-radius:999px;border:1px solid var(--border);background:#fff;padding:6px 12px;cursor:pointer}
-    .small-muted{color:var(--muted);font-size:.85rem;margin-left:8px}
-
-    .opts {
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px;
-      margin: 12px 0;
-      background: #fff;
+    .institution-bar .labo-name::before {
+      content: '';
+      display: block;
+      width: 22px;
+      height: 22px;
+      border: 2px solid rgba(255,255,255,.6);
+      border-radius: 3px;
+      background: rgba(255,255,255,.12);
+      flex-shrink: 0;
     }
-    .opts h3 {
-      margin: 0 0 8px;
-      font-size: .95rem;
+
+    .institution-bar .tagline {
+      color: rgba(255,255,255,.65);
+      font-weight: 400;
+      font-size: .7rem;
     }
-    .opts p {
-      margin: 0 0 10px;
+
+    /* ══════════════════════════════
+       TOPNAV
+    ══════════════════════════════ */
+    .topnav {
+      background: var(--page);
+      border-bottom: 1px solid var(--rule);
+      display: flex;
+      align-items: stretch;
+      padding: 0 40px;
+      gap: 0;
+      box-shadow: var(--shadow);
+    }
+
+    .topnav a {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 16px;
+      height: 46px;
+      font-size: .78rem;
+      font-weight: 600;
+      letter-spacing: .04em;
       color: var(--muted);
-      font-size: .85rem;
+      text-decoration: none;
+      border-bottom: 2px solid transparent;
+      transition: color .15s, border-color .15s;
+      white-space: nowrap;
     }
 
-    /* ✅ AXES */
-    .checks{
-      display:flex;
-      flex-wrap:wrap;
-      gap:10px 14px;
-      margin-top:6px;
-    }
-    .check{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:6px 10px;
-      border:1px solid var(--border);
-      border-radius:999px;
-      background:#fff;
-      font-weight:600;
-      font-size:.85rem;
-      cursor:pointer;
-      user-select:none;
-    }
-    .check input{
-      width:16px;height:16px;
-      margin:0;
+    .topnav a:hover { color: var(--ink); border-bottom-color: var(--rule-dark); }
+    .topnav a.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    .topnav a .icon { font-size: .9rem; opacity: .8; }
+
+    /* ══════════════════════════════
+       LAYOUT
+    ══════════════════════════════ */
+    .wrapper {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 48px 32px 80px;
     }
 
-    footer{margin-top:18px;color:var(--muted);font-size:.8rem}
+    /* ══════════════════════════════
+       EN-TÊTE PAGE
+    ══════════════════════════════ */
+    .page-head {
+      margin-bottom: 40px;
+    }
+
+    .breadcrumb {
+      font-size: .72rem;
+      font-weight: 600;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--faint);
+      margin-bottom: 12px;
+    }
+
+    .breadcrumb span {
+      color: var(--accent);
+    }
+
+    h1 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 2.4rem;
+      font-weight: 400;
+      line-height: 1.15;
+      color: var(--ink);
+      margin-bottom: 10px;
+    }
+
+    h1 em {
+      font-style: italic;
+      color: var(--accent);
+    }
+
+    .page-desc {
+      font-size: .9rem;
+      color: var(--muted);
+      font-weight: 300;
+      max-width: 580px;
+      line-height: 1.6;
+    }
+
+    .page-rule {
+      margin-top: 24px;
+      height: 1px;
+      background: linear-gradient(90deg, var(--accent) 60px, var(--rule) 60px);
+    }
+
+    /* ══════════════════════════════
+       TYPE SWITCHER
+    ══════════════════════════════ */
+    .switcher {
+      display: flex;
+      gap: 0;
+      margin-bottom: 20px;
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      overflow: hidden;
+      width: fit-content;
+      background: var(--page);
+    }
+
+    .switcher button {
+      padding: 9px 20px;
+      border: none;
+      background: none;
+      font-family: 'Source Sans 3', sans-serif;
+      font-size: .78rem;
+      font-weight: 600;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      color: var(--muted);
+      cursor: pointer;
+      border-right: 1px solid var(--rule);
+      transition: background .15s, color .15s;
+    }
+
+    .switcher button:last-child { border-right: none; }
+    .switcher button:hover { background: var(--bg); color: var(--ink); }
+
+    .switcher button.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .hint {
+      font-size: .82rem;
+      color: var(--faint);
+      margin-bottom: 24px;
+      font-style: italic;
+    }
+
+    /* ══════════════════════════════
+       FORMULAIRE PRINCIPAL
+    ══════════════════════════════ */
+    form {
+      background: var(--page);
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      box-shadow: var(--shadow-lg);
+    }
+
+    /* ── Sections du form ── */
+    .f-section {
+      padding: 28px 32px;
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .f-section:last-of-type { border-bottom: none; }
+
+    .f-section-head {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .f-section-num {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.6rem;
+      font-weight: 400;
+      color: var(--rule-dark);
+      line-height: 1;
+      min-width: 28px;
+    }
+
+    .f-section-title {
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* ── Labels & Inputs ── */
+    label {
+      display: block;
+      margin-bottom: 16px;
+      font-size: .84rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    label span {
+      display: block;
+      margin-bottom: 5px;
+      letter-spacing: .01em;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 9px 12px;
+      background: var(--field-bg);
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      color: var(--text);
+      font-family: 'Source Sans 3', sans-serif;
+      font-size: .9rem;
+      font-weight: 400;
+      transition: border-color .15s, background .15s, box-shadow .15s;
+      appearance: none;
+    }
+
+    input::placeholder, textarea::placeholder {
+      color: var(--faint);
+      font-weight: 300;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      background: var(--field-focus);
+      border-color: var(--accent-mid);
+      box-shadow: 0 0 0 3px rgba(139,26,42,.08);
+    }
+
+    textarea { resize: vertical; }
+
+    select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23a09890' d='M5 6L0 0h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 34px;
+      cursor: pointer;
+    }
+
+    .two-cols {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0 20px;
+    }
+
+    /* ── Auteurs ── */
+    .authors-label {
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    /* Généré par JS */
+    .author-row {
+      background: var(--field-bg);
+      border: 1px solid var(--rule);
+      border-radius: 2px;
+      padding: 12px;
+      margin-bottom: 8px;
+      transition: border-color .15s;
+    }
+
+    .author-row:hover { border-color: var(--rule-dark); }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border: 1px solid var(--rule-dark);
+      border-radius: 2px;
+      background: transparent;
+      color: var(--muted);
+      font-family: 'Source Sans 3', sans-serif;
+      font-size: .76rem;
+      font-weight: 600;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all .15s;
+    }
+
+    .btn-secondary:hover {
+      background: var(--accent-light);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .small-muted { color: var(--faint); font-size: .78rem; font-style: italic; }
+
+    /* ── Bloc Options ── */
+    .opts-wrap {
+      background: var(--bg);
+      border: 1px solid var(--rule);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 2px 2px 0;
+      padding: 20px 24px;
+      margin: 4px 0;
+    }
+
+    .opts-wrap h3 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1rem;
+      font-weight: 400;
+      color: var(--ink);
+      margin-bottom: 4px;
+    }
+
+    .opts-wrap > p {
+      font-size: .8rem;
+      color: var(--faint);
+      font-style: italic;
+      margin-bottom: 18px;
+    }
+
+    /* ── Axes ── */
+    .checks {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .check {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 14px;
+      border: 1px solid var(--rule-dark);
+      border-radius: 2px;
+      background: var(--page);
+      font-family: 'Source Sans 3', sans-serif;
+      font-weight: 700;
+      font-size: .76rem;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      user-select: none;
+      color: var(--muted);
+      transition: all .15s;
+    }
+
+    .check:hover {
+      border-color: var(--accent);
+      background: var(--accent-light);
+      color: var(--accent);
+    }
+
+    .check input {
+      width: 14px;
+      height: 14px;
+      margin: 0;
+      padding: 0;
+      accent-color: var(--accent);
+      background: none;
+      border: none;
+      box-shadow: none;
+    }
+
+    .check input:focus { border-color: transparent; box-shadow: none; }
+
+    /* ── DOI row ── */
+    .doi-row {
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
+    }
+    .doi-row input { flex: 1; }
+
+    /* ── Submit row ── */
+    .submit-section {
+      padding: 24px 32px;
+      background: var(--bg);
+      border-top: 1px solid var(--rule);
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+
+    button[type="submit"] {
+      padding: 11px 28px;
+      background: var(--accent);
+      border: none;
+      border-radius: 2px;
+      color: #fff;
+      font-family: 'Source Sans 3', sans-serif;
+      font-size: .82rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background .15s, box-shadow .15s;
+    }
+
+    button[type="submit"]:hover {
+      background: #6d1421;
+      box-shadow: 0 4px 14px rgba(139,26,42,.3);
+    }
+
+    button[type="submit"]:active { opacity: .88; }
+    button[type="submit"][disabled] { opacity: .45; cursor: default; }
+
+    .status {
+      font-size: .84rem;
+      font-style: italic;
+      white-space: pre-wrap;
+      min-height: 1.3em;
+      color: var(--muted);
+    }
+
+    .status.ok  { color: #1a6b3c; }
+    .status.err { color: var(--accent); font-style: normal; font-weight: 600; }
+
+    .form-footer {
+      padding: 14px 32px;
+      font-size: .75rem;
+      color: var(--faint);
+      font-style: italic;
+      border-top: 1px solid var(--rule);
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .institution-bar { animation: fadeIn .3s ease both; }
+    .topnav          { animation: fadeIn .3s ease .05s both; }
+    .page-head       { animation: fadeIn .35s ease .1s both; }
+    form             { animation: fadeIn .35s ease .15s both; }
+
+    /* ── Responsive ── */
+    @media (max-width: 680px) {
+      .institution-bar { padding: 0 16px; }
+      .institution-bar .tagline { display: none; }
+      .topnav { padding: 0 12px; overflow-x: auto; }
+      .wrapper { padding: 24px 16px 60px; }
+      h1 { font-size: 1.9rem; }
+      .f-section { padding: 20px 18px; }
+      .submit-section { padding: 18px; }
+    }
   </style>
-
-  <link rel="stylesheet" href="/assets/ui.css">
 </head>
 
-<body class="page-index">
-  <div class="page">
-    <header class="hub">
-      <div class="hub-brand">
-        <div class="hub-brand-text">
-          <h1 class="hub-title">Moulinette LAREQUOI</h1>
-          <p class="subtitle">Déclarez vos publications (articles, chapitres, ouvrages) et vos communications dans la moulinette qui se charge de générer des CV, de créer des notices sur HAL, de communiquer sur votre travail</p>
-        </div>
+<body>
 
-        <img
-          class="hub-logo"
-          src="/logo-larequoi-2020.jpg"
-          alt="LAREQUOI – UVSQ – Université Paris-Saclay"
-          loading="lazy"
-          decoding="async">
-      </div>
+  <!-- BANDEAU INSTITUTIONNEL -->
+  <div class="institution-bar">
+    <div class="labo-name">
+      LAREQUOI
+      <span style="font-weight:300;opacity:.7">·</span>
+      <span style="font-weight:400;opacity:.8;letter-spacing:.03em">Laboratoire de Recherche en Management</span>
+    </div>
+    <span class="tagline">Université Paris-Saclay · UVSQ</span>
+  </div>
 
-      <div class="hub-cards">
-        <a class="hub-card" href="/suivi.html" target="_blank" rel="noopener noreferrer">
-          <h2>📊 Suivi public HAL &amp; communication</h2>
-          <p>État des demandes de création de notices et de communications sur les réseaux</p>
-        </a>
+  <!-- NAVIGATION -->
+  <nav class="topnav">
+    <a href="/index.html" class="active"><span class="icon">📄</span> Publication</a>
+    <a href="/conference.html"><span class="icon">🎤</span> Conférence</a>
+    <a href="/import.html"><span class="icon">📥</span> Import CSV</a>
+    <a href="/cv.html" target="_blank" rel="noopener noreferrer"><span class="icon">🧾</span> CV</a>
+    <a href="/suivi.html" target="_blank" rel="noopener noreferrer"><span class="icon">📊</span> Suivi</a>
+  </nav>
 
-        <a class="hub-card" href="/cv.html" target="_blank" rel="noopener noreferrer">
-          <h2>🧾 Générateur de CV</h2>
-          <p>À partir des publications déposées dans la moulinette</p>
-        </a>
+  <div class="wrapper">
 
-        <a class="hub-card" href="/import.html">
-          <h2>📥 Import par lot CSV HAL</h2>
-          <p>Importez vos publications et communications par lot </p>
-        </a>
+    <!-- EN-TÊTE -->
+    <div class="page-head">
+      <p class="breadcrumb">LAREQUOI · Zotero · <span>Déclarations</span></p>
+      <h1>Déclarer une <em>publication</em></h1>
+      <p class="page-desc">Renseignez les informations bibliographiques de votre publication. Les données sont transmises automatiquement à la base Zotero du laboratoire.</p>
+      <div class="page-rule"></div>
+    </div>
 
-        <a class="hub-card" href="/conference.html">
-          <h2>🎤 Déclarer une communication</h2>
-          <p>Vos communication de congrès, colloques, journées d'études</p>
-        </a>
-      </div>
-    </header>
-
+    <!-- SWITCHER -->
     <div class="switcher">
       <button type="button" class="active">Nouvelle publication</button>
     </div>
 
-    <p class="hint">Choisissez le type de publication (Livre, chapitre d'ouvrage, article), puis remplissez les champs requis.
-</p>
+    <p class="hint">Sélectionnez le type de publication, puis complétez les champs requis.</p>
 
+    <!-- FORMULAIRE -->
     <form id="pub-form">
-      <label>
-        <span>Type de publication *</span>
-        <select name="pubType" id="pubType">
-          <option value="book">Livre</option>
-          <option value="bookSection">Chapitre d’ouvrage</option>
-          <option value="journalArticle">Article (revue)</option>
-        </select>
-      </label>
 
-      <label>
-        <span>Titre/Title *</span>
-        <input name="title" required>
-      </label>
+      <!-- § 1 — TYPE & TITRE -->
+      <div class="f-section">
+        <div class="f-section-head">
+          <span class="f-section-num">I.</span>
+          <span class="f-section-title">Identification de la publication</span>
+        </div>
 
-      <div class="authors-title">Auteur(s)/Author(s) *</div>
-      <div id="authors-list"></div>
-      <div style="display:flex;align-items:center;gap:8px;margin:8px 0 12px">
-        <button type="button" id="add-author-btn" class="btn-secondary">+ Ajouter un auteur</button>
-        <span class="small-muted">Prénom/Nom (minimum : un auteur)</span>
+        <label>
+          <span>Type de publication *</span>
+          <select name="pubType" id="pubType">
+            <option value="book">Livre (ouvrage)</option>
+            <option value="bookSection">Chapitre d'ouvrage</option>
+            <option value="journalArticle">Article de revue</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Titre complet *</span>
+          <input name="title" required placeholder="Titre de la publication telle qu'elle apparaît">
+        </label>
       </div>
 
-      <!-- ====== CHAMPS LIVRE ====== -->
-      <div id="book-fields">
-        <div class="two-cols">
-          <label><span>Date *</span><input name="date" placeholder="2024 ou 2024-06-15"></label>
-          <label><span>Langue/Language</span><input name="language" placeholder="fr / en"></label>
+      <!-- § 2 — AUTEURS -->
+      <div class="f-section">
+        <div class="f-section-head">
+          <span class="f-section-num">II.</span>
+          <span class="f-section-title">Auteur(s)</span>
+        </div>
+
+        <div class="authors-label">Liste des auteurs *</div>
+        <div id="authors-list"></div>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:6px">
+          <button type="button" id="add-author-btn" class="btn-secondary">+ Ajouter un auteur</button>
+          <span class="small-muted">Prénom puis Nom — au moins un auteur requis</span>
+        </div>
+      </div>
+
+      <!-- § 3 — CHAMPS LIVRE -->
+      <div id="book-fields" class="f-section">
+        <div class="f-section-head">
+          <span class="f-section-num">III.</span>
+          <span class="f-section-title">Informations bibliographiques</span>
         </div>
 
         <div class="two-cols">
-          <label><span>Maison d'édition/Publisher *</span><input name="publisher"></label>
-          <label><span>Lieu/Place *</span><input name="place"></label>
+          <label><span>Date de publication *</span><input name="date" placeholder="2024 ou 2024-06-15"></label>
+          <label><span>Langue</span><input name="language" placeholder="fr / en"></label>
         </div>
-
-        <label><span>ISBN</span><input name="isbn" placeholder="978-..."></label>
-        <label><span>Résumé/Abstract</span><textarea name="abstract" rows="4"></textarea></label>
+        <div class="two-cols">
+          <label><span>Éditeur (Publisher) *</span><input name="publisher"></label>
+          <label><span>Lieu de publication *</span><input name="place"></label>
+        </div>
+        <label><span>ISBN</span><input name="isbn" placeholder="978-…"></label>
+        <label><span>Résumé (Abstract)</span><textarea name="abstract" rows="4" placeholder="Résumé ou description de l'ouvrage…"></textarea></label>
       </div>
 
-      <!-- ====== CHAMPS CHAPITRE ====== -->
-      <div id="section-fields" style="display:none">
-        <label><span>Book Title *</span><input name="bookTitle"></label>
+      <!-- § 3 — CHAMPS CHAPITRE -->
+      <div id="section-fields" style="display:none" class="f-section">
+        <div class="f-section-head">
+          <span class="f-section-num">III.</span>
+          <span class="f-section-title">Informations bibliographiques</span>
+        </div>
 
+        <label><span>Titre de l'ouvrage *</span><input name="bookTitle"></label>
         <div class="two-cols">
           <label><span>Pages</span><input name="pages" placeholder="123-145"></label>
-          <label><span>Edition</span><input name="edition"></label>
+          <label><span>Édition</span><input name="edition"></label>
         </div>
-
         <div class="two-cols">
-          <label><span>Series</span><input name="series"></label>
-          <label><span>Series Number</span><input name="seriesNumber"></label>
+          <label><span>Série</span><input name="series"></label>
+          <label><span>Numéro de série</span><input name="seriesNumber"></label>
         </div>
-
         <div class="two-cols">
           <label><span>Volume</span><input name="volume"></label>
           <label><span>Date *</span><input name="sectionDate" placeholder="2024 ou 2024-06-15"></label>
         </div>
-
         <div class="two-cols">
-          <label><span>Publisher *</span><input name="sectionPublisher"></label>
-          <label><span>Place *</span><input name="sectionPlace"></label>
+          <label><span>Éditeur *</span><input name="sectionPublisher"></label>
+          <label><span>Lieu de publication *</span><input name="sectionPlace"></label>
         </div>
-
-        <label><span>ISBN</span><input name="sectionIsbn" placeholder="978-..."></label>
+        <label><span>ISBN</span><input name="sectionIsbn" placeholder="978-…"></label>
       </div>
 
-      <!-- ====== CHAMPS ARTICLE ====== -->
-      <div id="article-fields" style="display:none">
-        <div class="two-cols">
-          <label><span>Publication (revue) *</span><input name="articlePublication" placeholder="Nom de la revue"></label>
-          <label><span>Date *</span><input name="articleDate" placeholder="2024 ou 2024-06-15"></label>
+      <!-- § 3 — CHAMPS ARTICLE -->
+      <div id="article-fields" style="display:none" class="f-section">
+        <div class="f-section-head">
+          <span class="f-section-num">III.</span>
+          <span class="f-section-title">Informations bibliographiques</span>
         </div>
 
+        <div class="two-cols">
+          <label><span>Titre de la revue *</span><input name="articlePublication" placeholder="Nom de la revue"></label>
+          <label><span>Date de publication *</span><input name="articleDate" placeholder="2024 ou 2024-06-15"></label>
+        </div>
         <div class="two-cols">
           <label><span>Volume</span><input name="articleVolume"></label>
-          <label><span>Issue</span><input name="articleIssue"></label>
+          <label><span>Numéro (Issue)</span><input name="articleIssue"></label>
         </div>
-
         <div class="two-cols">
           <label><span>Pages</span><input name="articlePages" placeholder="123-145"></label>
-          <label><span>DOI</span>
-            <div style="display:flex;gap:8px;align-items:center">
-              <input name="articleDoi" id="articleDoi" placeholder="10.xxxx/xxxxx" style="flex:1">
-              <button type="button" id="doi-prefill" class="btn-secondary" title="Préremplir à partir du DOI">⚡ DOI</button>
+          <label>
+            <span>DOI</span>
+            <div class="doi-row">
+              <input name="articleDoi" id="articleDoi" placeholder="10.xxxx/xxxxx">
+              <button type="button" id="doi-prefill" class="btn-secondary" title="Préremplir via DOI">⚡ DOI</button>
             </div>
-            <span class="small-muted">Collez un DOI (ou une URL doi.org), puis cliquez sur ⚡</span>
+            <span class="small-muted" style="display:block;margin-top:5px">Collez un DOI ou URL doi.org, puis ⚡</span>
           </label>
         </div>
-
         <div class="two-cols">
-          <label><span>Publisher</span><input name="articlePublisher"></label>
-          <label><span>Place</span><input name="articlePlace"></label>
+          <label><span>Éditeur</span><input name="articlePublisher"></label>
+          <label><span>Lieu</span><input name="articlePlace"></label>
         </div>
       </div>
 
-      <!-- ====== OPTIONS (HAL / COMMS / AXES) ====== -->
-      <div class="opts">
-        <h3>Options</h3>
-        <p>Ces choix seront enregistrés dans Zotero (champ “Extra”).</p>
-
-        <div class="two-cols">
-          <label>
-            <span>Souhaitez-vous la création d’une notice sur HAL ? *</span>
-            <select name="optHal" required>
-              <option value="">— Choisir —</option>
-              <option value="yes">Oui</option>
-              <option value="no">Non</option>
-            </select>
-          </label>
-
-          <label>
-            <span>Souhaitez-vous une communication (newsletter + réseaux sociaux) ? *</span>
-            <select name="optComms" required>
-              <option value="">— Choisir —</option>
-              <option value="yes">Oui</option>
-              <option value="no">Non</option>
-            </select>
-          </label>
+      <!-- § 4 — OPTIONS -->
+      <div class="f-section">
+        <div class="f-section-head">
+          <span class="f-section-num">IV.</span>
+          <span class="f-section-title">Options de traitement</span>
         </div>
 
-        <!-- ✅ Nouvelle option AXES -->
-        <div style="margin-top:10px">
-          <div style="font-weight:700;font-size:.9rem;margin:0 0 6px">
-            Est-ce que votre publication est rattachée à un axe thématique de recherche ?
+        <div class="opts-wrap">
+          <h3>Dépôt HAL & Communication</h3>
+          <p>Ces réponses seront enregistrées dans le champ "Extra" de la notice Zotero.</p>
+
+          <div class="two-cols">
+            <label>
+              <span>Souhaitez-vous la création d'une notice sur HAL ? *</span>
+              <select name="optHal" required>
+                <option value="">— Choisir —</option>
+                <option value="yes">Oui</option>
+                <option value="no">Non</option>
+              </select>
+            </label>
+            <label>
+              <span>Souhaitez-vous une communication (newsletter + réseaux sociaux) ? *</span>
+              <select name="optComms" required>
+                <option value="">— Choisir —</option>
+                <option value="yes">Oui</option>
+                <option value="no">Non</option>
+              </select>
+            </label>
           </div>
-          <div class="checks">
-            <label class="check"><input type="checkbox" name="axisPICMAP" value="PICMAP"> PICMAP</label>
-            <label class="check"><input type="checkbox" name="axisMOPTIS" value="MOPTIS"> MOPTIS</label>
-            <label class="check"><input type="checkbox" name="axisOCSO" value="OCSO"> OCSO</label>
+
+          <div style="margin-top:20px">
+            <div style="font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px">
+              Rattachement aux axes thématiques
+            </div>
+            <div class="checks">
+              <label class="check"><input type="checkbox" name="axisPICMAP" value="PICMAP"> PICMAP</label>
+              <label class="check"><input type="checkbox" name="axisMOPTIS" value="MOPTIS"> MOPTIS</label>
+              <label class="check"><input type="checkbox" name="axisOCSO" value="OCSO"> OCSO</label>
+            </div>
+            <div class="small-muted" style="margin-top:8px">Plusieurs axes peuvent être cochés simultanément.</div>
           </div>
-          <div class="small-muted" style="margin-top:6px">Vous pouvez cocher plusieurs axes.</div>
         </div>
       </div>
 
-      <label>
-        <span>Extra</span>
-        <textarea name="extra" rows="4" placeholder="Toutes les informations annexes que vous voulez indiquer"></textarea>
-      </label>
+      <!-- § 5 — EXTRA -->
+      <div class="f-section">
+        <div class="f-section-head">
+          <span class="f-section-num">V.</span>
+          <span class="f-section-title">Informations complémentaires</span>
+        </div>
+        <label>
+          <textarea name="extra" rows="4" placeholder="Informations internes, notes de traitement, références de projet…"></textarea>
+        </label>
+      </div>
 
-      <button type="submit">Envoyer vers Zotero</button>
-      <p id="pub-status" class="status"></p>
+      <!-- SUBMIT -->
+      <div class="submit-section">
+        <button type="submit">Soumettre vers Zotero</button>
+        <p id="pub-status" class="status"></p>
+      </div>
 
-      <footer>Les champs marqués d’un * sont obligatoires.</footer>
+      <div class="form-footer">Les champs marqués d'un * sont obligatoires.</div>
     </form>
 
-    <footer class="site-footer">
-      <p>En cas de problème, n’hésitez pas à contacter <a href="mailto:maximilien.petit@uvsq.fr">maximilien.petit@uvsq.fr</a></p>
-    </footer>
-  </div>
+  </div><!-- /wrapper -->
 
   <script src="assets/app.js"></script>
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-<script>
-  // Initialise le widget
-  if (window.netlifyIdentity) {
-    window.netlifyIdentity.on("init", (user) => {
-      // Si on arrive via un lien d'invitation / confirmation, Netlify met souvent un hash dans l’URL
-      // On ouvre le widget automatiquement pour permettre la création/validation.
-      if (!user) {
-        const h = window.location.hash || "";
-        if (h.includes("invite_token") || h.includes("confirmation_token") || h.includes("recovery_token")) {
-          window.netlifyIdentity.open();
+  <script>
+    if (window.netlifyIdentity) {
+      window.netlifyIdentity.on("init", (user) => {
+        if (!user) {
+          const h = window.location.hash || "";
+          if (h.includes("invite_token") || h.includes("confirmation_token") || h.includes("recovery_token")) {
+            window.netlifyIdentity.open();
+          }
         }
-      }
-    });
-    window.netlifyIdentity.init();
-  }
-</script>
-<script>
-  (function(){
-    var h = window.location.hash || "";
-    if (h.includes("invite_token=") || h.includes("confirmation_token=") || h.includes("recovery_token=") || h.includes("email_change_token=")) {
-      window.location.replace("/auth.html" + h);
+      });
+      window.netlifyIdentity.init();
     }
-  })();
-</script>
+  </script>
+  <script>
+    (function(){
+      var h = window.location.hash || "";
+      if (h.includes("invite_token=") || h.includes("confirmation_token=") || h.includes("recovery_token=") || h.includes("email_change_token=")) {
+        window.location.replace("/auth.html" + h);
+      }
+    })();
+  </script>
 
 </body>
 </html>
