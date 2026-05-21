@@ -651,7 +651,7 @@
           <p class="chartTitle">Revues et éditeurs</p>
           <p class="sourceSectionTitle">Titres de revues — articles</p>
           <div id="journalList" class="sourceList"></div>
-          <p class="sourceSectionTitle">Éditeurs — ouvrages</p>
+          <p class="sourceSectionTitle">Éditeurs — ouvrages et chapitres</p>
           <div id="publisherList" class="sourceList"></div>
         </div>
       </div>
@@ -885,12 +885,12 @@
 
       const publishers = countValues(
         items
-          .filter(it => it.itemType === 'book')
+          .filter(it => it.itemType === 'book' || it.itemType === 'bookSection')
           .map(it => it.publisher)
       );
 
       renderSourceList($('journalList'), journals, 'Aucun titre de revue dans la sélection.');
-      renderSourceList($('publisherList'), publishers, 'Aucun éditeur d’ouvrage dans la sélection.');
+      renderSourceList($('publisherList'), publishers, 'Aucun éditeur d’ouvrage ou de chapitre dans la sélection.');
     }
 
     function setPage(n){
