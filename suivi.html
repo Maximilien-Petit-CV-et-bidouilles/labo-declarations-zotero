@@ -363,6 +363,43 @@
 
     @media (max-width: 520px) { .chartWrap { height: 170px; } }
 
+    /* ══ LISTE REVUES / ÉDITEURS ══ */
+    .sourceList {
+      max-height: 220px;
+      overflow: auto;
+      border: 1px solid var(--rule);
+      background: var(--field-bg);
+    }
+
+    .sourceItem {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 9px 11px;
+      border-bottom: 1px solid var(--rule);
+      font-size: .86rem;
+    }
+
+    .sourceItem:last-child { border-bottom: none; }
+    .sourceName { color: var(--ink); overflow-wrap: anywhere; }
+    .sourceMeta { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+    .sourceSectionTitle {
+      margin: 10px 0 6px;
+      font-size: .66rem;
+      font-weight: 700;
+      letter-spacing: .11em;
+      text-transform: uppercase;
+      color: var(--faint);
+    }
+
+    .sourceEmpty {
+      padding: 12px;
+      color: var(--muted);
+      font-style: italic;
+      font-size: .84rem;
+    }
+
     /* ══ PAGINATION ══ */
     .pager-bar {
       display: flex;
@@ -588,31 +625,34 @@
         </div>
         <div class="stat">
           <b id="sNeed">—</b>
-          <span>à traiter</span>
+          <span>articles</span>
         </div>
         <div class="stat">
           <b id="sHal">—</b>
-          <span>dépôts HAL demandés</span>
+          <span>livres</span>
         </div>
         <div class="stat">
           <b id="sComms">—</b>
-          <span>communications demandées</span>
+          <span>communications</span>
         </div>
       </div>
 
-      <!-- GRAPHIQUES -->
+      <!-- GRAPHIQUES ET LISTES -->
       <div class="charts">
         <div class="chartCard">
           <p class="chartTitle">Déclarations par année</p>
           <div class="chartWrap"><canvas id="chartYear"></canvas></div>
         </div>
         <div class="chartCard">
-          <p class="chartTitle">Répartition des demandes</p>
-          <div class="chartWrap"><canvas id="chartSplit"></canvas></div>
+          <p class="chartTitle">Répartition par type de publication</p>
+          <div class="chartWrap"><canvas id="chartType"></canvas></div>
         </div>
         <div class="chartCard" style="border-right:none">
-          <p class="chartTitle">Statut de traitement</p>
-          <div class="chartWrap"><canvas id="chartStatus"></canvas></div>
+          <p class="chartTitle">Revues et éditeurs</p>
+          <p class="sourceSectionTitle">Titres de revues — articles</p>
+          <div id="journalList" class="sourceList"></div>
+          <p class="sourceSectionTitle">Éditeurs — ouvrages</p>
+          <div id="publisherList" class="sourceList"></div>
         </div>
       </div>
 
@@ -671,7 +711,7 @@
   <script>
     let ALL = [];
     let VIEW = [];
-    let CHARTS = { year:null, split:null, status:null };
+    let CHARTS = { year:null, type:null };
 
     let PAGE = 1;
     let PAGE_SIZE = 50;
@@ -749,16 +789,12 @@
     }
 
     function destroyCharts(){
-      if (CHARTS.year)   { CHARTS.year.destroy();   CHARTS.year   = null; }
-      if (CHARTS.split)  { CHARTS.split.destroy();  CHARTS.split  = null; }
-      if (CHARTS.status) { CHARTS.status.destroy(); CHARTS.status = null; }
+      if (CHARTS.year) { CHARTS.year.destroy(); CHARTS.year = null; }
+      if (CHARTS.type) { CHARTS.type.destroy(); CHARTS.type = null; }
     }
 
     function renderCharts(items){
       destroyCharts();
-
-      // Palette cohérente avec le thème LAREQUOI
-      const palette = ['#8b1a2a','#b8ae9e','#1a6b3c','#7a4f00','#1d3c76','#6b6457'];
 
       const byYear = new Map();
       for (const it of items){
@@ -773,22 +809,13 @@
         });
       const yearCounts = years.map(y => byYear.get(y));
 
-      let halOnly=0, commOnly=0, both=0, none=0;
-      for (const it of items){
-        const f = it.flags || {};
-        const hal = f.hal_create === 'yes';
-        const com = f.comms_publish === 'yes';
-        if (hal && com) both++;
-        else if (hal) halOnly++;
-        else if (com) commOnly++;
-        else none++;
-      }
-
-      const statusCounts = { 'À traiter':0, 'Traité':0, 'Non demandé':0 };
-      for (const it of items){
-        const s = statusFor(it).txt;
-        statusCounts[s] = (statusCounts[s] || 0) + 1;
-      }
+      const typeLabels = ['Livre', 'Article', 'Chapitre', 'Communication'];
+      const typeCounts = [
+        items.filter(it => it.itemType === 'book').length,
+        items.filter(it => it.itemType === 'journalArticle').length,
+        items.filter(it => it.itemType === 'bookSection').length,
+        items.filter(it => it.itemType === 'conferencePaper').length
+      ];
 
       const commonOpts = {
         responsive: true,
@@ -814,23 +841,56 @@
         }
       });
 
-      CHARTS.split = new Chart($('chartSplit'), {
+      CHARTS.type = new Chart($('chartType'), {
         type: 'doughnut',
         data: {
-          labels: ['HAL seul', 'Com seule', 'HAL + Com', 'Aucune demande'],
-          datasets: [{ data: [halOnly, commOnly, both, none], backgroundColor: ['#8b1a2a','#1d3c76','#1a6b3c','#d9d2c8'], borderWidth: 0 }]
+          labels: typeLabels,
+          datasets: [{ data: typeCounts, backgroundColor: ['#8b1a2a','#1d3c76','#1a6b3c','#7a4f00'], borderWidth: 0 }]
         },
         options: commonOpts
       });
 
-      CHARTS.status = new Chart($('chartStatus'), {
-        type: 'doughnut',
-        data: {
-          labels: ['À traiter', 'Traité', 'Non demandé'],
-          datasets: [{ data: [statusCounts['À traiter'], statusCounts['Traité'], statusCounts['Non demandé']], backgroundColor: ['#7a4f00','#1a6b3c','#d9d2c8'], borderWidth: 0 }]
-        },
-        options: commonOpts
-      });
+      renderSourcesLists(items);
+    }
+
+    function countValues(values){
+      const map = new Map();
+      for (const value of values){
+        const clean = String(value || '').trim();
+        if (!clean) continue;
+        map.set(clean, (map.get(clean) || 0) + 1);
+      }
+      return [...map.entries()].sort((a,b) => b[1] - a[1] || a[0].localeCompare(b[0], 'fr'));
+    }
+
+    function renderSourceList(el, entries, emptyText){
+      if (!entries.length){
+        el.innerHTML = `<div class="sourceEmpty">${escapeHtml(emptyText)}</div>`;
+        return;
+      }
+      el.innerHTML = entries.map(([name, count]) => `
+        <div class="sourceItem">
+          <span class="sourceName">${escapeHtml(name)}</span>
+          <span class="sourceMeta">${count}</span>
+        </div>
+      `).join('');
+    }
+
+    function renderSourcesLists(items){
+      const journals = countValues(
+        items
+          .filter(it => it.itemType === 'journalArticle')
+          .map(it => it.publicationTitle)
+      );
+
+      const publishers = countValues(
+        items
+          .filter(it => it.itemType === 'book')
+          .map(it => it.publisher)
+      );
+
+      renderSourceList($('journalList'), journals, 'Aucun titre de revue dans la sélection.');
+      renderSourceList($('publisherList'), publishers, 'Aucun éditeur d’ouvrage dans la sélection.');
     }
 
     function setPage(n){
@@ -889,10 +949,9 @@
       });
 
       $('sTotal').textContent = VIEW.length;
-      const need = VIEW.filter(it => statusFor(it).txt === 'À traiter').length;
-      $('sNeed').textContent = need;
-      $('sHal').textContent = VIEW.filter(it => (it.flags?.hal_create === 'yes')).length;
-      $('sComms').textContent = VIEW.filter(it => (it.flags?.comms_publish === 'yes')).length;
+      $('sNeed').textContent = VIEW.filter(it => it.itemType === 'journalArticle').length;
+      $('sHal').textContent = VIEW.filter(it => it.itemType === 'book').length;
+      $('sComms').textContent = VIEW.filter(it => it.itemType === 'conferencePaper').length;
 
       renderCharts(VIEW);
 
@@ -1047,3 +1106,4 @@
 
 </body>
 </html>
+
