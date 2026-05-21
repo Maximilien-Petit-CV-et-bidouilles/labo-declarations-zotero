@@ -400,6 +400,91 @@
       font-size: .84rem;
     }
 
+
+
+    /* ══ RECHERCHE CHERCHEURS ══ */
+    .researcher-block {
+      border-top: 1px solid var(--rule);
+      background: var(--page);
+      padding: 18px 20px 20px;
+    }
+
+    .researcher-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .researcher-title {
+      font-size: .68rem;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--faint);
+      margin-bottom: 4px;
+    }
+
+    .researcher-help {
+      color: var(--muted);
+      font-size: .84rem;
+    }
+
+    .researcher-search {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) auto;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    @media (max-width: 560px) { .researcher-search { grid-template-columns: 1fr; } }
+
+    .researcher-results {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 10px;
+    }
+
+    .researcher-card {
+      border: 1px solid var(--rule);
+      background: var(--field-bg);
+      padding: 12px 13px;
+      border-radius: 2px;
+    }
+
+    .researcher-name {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 1.05rem;
+      color: var(--ink);
+      margin-bottom: 8px;
+    }
+
+    .researcher-line {
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+      padding: 3px 0;
+      font-size: .85rem;
+      border-top: 1px solid rgba(217,210,200,.65);
+    }
+
+    .researcher-line:first-of-type { border-top: none; }
+    .researcher-label { min-width: 58px; color: var(--faint); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; font-size: .68rem; }
+    .researcher-value { color: var(--muted); overflow-wrap: anywhere; }
+    .researcher-value a { color: var(--accent); text-decoration: none; }
+    .researcher-value a:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+    .researcher-empty {
+      border: 1px dashed var(--rule-dark);
+      background: var(--field-bg);
+      color: var(--muted);
+      padding: 12px;
+      font-size: .84rem;
+      font-style: italic;
+    }
+
     /* ══ PAGINATION ══ */
     .pager-bar {
       display: flex;
@@ -656,6 +741,25 @@
         </div>
       </div>
 
+
+
+      <!-- RECHERCHE IDENTIFIANTS CHERCHEURS -->
+      <div class="researcher-block">
+        <div class="researcher-head">
+          <div>
+            <p class="researcher-title">Identifiants des chercheurs LAREQUOI</p>
+            <p class="researcher-help">Saisir un nom ou prénom pour afficher les identifiants bibliographiques connus.</p>
+          </div>
+        </div>
+        <div class="researcher-search">
+          <input id="researcherQ" type="search" placeholder="Ex. Aline Lemeur, Szostak, Rouet…" autocomplete="off" />
+          <button class="ghost" id="researcherClear" type="button">Effacer</button>
+        </div>
+        <div id="researcherResults" class="researcher-results">
+          <div class="researcher-empty">Tapez au moins deux caractères pour lancer la recherche.</div>
+        </div>
+      </div>
+
       <!-- PAGINATION -->
       <div class="pager-bar">
         <div class="pager_allowwrap">
@@ -718,8 +822,321 @@
 
     const $ = (id) => document.getElementById(id);
 
+    const CHERCHEURS = [
+      {
+            "nom": "Hervé Chomienne",
+            "idref": "https://www.idref.fr/076049221",
+            "orcid": "",
+            "idhal": "",
+            "hal": "https://hal.science/search/index/q/*/authIdFormPerson_s/1628795-0",
+            "scholar": "https://scholar.google.fr/citations?user=CbUtsyUAAAAJ&hl=fr&oi=ao",
+            "cairn": "https://droit.cairn.info/publications-de-herve-chomienne--35671?lang=fr"
+      },
+      {
+            "nom": "Adrien Passant",
+            "idref": "https://www.idref.fr/253310997",
+            "orcid": "https://orcid.org/0000-0003-0015-1354",
+            "idhal": "",
+            "hal": "https://hal.science/search/index/q/*/authIdPerson_i/1376936",
+            "scholar": "https://scholar.google.com/citations?user=3k-UOvsAAAAJ&hl=fr&oi=ao",
+            "cairn": ""
+      },
+      {
+            "nom": "Aimée Ngalla",
+            "idref": "https://www.idref.fr/259051535",
+            "orcid": "",
+            "idhal": "",
+            "hal": "https://hal.science/search/index/q/*/authIdPerson_i/1286207",
+            "scholar": "",
+            "cairn": "https://shs.cairn.info/publications-de-aimee-ngalla--879777?lang=fr"
+      },
+      {
+            "nom": "Aline Courie Lemeur",
+            "idref": "https://www.idref.fr/193208385",
+            "orcid": "https://orcid.org/0000-0002-0838-3865",
+            "idhal": "",
+            "hal": "https://hal.science/search/index/q/*/authIdPerson_i/1285637",
+            "scholar": "https://scholar.google.com/citations?user=6ULQlSAAAAAJ&hl=fr&oi=ao",
+            "cairn": "https://droit.cairn.info/publications-de-aline-courie-lemeur--128671?lang=fr"
+      },
+      {
+            "nom": "Annie Bartoli",
+            "idref": "https://www.idref.fr/028809777",
+            "orcid": "https://orcid.org/0000-0002-9862-3710",
+            "idhal": "annie-bartoli",
+            "hal": "https://hal.science/search/index/q/*/authIdPerson_i/1087053",
+            "scholar": "",
+            "cairn": "https://droit.cairn.info/publications-de-annie-bartoli--74663?lang=fr"
+      },
+      {
+            "nom": "Benjamin Vedel",
+            "idref": "https://www.idref.fr/078962099",
+            "orcid": "https://orcid.org/0000-0002-1556-7347",
+            "idhal": "benjamin-vedel",
+            "hal": "https://hal.science/search/index/q/*/authIdPerson_i/1281230",
+            "scholar": "https://scholar.google.com/citations?user=eztPcykAAAAJ&hl=fr&oi=ao",
+            "cairn": "https://shs.cairn.info/publications-de-benjamin-vedel--77084?lang=fr"
+      },
+      {
+            "nom": "Bérangère L. Szostak",
+            "idref": "https://www.idref.fr/101290969",
+            "orcid": "https://orcid.org/0000-0002-8691-2697",
+            "idhal": "",
+            "hal": "https://hal.science/search/index/q/*/authIdPerson_i/1084515",
+            "scholar": "https://scholar.google.com/citations?user=wc2Q6X4AAAAJ&hl=fr&oi=ao",
+            "cairn": "https://shs.cairn.info/publications-de-berangere-l-szostak--718285?lang=fr"
+      },
+      {
+            "nom": "Darine Azzam",
+            "idref": "https://www.idref.fr/281275173",
+            "orcid": "",
+            "idhal": "darine-azzam",
+            "hal": "https://hal.science/search/index/q/*/authIdPerson_i/1208631",
+            "scholar": "",
+            "cairn": ""
+      },
+      {
+            "nom": "Delphine François-Philip Boisserolles de St Julien",
+            "idref": "https://www.idref.fr/072264330",
+            "orcid": "",
+            "idhal": "",
+            "hal": "https://hal.science/search/index/q/*/authIdFormPerson_s/2902780-0",
+            "scholar": "",
+            "cairn": "https://shs.cairn.info/publications-de-delphine-francois-philip-boisserolles-de-st-julien--683363?lang=fr"
+      },
+      {
+            "nom": "Gilles Rouet",
+            "idref": "https://www.idref.fr/031837891",
+            "orcid": "https://orcid.org/0000-0002-0647-4106",
+            "idhal": "",
+            "hal": "https://hal.science/search/index/q/*/authIdFormPerson_s/807712-0",
+            "scholar": "",
+            "cairn": "https://shs.cairn.info/publications-de-gilles-rouet--47022?lang=fr"
+      },
+      {
+            "nom": "Michaël Viegas-Pires",
+            "idref": "https://www.idref.fr/139628541",
+            "orcid": "https://orcid.org/0000-0002-3648-7469",
+            "idhal": "",
+            "hal": "https://hal.science/search/index/q/*/authIdPerson_i/1552100",
+            "scholar": "",
+            "cairn": "https://shs.cairn.info/publications-de-michael-viegas-pires--747576?lang=fr"
+      },
+      {
+            "nom": "Milie Theodora Miere",
+            "idref": "https://www.idref.fr/071523995",
+            "orcid": "",
+            "idhal": "",
+            "hal": "https://hal.science/search/index/q/*/authIdFormPerson_s/1376048-0",
+            "scholar": "",
+            "cairn": "https://shs.cairn.info/publications-de-milie-theodora-miere--835229?lang=fr"
+      },
+      {
+            "nom": "Mourad Attarca",
+            "idref": "https://www.idref.fr/123688523",
+            "orcid": "",
+            "idhal": "",
+            "hal": "https://hal.science/search/index/q/*/authIdPerson_i/1402374",
+            "scholar": "",
+            "cairn": "https://droit.cairn.info/publications-de-mourad-attarca--62402?lang=fr"
+      },
+      {
+            "nom": "Philippe Accard",
+            "idref": "https://www.idref.fr/060246219",
+            "orcid": "https://orcid.org/0000-0003-3595-0885",
+            "idhal": "philippe-accard",
+            "hal": "https://hal.science/search/index/q/*/authIdPerson_i/1078708",
+            "scholar": "",
+            "cairn": "https://droit.cairn.info/publications-de-philippe-accard--16978?lang=fr"
+      },
+      {
+            "nom": "Inès Elena Gabarret",
+            "idref": "https://www.idref.fr/146523431",
+            "orcid": "https://orcid.org/0000-0002-5514-2060",
+            "idhal": "",
+            "hal": "https://hal.science/search/index/q/*/authIdPerson_i/1401915",
+            "scholar": "https://scholar.google.fr/citations?user=nZ_cJXAAAAAJ&hl=fr&oi=ao",
+            "cairn": "https://droit.cairn.info/publications-de-ines-gabarret--92475?lang=fr"
+      },
+      {
+            "nom": "Jihane Sebai",
+            "idref": "https://www.idref.fr/114471703",
+            "orcid": "https://orcid.org/0009-0005-0010-4605",
+            "idhal": "",
+            "hal": "https://hal.science/search/index/q/*/authIdPerson_i/1161203",
+            "scholar": "",
+            "cairn": "https://shs.cairn.info/publications-de-jihane-sebai--16955?lang=fr"
+      },
+      {
+            "nom": "Karim Saïd",
+            "idref": "https://www.idref.fr/054055741",
+            "orcid": "",
+            "idhal": "",
+            "hal": "https://hal.science/search/index/q/*/authIdPerson_i/1058582",
+            "scholar": "",
+            "cairn": "https://shs.cairn.info/publications-de-karim-said--60278?lang=fr"
+      },
+      {
+            "nom": "Khalil Ait Said",
+            "idref": "https://www.idref.fr/183581482",
+            "orcid": "https://orcid.org/0000-0003-0924-0636",
+            "idhal": "khalil-ait-said",
+            "hal": "https://hal.science/search/index/q/*/authIdPerson_i/1670866",
+            "scholar": "https://scholar.google.fr/citations?user=Pnx7yt4AAAAJ",
+            "cairn": "https://droit.cairn.info/publications-de-khalil-ait-said--716865?lang=fr"
+      },
+      {
+            "nom": "Lydie-Marie Lavoisier",
+            "idref": "https://www.idref.fr/169361632",
+            "orcid": "",
+            "idhal": "",
+            "hal": "https://hal.science/search/index/q/*/authIdFormPerson_s/2855658-0",
+            "scholar": "",
+            "cairn": ""
+      },
+      {
+            "nom": "Marcella Costin",
+            "idref": "",
+            "orcid": "",
+            "idhal": "",
+            "hal": "https://hal.science/search/index/q/*/authIdFormPerson_s/3195177-0",
+            "scholar": "",
+            "cairn": ""
+      },
+      {
+            "nom": "Sara Zirari",
+            "idref": "https://www.idref.fr/277271118",
+            "orcid": "",
+            "idhal": "",
+            "hal": "https://hal.science/search/index/q/*/authIdFormPerson_s/3044297-0",
+            "scholar": "",
+            "cairn": "https://shs.cairn.info/publications-de-sara-zirari--899088?lang=fr"
+      },
+      {
+            "nom": "Stela Raytcheva",
+            "idref": "https://www.idref.fr/084147229",
+            "orcid": "https://orcid.org/0000-0002-4712-8250",
+            "idhal": "",
+            "hal": "https://hal.science/search/index/q/*/authIdPerson_i/1305718",
+            "scholar": "https://scholar.google.com/citations?user=7ztC2hYAAAAJ&hl=fr&oi=ao",
+            "cairn": "https://shs.cairn.info/publications-de-stela-raytcheva--100014?lang=fr"
+      },
+      {
+            "nom": "Sylvain Mbongui-Kialo",
+            "idref": "https://www.idref.fr/177238771",
+            "orcid": "https://orcid.org/0000-0002-6733-0026",
+            "idhal": "sylvain-mbongui-kialo",
+            "hal": "https://hal.science/search/index/q/*/authIdPerson_i/1281243",
+            "scholar": "",
+            "cairn": "https://shs.cairn.info/publications-de-sylvain-mbongui-kialo--104506?lang=fr"
+      },
+      {
+            "nom": "Thierry Come",
+            "idref": "https://www.idref.fr/031837859",
+            "orcid": "https://orcid.org/0009-0006-6037-1622",
+            "idhal": "",
+            "hal": "https://hal.science/search/index/q/*/authIdFormPerson_s/996607-0",
+            "scholar": "",
+            "cairn": "https://droit.cairn.info/publications-de-thierry-come--79413?lang=fr"
+      },
+      {
+            "nom": "Younes El Manzani",
+            "idref": "https://www.idref.fr/240645898",
+            "orcid": "https://orcid.org/0000-0002-4529-9953",
+            "idhal": "younes-el-manzani",
+            "hal": "https://cv.hal.science/younes-el-manzani",
+            "scholar": "https://scholar.google.fr/citations?user=RjKG8bgAAAAJ&hl=fr&oi=ao",
+            "cairn": "https://droit.cairn.info/publications-de-younes-el-manzani--684435?lang=fr"
+      },
+      {
+            "nom": "Zorana Jerinic-Ivic",
+            "idref": "https://www.idref.fr/234159480",
+            "orcid": "",
+            "idhal": "",
+            "hal": "https://hal.science/search/index/q/*/authIdPerson_i/1281645",
+            "scholar": "https://scholar.google.com/citations?user=IPWhDUMAAAAJ&hl=fr&oi=ao",
+            "cairn": "https://droit.cairn.info/publications-de-zorana-jerinic--706000?lang=fr"
+      },
+      {
+            "nom": "Philippe Hermel",
+            "idref": "https://www.idref.fr/028809750",
+            "orcid": "",
+            "idhal": "",
+            "hal": "https://hal.science/search/index/q/*/authIdPerson_i/1305937",
+            "scholar": "",
+            "cairn": "https://shs.cairn.info/publications-de-philippe-hermel--82157?lang=fr"
+      },
+      {
+            "nom": "Sana Kharrat",
+            "idref": "https://www.idref.fr/22018013X",
+            "orcid": "",
+            "idhal": "",
+            "hal": "https://hal.science/search/index/q/*/authIdFormPerson_s/3017609-0",
+            "scholar": "",
+            "cairn": ""
+      }
+];
+
+
     function norm(s){
       return (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    }
+
+
+
+    function renderResearcherSearch(){
+      const input = $('researcherQ');
+      const box = $('researcherResults');
+      if (!input || !box) return;
+
+      const query = norm(input.value).trim();
+      if (query.length < 2){
+        box.innerHTML = '<div class="researcher-empty">Tapez au moins deux caractères pour lancer la recherche.</div>';
+        return;
+      }
+
+      const tokens = query.split(/\s+/).filter(Boolean);
+      const matches = CHERCHEURS
+        .map(ch => {
+          const hay = norm([ch.nom, ch.idhal, ch.idref, ch.orcid, ch.hal].filter(Boolean).join(' '));
+          const score = tokens.reduce((acc, token) => acc + (hay.includes(token) ? 1 : 0), 0);
+          return { ch, score };
+        })
+        .filter(x => x.score === tokens.length)
+        .sort((a,b) => a.ch.nom.localeCompare(b.ch.nom, 'fr'))
+        .slice(0, 8)
+        .map(x => x.ch);
+
+      if (!matches.length){
+        box.innerHTML = '<div class="researcher-empty">Aucun chercheur trouvé pour cette recherche.</div>';
+        return;
+      }
+
+      box.innerHTML = matches.map(renderResearcherCard).join('');
+    }
+
+    function renderResearcherCard(ch){
+      return `
+        <div class="researcher-card">
+          <div class="researcher-name">${escapeHtml(ch.nom)}</div>
+          ${researcherLine('IDREF', ch.idref)}
+          ${researcherLine('ORCID', ch.orcid)}
+          ${researcherLine('IDHAL', ch.idhal)}
+          ${researcherLine('HAL', ch.hal)}
+        </div>
+      `;
+    }
+
+    function researcherLine(label, value){
+      const v = String(value || '').trim();
+      const htmlValue = v
+        ? (isUrl(v) ? `<a href="${escapeHtml(v)}" target="_blank" rel="noopener noreferrer">${escapeHtml(v)}</a>` : escapeHtml(v))
+        : '<span class="muted">Pas d’information</span>';
+      return `<div class="researcher-line"><span class="researcher-label">${escapeHtml(label)}</span><span class="researcher-value">${htmlValue}</span></div>`;
+    }
+
+    function isUrl(v){
+      return /^https?:\/\//i.test(String(v || ''));
     }
 
     function typeLabel(t){
@@ -1088,6 +1505,15 @@
       $('filterAxis').value = 'all';
       $('filterYear').value = 'all';
       render();
+    });
+
+
+
+    if ($('researcherQ')) $('researcherQ').addEventListener('input', renderResearcherSearch);
+    if ($('researcherClear')) $('researcherClear').addEventListener('click', () => {
+      $('researcherQ').value = '';
+      renderResearcherSearch();
+      $('researcherQ').focus();
     });
 
     $('refresh').addEventListener('click', load);
