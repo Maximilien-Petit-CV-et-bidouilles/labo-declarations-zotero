@@ -1098,7 +1098,7 @@
       const tokens = query.split(/\s+/).filter(Boolean);
       const matches = CHERCHEURS
         .map(ch => {
-          const hay = norm([ch.nom, ch.idhal, ch.idref, ch.orcid, ch.hal].filter(Boolean).join(' '));
+          const hay = norm([ch.nom, ch.idhal, ch.idref, ch.orcid, ch.hal, ch.cairn, ch.scholar].filter(Boolean).join(' '));
           const score = tokens.reduce((acc, token) => acc + (hay.includes(token) ? 1 : 0), 0);
           return { ch, score };
         })
@@ -1123,6 +1123,8 @@
           ${researcherLine('ORCID', ch.orcid)}
           ${researcherLine('IDHAL', ch.idhal)}
           ${researcherLine('HAL', ch.hal)}
+          ${researcherLine('Page CAIRN', ch.cairn)}
+          ${researcherLine('CV Google Scholar', ch.scholar)}
         </div>
       `;
     }
